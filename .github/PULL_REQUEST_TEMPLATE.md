@@ -1,5 +1,9 @@
 <!-- PR 제목 형식: [TMT-이슈번호] type: 설명   예) [TMT-50] feat: 그룹 가입 API 추가 -->
 
+## Related Issue
+
+- [TMT-](https://ttalkkak.atlassian.net/browse/TMT-)
+
 ## Why
 
 <!-- 이 변경의 배경/목적 -->
@@ -11,10 +15,6 @@
 ## How
 
 <!-- 구현 방법 -->
-
-## Related Issue
-
-- [TMT-](https://ttalkkak.atlassian.net/browse/TMT-)
 
 ## Prompt Log
 
