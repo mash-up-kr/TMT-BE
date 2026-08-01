@@ -1,0 +1,12 @@
+server:
+  servlet:
+    context-path: /api
+
+springdoc:
+  packages-to-scan: com.tmt.input.http
+  swagger-ui:
+    path: /api-docs
+    operations-sorter: alpha
+  api-docs:
+    groups:
+      enabled: true
