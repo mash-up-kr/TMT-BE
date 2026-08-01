@@ -19,7 +19,7 @@ kotlin-lint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktLintPlugi
 # Kotlin
 kotlin-jackson = { group = "tools.jackson.module", name = "jackson-module-kotlin" }
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect" }
-kotlin-logging = { group = "io.github.microutils", name = "kotlin-logging-jvm", version = "3.0.5" }
+kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging-jvm", version = "8.0.4" }
 
 # Spring
 spring-transaction = { group = "org.springframework", name = "spring-tx" }
@@ -43,13 +43,13 @@ spring-boot-annotation-processor = { group = "org.springframework.boot", name = 
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
 kotlin-junit5 = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit5" }
 junit = { group = "org.junit.platform", name = "junit-platform-launcher" }
-mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.4.0" }
+mockk = { group = "io.mockk", name = "mockk", version = "1.14.11" }
 
 [bundles]
 # 공통 (convention에서 사용)
 spring-common = ["spring-boot-starter-autoconfigure"]
 kotlin-spring = ["kotlin-reflect", "kotlin-jackson", "kotlin-logging"]
-test-implementation = ["spring-boot-starter-test", "kotlin-junit5", "mockito-kotlin"]
+test-implementation = ["spring-boot-starter-test", "kotlin-junit5", "mockk"]
 test-runtime = ["junit"]
 
 # 모듈별
