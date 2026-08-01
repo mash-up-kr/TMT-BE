@@ -5,11 +5,11 @@
 
 | 분류 | 기술 |
 |------|------|
-| Language | Kotlin 2.0, JDK 21 |
-| Framework | Spring Boot 3.3 |
+| Language | Kotlin 2.3, JDK 21 |
+| Framework | Spring Boot 4.1 |
 | ORM / Query | JPA, QueryDSL |
-| Database | PostgreSQL 17 |
-| Build | Gradle 8.8 (buildSrc convention plugin + version catalog), ktlint |
+| Database | PostgreSQL 17 (PostGIS) |
+| Build | Gradle 9.5 (buildSrc convention plugin + version catalog), ktlint |
 | Infra | Docker, GitHub Actions (CI/CD) |
 
 ---
