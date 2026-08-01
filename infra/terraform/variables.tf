@@ -137,3 +137,24 @@ variable "postgres_user" {
   type        = string
   default     = "tmt"
 }
+
+variable "backup_bucket_name" {
+  description = "pg_dump 보관 S3 버킷. 이름은 전역 유니크여야 한다"
+  type        = string
+  default     = "tmt-db-backup"
+}
+
+variable "backup_retention_days" {
+  description = "덤프 보관 일수. 지나면 S3 lifecycle이 지운다"
+  type        = number
+  default     = 30
+}
+
+variable "backup_schedule" {
+  description = <<-EOT
+    systemd OnCalendar 형식의 백업 주기. 기본은 매일 UTC 18:00 = KST 03:00.
+    인스턴스 타임존이 UTC라 KST 기준으로 적으면 안 된다.
+  EOT
+  type        = string
+  default     = "*-*-* 18:00:00"
+}

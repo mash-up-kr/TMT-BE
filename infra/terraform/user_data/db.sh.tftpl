@@ -79,3 +79,68 @@ docker run -d \
 
 # pgvector는 PostGIS 이미지에 들어있지 않을 수 있다. 확장 생성은 애플리케이션
 # 마이그레이션(Flyway 등)에서 CREATE EXTENSION으로 처리한다 — TMT-61에서 확정.
+
+# --- 백업 ---
+# RDS 자동 스냅샷이 없으므로 pg_dump를 직접 돌린다. EBS 분리(prevent_destroy)는
+# 인스턴스 교체를 견디게 해줄 뿐, 볼륨 자체가 깨지거나 데이터를 잘못 지운 경우는
+# 못 막는다. 그 경우의 유일한 복구 수단이 이 덤프다.
+cat > /usr/local/bin/tmt-pg-backup.sh <<'EOS'
+#!/bin/bash
+set -euo pipefail
+
+BUCKET="${backup_bucket}"
+REGION="${region}"
+DB="${postgres_db}"
+DBUSER="${postgres_user}"
+
+if ! docker inspect -f '{{.State.Running}}' postgres 2>/dev/null | grep -q true; then
+  echo "postgres container is not running — skipping backup" >&2
+  exit 1
+fi
+
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+PREFIX="pg/$(date -u +%Y/%m)"
+OUT="/var/tmp/tmt-$TS.dump"
+trap 'rm -f "$OUT"' EXIT
+
+# -Fc: custom format. pg_restore로 선택 복구가 되고 자체 압축된다.
+# 비밀번호는 컨테이너에 이미 마운트된 파일에서 읽는다 — 호스트 프로세스 목록에 남기지 않는다.
+docker exec postgres bash -c "PGPASSWORD=\$(cat /run/secrets/db_password) pg_dump -U $DBUSER -d $DB -Fc" > "$OUT"
+
+# 0바이트 덤프를 올려놓고 백업이 됐다고 착각하는 게 최악이다.
+if [ ! -s "$OUT" ]; then
+  echo "dump is empty — aborting" >&2
+  exit 1
+fi
+
+aws s3 cp "$OUT" "s3://$BUCKET/$PREFIX/tmt-$TS.dump" --region "$REGION"
+echo "uploaded s3://$BUCKET/$PREFIX/tmt-$TS.dump ($(stat -c %s "$OUT") bytes)"
+EOS
+chmod 750 /usr/local/bin/tmt-pg-backup.sh
+
+cat > /etc/systemd/system/tmt-pg-backup.service <<'EOS'
+[Unit]
+Description=TMT PostgreSQL dump to S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tmt-pg-backup.sh
+EOS
+
+cat > /etc/systemd/system/tmt-pg-backup.timer <<'EOS'
+[Unit]
+Description=TMT PostgreSQL backup schedule
+
+[Timer]
+OnCalendar=${backup_schedule}
+# 인스턴스가 꺼져 있어 놓친 실행을 부팅 후 따라잡는다
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOS
+
+systemctl daemon-reload
+systemctl enable --now tmt-pg-backup.timer
