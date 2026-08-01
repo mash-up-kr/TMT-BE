@@ -1,0 +1,7 @@
+springdoc:
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.mashup.tmt: INFO
