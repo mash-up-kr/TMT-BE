@@ -1,9 +1,9 @@
 [versions]
-springBoot = "3.3.0"
-springDependencyManagement = "1.1.5"
-kotlinPlugin = "2.0.0"
+springBoot = "4.1.0"
+springDependencyManagement = "1.1.7"
+kotlinPlugin = "2.3.21"
 querydsl = "5.1.0"
-ktLintPlugin = "12.1.1"
+ktLintPlugin = "14.2.0"
 javaVersion = "21"
 
 [plugins]
@@ -17,7 +17,7 @@ kotlin-lint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktLintPlugi
 
 [libraries]
 # Kotlin
-kotlin-jackson = { group = "com.fasterxml.jackson.module", name = "jackson-module-kotlin" }
+kotlin-jackson = { group = "tools.jackson.module", name = "jackson-module-kotlin" }
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect" }
 kotlin-logging = { group = "io.github.microutils", name = "kotlin-logging-jvm", version = "3.0.5" }
 
@@ -25,11 +25,11 @@ kotlin-logging = { group = "io.github.microutils", name = "kotlin-logging-jvm", 
 spring-transaction = { group = "org.springframework", name = "spring-tx" }
 
 spring-boot-starter-autoconfigure = { group = "org.springframework.boot", name = "spring-boot-autoconfigure" }
-spring-boot-starter-web = { group = "org.springframework.boot", name = "spring-boot-starter-web" }
+spring-boot-starter-web = { group = "org.springframework.boot", name = "spring-boot-starter-webmvc" }
 spring-boot-starter-actuator = { group = "org.springframework.boot", name = "spring-boot-starter-actuator" }
 spring-boot-starter-validation = { group = "org.springframework.boot", name = "spring-boot-starter-validation" }
 spring-boot-starter-jpa = { group = "org.springframework.boot", name = "spring-boot-starter-data-jpa" }
-spring-boot-docs = { group = "org.springdoc", name = "springdoc-openapi-starter-webmvc-ui", version = "2.5.0" }
+spring-boot-docs = { group = "org.springdoc", name = "springdoc-openapi-starter-webmvc-ui", version = "3.0.3" }
 
 # QueryDSL
 querydsl-jpa = { group = "com.querydsl", name = "querydsl-jpa", version.ref = "querydsl" }

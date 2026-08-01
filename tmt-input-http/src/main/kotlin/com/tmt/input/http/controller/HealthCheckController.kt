@@ -39,17 +39,14 @@ class HealthCheckController(
     }
 
     @PostMapping("/error-test-global")
-    fun errorTestGlobal() {
-        throw RuntimeException()
-    }
+    fun errorTestGlobal(): Nothing = throw RuntimeException()
 
     @PostMapping("/error-test-tmt")
-    fun errorTestTmt() {
+    fun errorTestTmt(): Nothing =
         throw TmtException(
             ExceptionCode.INTERNAL_ERROR_TEST,
             "error-test: 의도적으로 발생시킨 TmtException",
         )
-    }
 
     data class HealthResponse(
         val status: String,
