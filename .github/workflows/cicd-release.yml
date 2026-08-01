@@ -1,0 +1,170 @@
+# 릴리즈 태그(vX.Y.Z) 발행 시 자동 배포 (docs/BRANCHING.md §5)
+#
+# 필요한 Repository secrets:
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY : ECR push 권한 IAM
+#   ECR_REGISTRY                              : 예) 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
+#   SERVER_HOST / SERVER_KEY                  : 배포 대상 EC2 호스트, SSH 프라이빗 키
+#   POSTGRES_PASSWORD                         : prod PostgreSQL 비밀번호
+#   DISCORD_WEBHOOK_RELEASE_URL               : (선택) 배포 알림 웹훅 — 없으면 알림 스킵
+name: CI/CD
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECR_REPOSITORY: tmt
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository 접근
+        uses: actions/checkout@v4
+
+      - name: JDK 21 셋팅
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Gradle 의존성 캐싱
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: JAR 빌드
+        run: ./gradlew :tmt-bootstrap:bootJar
+
+      - name: AWS 자격 증명 설정
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECR 로그인
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker 이미지 빌드 및 푸시
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: 배포 파일 EC2에 전송
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SERVER_KEY }}
+          source: "docker/docker-compose.postgres.yml,docker/docker-compose.prod.yml"
+          target: "~/tmt/"
+          strip_components: 0
+          overwrite: true
+
+      - name: EC2 파일 정리 및 배포
+        uses: appleboy/ssh-action@master
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SERVER_KEY }}
+          envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,POSTGRES_PASSWORD
+          script: |
+            set -e
+
+            DEPLOY_DIR=~/tmt
+
+            # Docker Compose 플러그인 설치 (없으면)
+            if ! docker compose version > /dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            fi
+
+            # ECR 로그인
+            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+            # SCP로 전송된 파일 정리 (strip_components=0이라 docker/ 폴더 안에 들어감)
+            mkdir -p $DEPLOY_DIR
+            mv -f $DEPLOY_DIR/docker/docker-compose.postgres.yml $DEPLOY_DIR/docker-compose.postgres.yml 2>/dev/null || true
+            mv -f $DEPLOY_DIR/docker/docker-compose.prod.yml $DEPLOY_DIR/docker-compose.prod.yml 2>/dev/null || true
+            rmdir $DEPLOY_DIR/docker 2>/dev/null || true
+
+            # .env 파일 생성
+            echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" > $DEPLOY_DIR/.env
+            echo "ECR_REGISTRY=${ECR_REGISTRY}" >> $DEPLOY_DIR/.env
+            echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> $DEPLOY_DIR/.env
+            chmod 600 $DEPLOY_DIR/.env
+
+            cd $DEPLOY_DIR
+
+            # PostgreSQL: 이미 실행 중이면 skip (데이터 볼륨 보존)
+            if docker ps --format '{{.Names}}' | grep -q '^tmt-postgres$'; then
+              echo ">>> tmt-postgres 이미 실행 중 → 스킵"
+            else
+              echo ">>> tmt-postgres 신규 기동"
+              docker compose -f docker-compose.postgres.yml up -d
+            fi
+
+            # 네트워크 보장 (없으면 생성)
+            docker network create tmt-network 2>/dev/null || true
+
+            # 기존 app 컨테이너 정리 (docker run으로 만든 잔여 컨테이너)
+            docker stop tmt-app 2>/dev/null || true
+            docker rm tmt-app 2>/dev/null || true
+
+            # App: 매 배포마다 재기동
+            docker compose -f docker-compose.prod.yml pull app
+            docker compose -f docker-compose.prod.yml up -d --force-recreate
+            docker image prune -f
+
+            echo ">>> 배포 완료"
+            docker ps
+
+      - name: 디스코드 배포 알림
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_RELEASE_URL }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_RELEASE_URL 미설정 → 알림 스킵"
+            exit 0
+          fi
+          payload=$(jq -n \
+            --arg content "@everyone\n🚀 또맛또(TMT) 백엔드 배포 완료" \
+            --arg tag "$RELEASE_TAG" \
+            --arg name "$RELEASE_NAME" \
+            --arg body "$RELEASE_BODY" \
+            '{
+              content: $content,
+              allowed_mentions: { parse: ["everyone"] },
+              embeds: [
+                {
+                  title: ($name + " (" + $tag + ")"),
+                  description: $body,
+                  color: 5814783
+                }
+              ]
+            }')
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
