@@ -1,0 +1,54 @@
+name: PR 자동 배정
+
+# PR이 열리면 리뷰어(팀 전원)와 담당자(작성자)를 자동 배정한다.
+# - Draft는 건너뛰고, Ready for review로 전환될 때 배정한다.
+# - 리뷰어에서 작성자는 제외한다 (GitHub이 작성자 본인의 리뷰 요청을 거부한다).
+# - 담당자는 작성자 1인 — "이 PR을 책임지는 사람"으로 쓴다.
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  assign:
+    name: 리뷰어·담당자 배정
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const TEAM = ['toychip', 'mingdodev', 'wnsvy607']
+
+            const { owner, repo } = context.repo
+            const pr = context.payload.pull_request
+            const author = pr.user.login
+
+            const reviewers = TEAM.filter((login) => login !== author)
+            if (reviewers.length > 0) {
+              try {
+                await github.rest.pulls.requestReviewers({
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  reviewers,
+                })
+                core.info(`리뷰어 배정: ${reviewers.join(', ')}`)
+              } catch (error) {
+                core.warning(`리뷰어 배정 실패 — ${error.message}`)
+              }
+            }
+
+            try {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: pr.number,
+                assignees: [author],
+              })
+              core.info(`담당자 배정: ${author}`)
+            } catch (error) {
+              core.warning(`담당자 배정 실패 — ${error.message}`)
+            }
