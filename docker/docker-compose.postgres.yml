@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:17
+    image: postgis/postgis:17-3.5
+    # postgis 공식 이미지는 arm64 미제공 — Apple Silicon 로컬은 에뮬레이션으로 실행 (운영 EC2는 amd64 네이티브)
+    platform: linux/amd64
     container_name: tmt-postgres
     restart: unless-stopped
     environment:
