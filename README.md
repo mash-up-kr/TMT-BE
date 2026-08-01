@@ -8,9 +8,9 @@
 | Language | Kotlin 2.0, JDK 21 |
 | Framework | Spring Boot 3.3 |
 | ORM / Query | JPA, QueryDSL |
-| Database | MySQL 8.4 |
+| Database | PostgreSQL 17 |
 | Build | Gradle 8.8 (buildSrc convention plugin + version catalog), ktlint |
-| Infra | Docker |
+| Infra | Docker, GitHub Actions (CI/CD) |
 
 ---
 
@@ -26,7 +26,7 @@ tmt-bootstrap                 ← Spring Boot 진입점, DI 조립 (모든 모�
 │   ├── port/input/           ← UseCase 인터페이스
 │   └── port/output/          ← Output Port 인터페이스
 │
-├── tmt-output-persistence    ← MySQL JPA + QueryDSL 어댑터
+├── tmt-output-persistence    ← PostgreSQL JPA + QueryDSL 어댑터
 └── tmt-common                ← 공통 예외 (TmtException, ExceptionCode)
 ```
 
@@ -37,8 +37,8 @@ tmt-bootstrap                 ← Spring Boot 진입점, DI 조립 (모든 모�
 ## Getting Started
 
 ```bash
-# 1. 개발용 MySQL 기동 (호스트 포트 3307 — 로컬 3306 MySQL과 충돌 방지)
-docker compose -f docker/docker-compose.mysql.yml up -d
+# 1. 개발용 PostgreSQL 기동
+docker compose -f docker/docker-compose.postgres.yml up -d
 
 # 2. 애플리케이션 실행 (기본 프로필: dev)
 ./gradlew :tmt-bootstrap:bootRun
@@ -55,3 +55,14 @@ docker compose -f docker/docker-compose.mysql.yml up -d
 # 빌드 + 테스트 + ktlint
 ./gradlew build
 ```
+
+## CI/CD
+
+| 워크플로 | 트리거 | 동작 |
+|----------|--------|------|
+| `ci-pull-request.yml` | main 대상 PR | ktlintCheck + test (PR 코멘트 `빌드검증` 입력 시 전체 빌드 후 결과 코멘트) |
+| `ci-push.yml` | main push | 전체 빌드 |
+| `cicd-release.yml` | GitHub Release 발행 (vX.Y.Z) | bootJar → Docker 이미지 ECR push → EC2 SSH 배포 → 디스코드 알림 |
+
+배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포, [docs/BRANCHING.md](docs/BRANCHING.md) §5).
+릴리즈 배포에 필요한 Repository secrets는 [cicd-release.yml](.github/workflows/cicd-release.yml) 상단 주석 참고.
