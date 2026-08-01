@@ -95,7 +95,7 @@ PR squash merge → main → 릴리즈 태그 생성 (vX.Y.Z) → CI가 태그 �
 - 태그 형식: `v<major>.<minor>.<patch>` (semver) — GitHub Release로 생성
 - main은 항상 배포 가능 상태를 유지하되, **실제 배포 타이밍은 태그로 통제**한다 — 여러 PR을 모아 한 번에 릴리즈 가능
 - 릴리즈 노트: GitHub Release의 자동 생성(Generate release notes) 사용 — squash merge 덕에 PR 단위로 깔끔하게 정리됨
-- 배포 CI 구성·롤백 절차 상세는 릴리즈 가이드(TMT-62)에서 문서화
+- 배포 CI 구성·롤백 절차 상세는 [릴리즈 가이드](RELEASE.md) 참고 (TMT-62)
 
 ## 6. Jira 상태 전환 (본인이 직접)
 

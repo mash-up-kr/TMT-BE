@@ -64,5 +64,4 @@ docker compose -f docker/docker-compose.postgres.yml up -d
 | `ci-push.yml` | main push | 전체 빌드 |
 | `cicd-release.yml` | GitHub Release 발행 (vX.Y.Z) | bootJar → Docker 이미지 ECR push → EC2 SSH 배포 → 디스코드 알림 |
 
-배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포, [docs/BRANCHING.md](docs/BRANCHING.md) §5).
-릴리즈 배포에 필요한 Repository secrets는 [cicd-release.yml](.github/workflows/cicd-release.yml) 상단 주석 참고.
+**배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포).** 릴리즈 발행 절차·버전 규칙·롤백은 [docs/RELEASE.md](docs/RELEASE.md), 브랜치·머지 규칙은 [docs/BRANCHING.md](docs/BRANCHING.md) 참고.
