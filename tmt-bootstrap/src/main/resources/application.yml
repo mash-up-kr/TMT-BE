@@ -7,7 +7,7 @@ spring:
       - classpath:application-http.yml
 
   jpa:
-    open-in-view: false
+    open-in-view: true
     properties:
       hibernate:
         format_sql: true
