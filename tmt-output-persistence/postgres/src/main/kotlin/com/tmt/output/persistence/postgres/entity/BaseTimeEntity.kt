@@ -1,4 +1,4 @@
-package com.tmt.output.persistence.mysql.entity
+package com.tmt.output.persistence.postgres.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.EntityListeners

@@ -1,4 +1,4 @@
-package com.tmt.output.persistence.mysql.adapter
+package com.tmt.output.persistence.postgres.adapter
 
 import com.tmt.application.port.output.persistence.DatabaseHealthCheckPort
 import org.springframework.stereotype.Component

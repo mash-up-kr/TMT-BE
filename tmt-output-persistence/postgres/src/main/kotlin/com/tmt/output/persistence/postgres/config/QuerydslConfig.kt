@@ -1,4 +1,4 @@
-package com.tmt.output.persistence.mysql.config
+package com.tmt.output.persistence.postgres.config
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import jakarta.persistence.EntityManager

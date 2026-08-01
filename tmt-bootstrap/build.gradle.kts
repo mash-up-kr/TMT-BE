@@ -5,7 +5,7 @@ plugins {
 dependencies {
     implementation(project(":tmt-application"))
     implementation(project(":tmt-input-http"))
-    implementation(project(":tmt-output-persistence:mysql"))
+    implementation(project(":tmt-output-persistence:postgres"))
 
     implementation(libs.bundles.bootstrap)
 }

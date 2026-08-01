@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":tmt-application"))
-    implementation(libs.bundles.adaptor.persistence.mysql)
+    implementation(libs.bundles.adaptor.persistence.postgres)
 
     // QueryDSL (Jakarta)
     implementation(variantOf(libs.querydsl.jpa) { classifier("jakarta") })

@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: tmt-postgres
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Seoul
+      - POSTGRES_DB=tmt
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-12345678}
+    command: postgres -c timezone=Asia/Seoul
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - tmt-network
+
+volumes:
+  postgres-data:
+
+networks:
+  tmt-network:
+    name: tmt-network
+    driver: bridge

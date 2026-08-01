@@ -35,8 +35,8 @@ spring-boot-docs = { group = "org.springdoc", name = "springdoc-openapi-starter-
 querydsl-jpa = { group = "com.querydsl", name = "querydsl-jpa", version.ref = "querydsl" }
 querydsl-apt = { group = "com.querydsl", name = "querydsl-apt", version.ref = "querydsl" }
 
-# MySQL
-mysql = { group = "com.mysql", name = "mysql-connector-j" }
+# PostgreSQL
+postgresql = { group = "org.postgresql", name = "postgresql" }
 
 # Test
 spring-boot-annotation-processor = { group = "org.springframework.boot", name = "spring-boot-configuration-processor" }
@@ -56,4 +56,4 @@ test-runtime = ["junit"]
 bootstrap = ["spring-boot-starter-web", "spring-boot-starter-actuator"]
 domain-application = ["spring-transaction"]
 adaptor-input-http = ["spring-boot-starter-web", "spring-boot-docs", "spring-boot-starter-validation"]
-adaptor-persistence-mysql = ["spring-boot-starter-jpa", "mysql"]
+adaptor-persistence-postgres = ["spring-boot-starter-jpa", "postgresql"]
