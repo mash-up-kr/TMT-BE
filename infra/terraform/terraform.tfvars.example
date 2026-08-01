@@ -1,0 +1,18 @@
+# cp terraform.tfvars.example terraform.tfvars 후 채운다.
+# terraform.tfvars 는 .gitignore 대상 — 커밋하지 않는다.
+
+# 필수: EC2에 등록할 SSH 공개키
+ssh_public_key = "ssh-ed25519 AAAAC3Nza... team@tmt"
+
+# 비상용 SSH 허용 대역. 기본값은 빈 목록(전면 차단)이고,
+# 평상시 접속은 SSM Session Manager를 쓴다:
+#   aws ssm start-session --target i-xxxxxxxx
+# ssh_allowed_cidrs = ["203.0.113.10/32"]
+
+# 앱 포트 공개 범위. 도그푸딩 중 외부 공개가 필요 없으면 팀 IP로 좁힌다.
+# app_ingress_cidrs = ["203.0.113.10/32"]
+
+# region            = "ap-northeast-2"
+# az                = "ap-northeast-2a"
+# was_instance_type = "t3.small"
+# db_instance_type  = "t3.small"
