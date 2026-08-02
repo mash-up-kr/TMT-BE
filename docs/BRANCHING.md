@@ -79,7 +79,7 @@ fix: 리뷰 3개 미만 조회 시 NPE 수정
 | 항목 | 규칙 |
 |---|---|
 | 방식 | **Squash merge** — main 히스토리 = PR 단위 |
-| PR 제목 | `[TMT-50] 그룹 가입 API` (squash 커밋 메시지로 사용됨) |
+| PR 제목 | `[TMT-50] feat: 그룹 가입 API` (squash 커밋 메시지로 사용됨) |
 | 조건 | **최소 1명 approve** + CI(빌드·테스트) 통과 |
 | 리뷰 부재 시 | **리뷰 요청 후 48시간 내 리뷰가 없으면 머지 가능** (CI 통과 전제, 사후 리뷰 환영) |
 | 머지 후 | 작업 브랜치 삭제 (자동 삭제 설정) |
@@ -95,7 +95,7 @@ PR squash merge → main → 릴리즈 태그 생성 (vX.Y.Z) → CI가 태그 �
 - 태그 형식: `v<major>.<minor>.<patch>` (semver) — GitHub Release로 생성
 - main은 항상 배포 가능 상태를 유지하되, **실제 배포 타이밍은 태그로 통제**한다 — 여러 PR을 모아 한 번에 릴리즈 가능
 - 릴리즈 노트: GitHub Release의 자동 생성(Generate release notes) 사용 — squash merge 덕에 PR 단위로 깔끔하게 정리됨
-- 배포 CI 구성·롤백 절차 상세는 릴리즈 가이드(TMT-62)에서 문서화
+- 배포 CI 구성·롤백 절차 상세는 [릴리즈 가이드](RELEASE.md) 참고 (TMT-62)
 
 ## 6. Jira 상태 전환 (본인이 직접)
 

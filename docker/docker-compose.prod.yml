@@ -1,0 +1,22 @@
+services:
+  app:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY:-tmt}:latest
+    container_name: tmt-app
+    restart: unless-stopped
+    # nginx 등 리버스 프록시 도입 전까지는 호스트로 직접 노출
+    ports:
+      - "8080:8080"
+    mem_limit: 1280m
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TZ=Asia/Seoul
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - tmt-network
+
+networks:
+  tmt-network:
+    name: tmt-network
+    external: true
