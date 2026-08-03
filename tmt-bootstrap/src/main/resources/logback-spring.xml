@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 콘솔 출력 (패턴 포맷) -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS}|%5p|%-8X{requestId:- }|%-40.40logger{39}|%m%n%wEx</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <!-- dev 프로필 -->
+    <springProfile name="dev">
+        <logger name="com.tmt" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.orm.jdbc.bind" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+
+    <!-- prod 프로필 -->
+    <springProfile name="prod">
+        <logger name="com.tmt" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <root level="INFO">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+</configuration>
