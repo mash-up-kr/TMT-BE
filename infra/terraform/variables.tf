@@ -139,9 +139,12 @@ variable "postgres_user" {
 }
 
 variable "backup_bucket_name" {
-  description = "pg_dump 보관 S3 버킷. 이름은 전역 유니크여야 한다"
+  description = <<-EOT
+    pg_dump 보관 S3 버킷. 이름은 전 계정 공용이라 흔한 이름은 이미 선점되어 있다.
+    충돌하면(CreateBucket이 BucketAlreadyExists) tfvars에서 더 유니크한 이름으로 덮어쓴다.
+  EOT
   type        = string
-  default     = "tmt-db-backup"
+  default     = "ttalkkak-tmt-db-backup"
 }
 
 variable "backup_retention_days" {
