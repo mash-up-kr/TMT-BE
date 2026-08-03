@@ -33,9 +33,16 @@ variable "region" {
 }
 
 variable "bucket_name" {
-  description = "state 버킷 이름. versions.tf 의 backend 설정과 반드시 같아야 한다"
+  description = <<-EOT
+    state 버킷 이름. versions.tf 의 backend 설정과 반드시 같아야 한다.
+
+    S3 버킷 이름은 전 계정 공용이라 흔한 이름은 이미 선점되어 있다
+    (`tmt-terraform-state`는 CreateBucket에서 BucketAlreadyExists로 실패했다).
+    HeadBucket은 권한 없는 기존 버킷에도 404를 주므로 사전 확인 수단이 못 된다 —
+    충돌하면 이 값과 versions.tf 를 함께 더 유니크한 이름으로 바꾼다.
+  EOT
   type        = string
-  default     = "tmt-terraform-state"
+  default     = "ttalkkak-tmt-tfstate"
 }
 
 resource "aws_s3_bucket" "state" {

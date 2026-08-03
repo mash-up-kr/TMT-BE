@@ -17,7 +17,7 @@ terraform {
   #
   # use_lockfile: Terraform 1.10+ 의 S3 네이티브 락. DynamoDB 테이블이 필요 없다.
   backend "s3" {
-    bucket       = "tmt-terraform-state"
+    bucket       = "ttalkkak-tmt-tfstate"
     key          = "prod/infra.tfstate"
     region       = "ap-northeast-2"
     encrypt      = true
