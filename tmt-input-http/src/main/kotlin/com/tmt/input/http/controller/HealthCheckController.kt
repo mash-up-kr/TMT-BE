@@ -1,9 +1,8 @@
 package com.tmt.input.http.controller
 
 import com.tmt.application.port.input.HealthCheckUseCase
-import com.tmt.common.exception.ExceptionCode
+import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import com.tmt.input.http.controller.dto.response.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -17,25 +16,15 @@ class HealthCheckController(
     private val healthCheckUseCase: HealthCheckUseCase,
 ) {
     @GetMapping("/api")
-    fun apiHealth(): ApiResponse<HealthResponse> =
-        ApiResponse.ok(
-            HealthResponse(status = "UP", service = "tmt-api"),
-        )
+    fun apiHealth(): ResponseEntity<HealthResponse> =
+        ResponseEntity.ok(HealthResponse(status = "UP", service = "tmt-api"))
 
     @GetMapping("/db")
-    fun dbHealth(): ResponseEntity<ApiResponse<HealthResponse>> {
+    fun dbHealth(): ResponseEntity<HealthResponse> {
         val isHealthy = healthCheckUseCase.checkDatabaseHealth()
-        val httpStatus = if (isHealthy) HttpStatus.OK else HttpStatus.SERVICE_UNAVAILABLE
-        val healthStatus = if (isHealthy) "UP" else "DOWN"
         return ResponseEntity
-            .status(httpStatus)
-            .body(
-                ApiResponse(
-                    status = httpStatus.value(),
-                    message = httpStatus.reasonPhrase,
-                    data = HealthResponse(status = healthStatus, service = "tmt-db"),
-                ),
-            )
+            .status(if (isHealthy) HttpStatus.OK else HttpStatus.SERVICE_UNAVAILABLE)
+            .body(HealthResponse(status = if (isHealthy) "UP" else "DOWN", service = "tmt-db"))
     }
 
     @PostMapping("/error-test-global")
@@ -44,7 +33,7 @@ class HealthCheckController(
     @PostMapping("/error-test-tmt")
     fun errorTestTmt(): Nothing =
         throw TmtException(
-            ExceptionCode.INTERNAL_ERROR_TEST,
+            ErrorCode.INTERNAL_ERROR_TEST,
             "error-test: 의도적으로 발생시킨 TmtException",
         )
 
