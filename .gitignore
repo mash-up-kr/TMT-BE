@@ -16,6 +16,16 @@ out/
 ### Kotlin ###
 .kotlin
 
+### Java 산출물 · 크래시 로그 ###
+*.class
+*.jar
+!gradle/wrapper/*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+
 ### Eclipse ###
 .apt_generated
 .classpath
@@ -40,9 +50,21 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+Thumbs.db
 
+### 로컬 전용 — 개인 에이전트/MCP 설정 ###
 .claude/**
+.mcp.json
+CLAUDE.local.md
+.serena/
 
-### Secrets ###
+### Secrets — 절대 커밋 금지 (docs/BRANCHING.md §7) ###
 .env
+.env.*
+!.env.example
 *.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
