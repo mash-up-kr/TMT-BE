@@ -10,8 +10,8 @@
         </encoder>
     </appender>
 
-    <!-- dev 프로필 -->
-    <springProfile name="dev">
+    <!-- local 프로필 -->
+    <springProfile name="local">
         <logger name="com.tmt" level="DEBUG"/>
         <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.hibernate.orm.jdbc.bind" level="WARN"/>
