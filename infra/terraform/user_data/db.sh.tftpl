@@ -42,12 +42,26 @@ mkdir -p /mnt/pgdata/data
 # (-e POSTGRES_PASSWORD 로 넘기면 docker inspect에 그대로 남는다)
 mkdir -p /etc/tmt
 chmod 700 /etc/tmt
-aws ssm get-parameter \
-  --region "${region}" \
-  --name "${password_param}" \
-  --with-decryption \
-  --query 'Parameter.Value' \
-  --output text > /etc/tmt/db_password
+# 부팅 직후에는 인스턴스 역할 자격증명 전파가 늦어 이 호출이 한 번 실패하는 일이 있다.
+# set -euo pipefail 아래에서 그 일시적 실패 하나가 user_data 전체를 죽이면 DB가 뜨지 않는다.
+# 위 볼륨 대기 루프와 같은 패턴으로 재시도한다.
+for _ in $(seq 1 30); do
+  if aws ssm get-parameter \
+      --region "${region}" \
+      --name "${password_param}" \
+      --with-decryption \
+      --query 'Parameter.Value' \
+      --output text > /etc/tmt/db_password 2>/dev/null; then
+    break
+  fi
+  sleep 5
+done
+
+# 빈 파일을 그대로 넘기면 initdb가 비밀번호 없는 DB를 만들어버린다. 확실히 실패시킨다.
+if [ ! -s /etc/tmt/db_password ]; then
+  echo "failed to read ${password_param} from SSM" >&2
+  exit 1
+fi
 chmod 600 /etc/tmt/db_password
 
 # --- PostgreSQL 기동 ---

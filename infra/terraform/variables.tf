@@ -69,18 +69,35 @@ variable "ssh_public_key" {
   type        = string
 }
 
-variable "ssh_allowed_cidrs" {
+# SSH 허용 대역은 WAS와 DB를 따로 둔다.
+# 하나로 공유하면 비상시 WAS에 본인 IP를 열어주는 순간 DB의 22번도 함께 열린다.
+# DB 서브넷은 퍼블릭이라(NAT 미사용) 그 노출이 곧 인터넷 노출이다.
+variable "was_ssh_cidrs" {
   description = <<-EOT
-    SSH(22)를 허용할 CIDR 목록. 기본값은 빈 목록 = SSH 인바운드 전면 차단.
-    접속이 필요하면 SSM Session Manager를 쓰고, 그래도 SSH가 필요할 때만 본인 IP/32를 넣는다.
+    WAS의 SSH(22)를 허용할 CIDR 목록. 기본값은 빈 목록 = 전면 차단.
+    평상시 접속은 SSM Session Manager를 쓰고, 그래도 SSH가 필요할 때만 본인 IP/32를 넣는다.
     0.0.0.0/0 은 넣지 않는다.
   EOT
   type        = list(string)
   default     = []
 
   validation {
-    condition     = !contains(var.ssh_allowed_cidrs, "0.0.0.0/0")
-    error_message = "ssh_allowed_cidrs에 0.0.0.0/0을 넣을 수 없다. 전 세계에 SSH를 여는 설정이다."
+    condition     = !contains(var.was_ssh_cidrs, "0.0.0.0/0")
+    error_message = "was_ssh_cidrs에 0.0.0.0/0을 넣을 수 없다. 전 세계에 SSH를 여는 설정이다."
+  }
+}
+
+variable "db_ssh_cidrs" {
+  description = <<-EOT
+    DB의 SSH(22)를 허용할 CIDR 목록. 기본값 빈 목록을 유지하는 것을 강하게 권한다.
+    DB 인스턴스는 SSM Session Manager로만 접속하고, SSH는 열지 않는다.
+  EOT
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !contains(var.db_ssh_cidrs, "0.0.0.0/0")
+    error_message = "db_ssh_cidrs에 0.0.0.0/0을 넣을 수 없다. DB를 전 세계에 여는 설정이다."
   }
 }
 

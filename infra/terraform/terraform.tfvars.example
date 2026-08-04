@@ -7,7 +7,11 @@ ssh_public_key = "ssh-ed25519 AAAAC3Nza... team@tmt"
 # 비상용 SSH 허용 대역. 기본값은 빈 목록(전면 차단)이고,
 # 평상시 접속은 SSM Session Manager를 쓴다:
 #   aws ssm start-session --target i-xxxxxxxx
-# ssh_allowed_cidrs = ["203.0.113.10/32"]
+# was_ssh_cidrs = ["203.0.113.10/32"]
+#
+# DB는 별도 변수다. WAS와 공유하지 않으므로 위를 열어도 DB의 22번은 닫혀 있다.
+# DB는 SSM으로만 접속하고 빈 목록을 유지하는 것을 권한다.
+# db_ssh_cidrs = []
 
 # 앱 포트 공개 범위. 도그푸딩 중 외부 공개가 필요 없으면 팀 IP로 좁힌다.
 # app_ingress_cidrs = ["203.0.113.10/32"]

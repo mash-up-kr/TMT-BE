@@ -1,5 +1,8 @@
+# 아래 db_secret_read 정책이 SSM 파라미터 ARN을 조립할 때 계정 ID가 필요하다.
+data "aws_caller_identity" "current" {}
+
 # SSM Session Manager용 역할. SSH 키 없이 콘솔/CLI로 셸을 열 수 있어
-# ssh_allowed_cidrs를 빈 목록으로 두는 것이 기본값일 수 있는 근거다.
+# was_ssh_cidrs·db_ssh_cidrs를 빈 목록으로 두는 것이 기본값일 수 있는 근거다.
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
     actions = ["sts:AssumeRole"]

@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 output "was_public_ip" {
   description = "WAS 고정 공인 IP (EIP). DNS·CI 배포 대상"
   value       = aws_eip.was.public_ip

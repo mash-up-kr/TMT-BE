@@ -33,7 +33,7 @@ resource "aws_vpc_security_group_ingress_rule" "was_app" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "was_ssh" {
-  for_each = toset(var.ssh_allowed_cidrs)
+  for_each = toset(var.was_ssh_cidrs)
 
   security_group_id = aws_security_group.was.id
   description       = "ssh (emergency only)"
@@ -57,8 +57,9 @@ resource "aws_vpc_security_group_ingress_rule" "db_postgres" {
   ip_protocol                  = "tcp"
 }
 
+# WAS와 대역을 공유하지 않는다 — was_ssh_cidrs를 열어도 DB의 22번은 닫힌 채로 남는다.
 resource "aws_vpc_security_group_ingress_rule" "db_ssh" {
-  for_each = toset(var.ssh_allowed_cidrs)
+  for_each = toset(var.db_ssh_cidrs)
 
   security_group_id = aws_security_group.db.id
   description       = "ssh (emergency only)"

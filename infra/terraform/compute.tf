@@ -27,6 +27,10 @@ resource "aws_instance" "was" {
 
   metadata_options {
     http_tokens = "required" # IMDSv2 강제 — SSRF로 인스턴스 자격증명이 새는 경로를 막는다
+
+    # 기본값 1이면 도커 브리지가 홉을 하나 소비해 컨테이너 안에서 IMDS에 닿지 못한다.
+    # 앱이 SDK로 SSM 파라미터를 읽기 시작하면 자격증명 조회가 실패하므로 미리 2로 둔다.
+    http_put_response_hop_limit = 2
   }
 
   tags = { Name = "${local.name}-was" }
@@ -58,6 +62,9 @@ resource "aws_instance" "db" {
 
   metadata_options {
     http_tokens = "required"
+
+    # WAS와 같은 이유. postgres 컨테이너에서 IMDS를 쓰게 될 경우를 대비한다.
+    http_put_response_hop_limit = 2
   }
 
   tags = { Name = "${local.name}-db" }

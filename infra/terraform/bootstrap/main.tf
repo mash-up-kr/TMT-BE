@@ -2,8 +2,15 @@
 # (백엔드 버킷을 원격 state로 관리할 수는 없다).
 #
 # 최초 1회만 로컬 state로 apply하고, 그 뒤로는 건드릴 일이 없다.
-# 이 디렉토리의 terraform.tfstate 는 커밋하지 않는다 — 버킷 메타데이터뿐이라
-# 유실돼도 재생성이 가능하고, 실제 인프라 state는 여기 없다.
+# 이 디렉토리의 terraform.tfstate 는 커밋하지 않는다 — 버킷 메타데이터뿐이고
+# 실제 인프라 state는 여기 없다.
+#
+# 다만 "유실돼도 재생성 가능"은 아니다. 로컬 state를 잃어도 AWS에는 버킷이 남아 있어서
+# apply를 다시 돌리면 BucketAlreadyOwnedByYou 로 실패한다. 그때는 import로 복구한다:
+#
+#   terraform import aws_s3_bucket.state <버킷명>
+#
+# 버킷에 prevent_destroy가 걸려 있어 지우고 다시 만드는 경로도 막혀 있다.
 
 terraform {
   required_version = ">= 1.10.0"
@@ -63,6 +70,11 @@ resource "aws_s3_bucket_versioning" "state" {
   }
 }
 
+# SSE-S3(AES256)를 쓴다. SSE-KMS(고객 관리 키)로 두면 s3:GetObject 외에 kms:Decrypt가
+# 한 겹 더 필요해져서, state에 든 평문 DB 비밀번호에 접근 통제가 하나 더 붙는다.
+# 그럼에도 AES256을 택한 이유는 고객 관리 키가 키당 월 $1이고, NAT·ALB·Multi-AZ를
+# 전부 걷어낸 비용 방침(TMT-61)과 맞지 않기 때문이다.
+# 실유저 데이터가 들어오는 시점(UT2 8/29 전후)에 재검토한다.
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   bucket = aws_s3_bucket.state.id
 
