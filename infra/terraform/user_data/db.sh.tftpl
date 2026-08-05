@@ -118,7 +118,9 @@ docker exec postgres bash -c "PGPASSWORD=\$(cat /run/secrets/db_password) pg_dum
 # 깨진 덤프를 올려놓고 백업이 됐다고 착각하는 게 최악이다. -Fc는 완전히 빈 DB라도
 # 수백 바이트 아카이브 헤더를 만들어 크기 검사로는 걸러지지 않는다 — pg_restore가
 # 목차를 읽을 수 있는지로 아카이브 유효성을 직접 확인한다.
-if ! docker exec -i postgres pg_restore -l - < "$OUT" >/dev/null 2>&1; then
+# 파일 인자를 주지 않아야 stdin을 읽는다. '-'는 stdin이 아니라 파일명 리터럴로
+# 해석되어("could not open input file \"-\"") 검사가 항상 실패한다.
+if ! docker exec -i postgres pg_restore -l < "$OUT" >/dev/null 2>&1; then
   echo "dump is not a valid archive — aborting" >&2
   exit 1
 fi
