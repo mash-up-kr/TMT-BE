@@ -1,0 +1,16 @@
+# state에는 DB 비밀번호가 평문으로 들어간다. 절대 커밋하지 않는다.
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+.terraform/
+.terraform.lock.hcl.bak
+
+# 실제 값이 담긴 변수 파일 (example만 커밋)
+terraform.tfvars
+*.auto.tfvars
+
+# plan 산출물 — 시크릿이 그대로 들어있다
+*.tfplan
+crash.log
+crash.*.log

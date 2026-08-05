@@ -1,0 +1,81 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y docker
+systemctl enable --now docker
+
+# --- 데이터 볼륨 준비 ---
+# Nitro 인스턴스(t3)에서는 attach 시 지정한 /dev/sdf 이름이 그대로 보이지 않고
+# /dev/nvme1n1 식으로 잡힌다. 순서도 보장되지 않으므로 볼륨 ID로 심링크를 찾는다.
+VOL_SERIAL=$(echo "${volume_id}" | tr -d '-')
+DEV="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$VOL_SERIAL"
+
+for _ in $(seq 1 60); do
+  [ -e "$DEV" ] && break
+  sleep 5
+done
+
+if [ ! -e "$DEV" ]; then
+  echo "data volume ${volume_id} did not appear" >&2
+  exit 1
+fi
+
+# 이미 파일시스템이 있으면 절대 다시 만들지 않는다. 인스턴스 교체 후 재부팅에서
+# 여기가 무조건 mkfs를 하면 기존 DB가 통째로 날아간다.
+if ! blkid "$DEV" >/dev/null 2>&1; then
+  mkfs.ext4 -L tmtpgdata "$DEV"
+fi
+
+mkdir -p /mnt/pgdata
+UUID=$(blkid -s UUID -o value "$DEV")
+# nofail: 볼륨이 없을 때 부팅이 멈추는 대신 올라오게 한다(SSM으로 진입해 복구 가능)
+grep -q "$UUID" /etc/fstab || echo "UUID=$UUID /mnt/pgdata ext4 defaults,nofail 0 2" >> /etc/fstab
+mount -a
+
+# ext4 루트에는 lost+found가 있어 initdb가 "디렉토리가 비어있지 않다"며 거부한다.
+# 하위 디렉토리를 PGDATA로 쓴다.
+mkdir -p /mnt/pgdata/data
+
+# --- 비밀번호 주입 ---
+# user_data는 인스턴스 메타데이터로 조회되므로 여기에 평문을 넣지 않는다.
+# 인스턴스 IAM 역할로 SSM에서 읽어 600 파일로 떨군 뒤 컨테이너에 파일로 넘긴다.
+# (-e POSTGRES_PASSWORD 로 넘기면 docker inspect에 그대로 남는다)
+mkdir -p /etc/tmt
+chmod 700 /etc/tmt
+# 부팅 직후에는 인스턴스 역할 자격증명 전파가 늦어 이 호출이 한 번 실패하는 일이 있다.
+# set -euo pipefail 아래에서 그 일시적 실패 하나가 user_data 전체를 죽이면 DB가 뜨지 않는다.
+# 위 볼륨 대기 루프와 같은 패턴으로 재시도한다.
+for _ in $(seq 1 30); do
+  if aws ssm get-parameter \
+      --region "${region}" \
+      --name "${password_param}" \
+      --with-decryption \
+      --query 'Parameter.Value' \
+      --output text > /etc/tmt/db_password 2>/dev/null; then
+    break
+  fi
+  sleep 5
+done
+
+# 빈 파일을 그대로 넘기면 initdb가 비밀번호 없는 DB를 만들어버린다. 확실히 실패시킨다.
+if [ ! -s /etc/tmt/db_password ]; then
+  echo "failed to read ${password_param} from SSM" >&2
+  exit 1
+fi
+chmod 600 /etc/tmt/db_password
+
+# --- PostgreSQL 기동 ---
+# 5432를 호스트에 바인딩한다. 노출면은 보안그룹이 WAS 보안그룹으로만 제한한다.
+docker run -d \
+  --name postgres \
+  --restart unless-stopped \
+  -p 5432:5432 \
+  -v /mnt/pgdata/data:/var/lib/postgresql/data \
+  -v /etc/tmt/db_password:/run/secrets/db_password:ro \
+  -e POSTGRES_DB="${postgres_db}" \
+  -e POSTGRES_USER="${postgres_user}" \
+  -e POSTGRES_PASSWORD_FILE=/run/secrets/db_password \
+  "${postgres_image}"
+
+# pgvector는 PostGIS 이미지에 들어있지 않을 수 있다. 확장 생성은 애플리케이션
+# 마이그레이션(Flyway 등)에서 CREATE EXTENSION으로 처리한다 — TMT-61에서 확정.
