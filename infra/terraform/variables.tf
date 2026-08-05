@@ -137,3 +137,27 @@ variable "postgres_user" {
   type        = string
   default     = "tmt"
 }
+
+variable "backup_bucket_name" {
+  description = <<-EOT
+    pg_dump 보관 S3 버킷. 이름은 전 계정 공용이라 흔한 이름은 이미 선점되어 있다.
+    충돌하면(CreateBucket이 BucketAlreadyExists) tfvars에서 더 유니크한 이름으로 덮어쓴다.
+  EOT
+  type        = string
+  default     = "ttalkkak-tmt-db-backup"
+}
+
+variable "backup_retention_days" {
+  description = "덤프 보관 일수. 지나면 S3 lifecycle이 지운다"
+  type        = number
+  default     = 30
+}
+
+variable "backup_schedule" {
+  description = <<-EOT
+    systemd OnCalendar 형식의 백업 주기. 기본은 매일 UTC 18:00 = KST 03:00.
+    인스턴스 타임존이 UTC라 KST 기준으로 적으면 안 된다.
+  EOT
+  type        = string
+  default     = "*-*-* 18:00:00"
+}

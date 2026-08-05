@@ -45,12 +45,14 @@ resource "aws_instance" "db" {
   iam_instance_profile   = aws_iam_instance_profile.instance.name
 
   user_data = templatefile("${path.module}/user_data/db.sh.tftpl", {
-    region         = var.region
-    volume_id      = aws_ebs_volume.db_data.id
-    postgres_image = var.postgres_image
-    postgres_db    = var.postgres_db
-    postgres_user  = var.postgres_user
-    password_param = aws_ssm_parameter.db_password.name
+    region          = var.region
+    volume_id       = aws_ebs_volume.db_data.id
+    postgres_image  = var.postgres_image
+    postgres_db     = var.postgres_db
+    postgres_user   = var.postgres_user
+    password_param  = aws_ssm_parameter.db_password.name
+    backup_bucket   = aws_s3_bucket.backup.id
+    backup_schedule = var.backup_schedule
   })
 
   root_block_device {
