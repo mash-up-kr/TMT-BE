@@ -93,7 +93,7 @@ RDS 자동 스냅샷이 없으므로 `pg_dump`를 직접 돌린다. EBS 분리(`
 - DB 인스턴스의 systemd 타이머가 하루 1회(기본 KST 03:00) `pg_dump -Fc` → S3 업로드
 - 경로: `s3://<backup_bucket_name>/pg/YYYY/MM/tmt-<타임스탬프>.dump`
 - 보관 30일 (`backup_retention_days`), 이후 S3 lifecycle이 삭제
-- 인스턴스 역할에 **`s3:PutObject`만** 준다. 삭제 권한이 없어 인스턴스가 털려도 기존 백업은 지워지지 않는다
+- 인스턴스 역할에는 **쓰기 권한만**(`s3:PutObject` + 멀티파트 abort) 준다. 삭제 권한이 없어 실수나 스크립트 오작동으로 기존 백업이 지워지지는 않는다 (같은 키로 덮어쓰는 것까지 막지는 못한다)
 
 동작 확인·수동 실행:
 

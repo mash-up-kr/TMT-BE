@@ -93,6 +93,14 @@ REGION="${region}"
 DB="${postgres_db}"
 DBUSER="${postgres_user}"
 
+# Persistent=true가 부팅 직후 놓친 회차를 따라잡을 때 docker는 떠 있어도 postgres
+# 컨테이너는 아직 준비 전일 수 있다. 여기서 바로 실패하면 그 회차가 그대로 소진되어
+# 다음 OnCalendar까지 백업이 빈다. 위 데이터 볼륨 대기 루프와 같은 패턴으로 기다린다.
+for _ in $(seq 1 12); do
+  docker inspect -f '{{.State.Running}}' postgres 2>/dev/null | grep -q true && break
+  sleep 5
+done
+
 if ! docker inspect -f '{{.State.Running}}' postgres 2>/dev/null | grep -q true; then
   echo "postgres container is not running — skipping backup" >&2
   exit 1
@@ -107,9 +115,11 @@ trap 'rm -f "$OUT"' EXIT
 # 비밀번호는 컨테이너에 이미 마운트된 파일에서 읽는다 — 호스트 프로세스 목록에 남기지 않는다.
 docker exec postgres bash -c "PGPASSWORD=\$(cat /run/secrets/db_password) pg_dump -U $DBUSER -d $DB -Fc" > "$OUT"
 
-# 0바이트 덤프를 올려놓고 백업이 됐다고 착각하는 게 최악이다.
-if [ ! -s "$OUT" ]; then
-  echo "dump is empty — aborting" >&2
+# 깨진 덤프를 올려놓고 백업이 됐다고 착각하는 게 최악이다. -Fc는 완전히 빈 DB라도
+# 수백 바이트 아카이브 헤더를 만들어 크기 검사로는 걸러지지 않는다 — pg_restore가
+# 목차를 읽을 수 있는지로 아카이브 유효성을 직접 확인한다.
+if ! docker exec -i postgres pg_restore -l - < "$OUT" >/dev/null 2>&1; then
+  echo "dump is not a valid archive — aborting" >&2
   exit 1
 fi
 

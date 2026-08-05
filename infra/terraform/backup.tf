@@ -54,10 +54,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
 }
 
 # DB 인스턴스가 덤프를 올릴 수 있게 한다. 쓰기만 주고 삭제 권한은 주지 않는다 —
-# 인스턴스가 털렸을 때 백업까지 지워지는 시나리오를 막는다. 만료는 위 lifecycle이 처리한다.
+# 실수나 스크립트 오작동으로 기존 백업이 지워지는 시나리오를 막는다 (같은 키 덮어쓰기까지
+# 막지는 못한다). 만료는 위 lifecycle이 처리한다.
+# AbortMultipartUpload: aws s3 cp는 8MiB를 넘으면 멀티파트로 올리고 실패 시 abort를
+# 시도한다. 이 권한이 없으면 abort가 AccessDenied로 또 실패해 로그에 실제 실패 원인
+# 대신 권한 에러가 남는다. 잔여 파트 정리는 lifecycle의 abort_incomplete_multipart_upload 몫.
 data "aws_iam_policy_document" "backup_write" {
   statement {
-    actions   = ["s3:PutObject"]
+    actions   = ["s3:PutObject", "s3:AbortMultipartUpload"]
     resources = ["${aws_s3_bucket.backup.arn}/pg/*"]
   }
 
