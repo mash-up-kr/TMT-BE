@@ -52,7 +52,7 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 |------|------|
 | 빌드 | `./gradlew :tmt-bootstrap:bootJar` |
 | 이미지 | Docker 이미지 빌드 → ECR에 `latest` 태그로 push |
-| 전송 | `docker-compose.postgres.yml`, `docker-compose.prod.yml`을 EC2 `~/tmt/`로 scp |
+| 전송 | `docker-compose.prod-postgres.yml`, `docker-compose.prod.yml`을 EC2 `~/tmt/`로 scp |
 | DB | `tmt-postgres` 컨테이너가 **이미 실행 중이면 스킵** (데이터 볼륨 보존), 없으면 신규 기동 |
 | 앱 | `tmt-app` 컨테이너를 매 배포마다 pull + `--force-recreate` 재기동 |
 | 알림 | 성공 시 디스코드 웹훅으로 릴리즈 노트 전송 (미설정 시 스킵) |

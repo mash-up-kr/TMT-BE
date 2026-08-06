@@ -69,7 +69,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ec2-user
           key: ${{ secrets.SERVER_KEY }}
-          source: "docker/docker-compose.postgres.yml,docker/docker-compose.prod.yml"
+          source: "docker/docker-compose.prod-postgres.yml,docker/docker-compose.prod.yml"
           target: "~/tmt/"
           strip_components: 0
           overwrite: true
@@ -103,7 +103,7 @@ jobs:
 
             # SCP로 전송된 파일 정리 (strip_components=0이라 docker/ 폴더 안에 들어감)
             mkdir -p $DEPLOY_DIR
-            mv -f $DEPLOY_DIR/docker/docker-compose.postgres.yml $DEPLOY_DIR/docker-compose.postgres.yml 2>/dev/null || true
+            mv -f $DEPLOY_DIR/docker/docker-compose.prod-postgres.yml $DEPLOY_DIR/docker-compose.prod-postgres.yml 2>/dev/null || true
             mv -f $DEPLOY_DIR/docker/docker-compose.prod.yml $DEPLOY_DIR/docker-compose.prod.yml 2>/dev/null || true
             rmdir $DEPLOY_DIR/docker 2>/dev/null || true
 
@@ -120,7 +120,7 @@ jobs:
               echo ">>> tmt-postgres 이미 실행 중 → 스킵"
             else
               echo ">>> tmt-postgres 신규 기동"
-              docker compose -f docker-compose.postgres.yml up -d
+              docker compose -f docker-compose.prod-postgres.yml up -d
             fi
 
             # 네트워크 보장 (없으면 생성)

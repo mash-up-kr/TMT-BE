@@ -1,0 +1,18 @@
+services:
+  postgres:
+    # 공식 postgis/postgis는 arm64 이미지를 제공하지 않는다.
+    # imresamu/postgis는 공식 저장소의 빌드 스크립트로 만든 멀티아키(amd64·arm64) 이미지이며 태그 체계가 동일하다.
+    image: imresamu/postgis:17-3.5
+    container_name: tmt-postgres-local
+    environment:
+      - TZ=Asia/Seoul
+      - POSTGRES_DB=tmt
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-12345678}
+    command: postgres -c timezone=Asia/Seoul
+    volumes:
+      - postgres-local-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres-local-data:
