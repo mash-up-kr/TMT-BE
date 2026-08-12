@@ -25,6 +25,16 @@ output "db_password_ssm_parameter" {
   value       = aws_ssm_parameter.db_password.name
 }
 
+output "ecr_repository_url" {
+  description = "앱 이미지 리포지토리. cicd-release.yml이 push, WAS가 pull"
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "ci_deploy_policy_arn" {
+  description = "CI 배포 IAM 사용자에 부착할 정책 — aws iam attach-user-policy 용"
+  value       = aws_iam_policy.ci_deploy.arn
+}
+
 output "db_data_volume_id" {
   description = "DB 데이터 EBS 볼륨. prevent_destroy가 걸려 있어 terraform destroy로 지워지지 않는다"
   value       = aws_ebs_volume.db_data.id

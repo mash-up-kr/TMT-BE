@@ -115,8 +115,13 @@ docker exec -it postgres bash -c \
 
 > `--clean`은 기존 객체를 지우고 덮어쓴다. 운영 DB에 그대로 쏘기 전에 빈 DB를 만들어 먼저 확인할 것.
 
+## 배포와의 연결 (TMT-107)
+
+- **ECR** — 앱 이미지 리포지토리 `tmt`(`ecr.tf`). CI가 push하고 WAS가 인스턴스 역할(`ecr_pull`)로 pull한다
+- **CI 자격** — 배포 IAM 사용자에 붙일 정책이 `ci.tf`에 있다. 사용자 자체는 state에 두지 않으므로 부착은 수동: `aws iam attach-user-policy --user-name <ci-user> --policy-arn "$(terraform output -raw ci_deploy_policy_arn)"`
+- **배포 경로** — `cicd-release.yml`이 SSM Run Command로 WAS에 명령을 보낸다. SSH 전면 차단과 충돌하지 않고, 인스턴스는 `Name=tmt-prod-was` 태그로 찾는다
+- **DB 접속 정보** — 정본은 SSM 파라미터 `/tmt-prod/db/*`. 배포 시 WAS가 읽어 앱 컨테이너에 주입하므로 GitHub Secrets에 비밀번호가 없다
+
 ## 아직 없는 것
 
-- **배포 CI** — 릴리즈 태그 트리거 GitHub Actions (TMT-62). PR #4에 이미 구현돼 있으나 단일 인스턴스 전제라 2대 구성에 맞춰 손봐야 한다
-- **릴리즈 가이드** — `docs/RELEASE.md` (PR #4)
-- **복구 리허설** — 위 절차를 실제로 한 번 돌려봐야 백업이 있다고 말할 수 있다
+- **복구 리허설** — 위 백업·복구 절차를 실제로 한 번 돌려봐야 백업이 있다고 말할 수 있다 (TMT-106, 스키마 v1 투입 후)

@@ -1,11 +1,17 @@
 # 릴리즈 태그(vX.Y.Z) 발행 시 자동 배포 (docs/BRANCHING.md §5)
 #
 # 필요한 Repository secrets:
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY : ECR push 권한 IAM
-#   ECR_REGISTRY                              : 예) 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
-#   SERVER_HOST / SERVER_KEY                  : 배포 대상 EC2 호스트, SSH 프라이빗 키
-#   POSTGRES_PASSWORD                         : prod PostgreSQL 비밀번호
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY : 배포 IAM 사용자 — infra/terraform/ci.tf의
+#                                               ci_deploy 정책이 부착되어 있어야 한다
 #   DISCORD_WEBHOOK_RELEASE_URL               : (선택) 배포 알림 웹훅 — 없으면 알림 스킵
+#
+# 2대 구성 대응 (TMT-107):
+#   - WAS에는 앱 컨테이너만 배포한다. PostgreSQL은 DB 인스턴스의 user_data 소관이라
+#     여기서 건드리지 않는다.
+#   - 서버 접속은 SSH가 아니라 SSM Run Command — 보안그룹 22번이 전면 차단이어도
+#     동작하므로 SERVER_HOST/SERVER_KEY 시크릿이 필요 없다. 대상은 Name 태그로 찾는다.
+#   - DB 접속 정보 정본은 SSM 파라미터(/tmt-prod/db/*)다. GitHub Secrets에 두지 않고
+#     WAS 인스턴스가 자기 IAM 역할로 배포 시점에 읽는다.
 name: CI/CD
 
 on:
@@ -15,8 +21,9 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
   ECR_REPOSITORY: tmt
+  WAS_NAME_TAG: tmt-prod-was
+  SSM_DB_PREFIX: /tmt-prod/db
 
 jobs:
   build-and-deploy:
@@ -59,84 +66,134 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Docker 이미지 빌드 및 푸시
-        run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
-          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-
-      - name: 배포 파일 EC2에 전송
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ec2-user
-          key: ${{ secrets.SERVER_KEY }}
-          source: "docker/docker-compose.prod-postgres.yml,docker/docker-compose.prod.yml"
-          target: "~/tmt/"
-          strip_components: 0
-          overwrite: true
-
-      - name: EC2 파일 정리 및 배포
-        uses: appleboy/ssh-action@master
         env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ec2-user
-          key: ${{ secrets.SERVER_KEY }}
-          envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,POSTGRES_PASSWORD
-          script: |
-            set -e
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest .
+          docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
 
-            DEPLOY_DIR=~/tmt
+      - name: 배포 대상 WAS 조회
+        id: was
+        run: |
+          read -r INSTANCE_ID PUBLIC_IP <<< "$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${WAS_NAME_TAG}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].[InstanceId,PublicIpAddress]' \
+            --output text)"
 
-            # Docker Compose 플러그인 설치 (없으면)
-            if ! docker compose version > /dev/null 2>&1; then
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          if [ -z "${INSTANCE_ID:-}" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "::error::Name=${WAS_NAME_TAG} 태그의 실행 중 인스턴스를 찾지 못했습니다"
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          echo "public_ip=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
+
+      - name: 배포 (SSM Run Command)
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
+        run: |
+          # compose 파일은 scp 대신 명령 페이로드에 실어 보낸다. Run Command 인라인
+          # 파라미터 한도(약 8KB) 안에 넉넉히 들어가는 크기다.
+          COMPOSE_B64=$(base64 < docker/docker-compose.prod.yml | tr -d '\n')
+
+          # 원격 스크립트. $VAR는 여기서 치환되어 들어가고, 원격에서 평가될 변수는 \$로 남긴다.
+          cat > /tmp/remote.sh <<EOF
+          set -euo pipefail
+
+          DEPLOY_DIR=/opt/tmt
+          mkdir -p "\$DEPLOY_DIR"
+
+          # Docker Compose 플러그인 설치 (없으면)
+          if ! docker compose version >/dev/null 2>&1; then
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\$(uname -m)" \
+              -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
+
+          # DB 접속 정보 — 정본은 SSM 파라미터. 인스턴스 IAM 역할로 읽는다.
+          DB_HOST=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/host --query Parameter.Value --output text)
+          DB_NAME=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/name --query Parameter.Value --output text)
+          DB_USER=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/user --query Parameter.Value --output text)
+          DB_PASSWORD=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/password --with-decryption --query Parameter.Value --output text)
+
+          # ECR pull — 인스턴스 역할 권한 (infra/terraform/ecr.tf)
+          aws ecr get-login-password --region ${AWS_REGION} \
+            | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+          echo "${COMPOSE_B64}" | base64 -d > "\$DEPLOY_DIR/docker-compose.prod.yml"
+
+          umask 077
+          cat > "\$DEPLOY_DIR/.env" <<ENV
+          ECR_REGISTRY=${ECR_REGISTRY}
+          ECR_REPOSITORY=${ECR_REPOSITORY}
+          DB_HOST=\$DB_HOST
+          DB_NAME=\$DB_NAME
+          DB_USER=\$DB_USER
+          DB_PASSWORD=\$DB_PASSWORD
+          ENV
+
+          cd "\$DEPLOY_DIR"
+
+          # 단일 인스턴스 시절 잔재 정리 — postgres는 이제 DB 인스턴스 소관이라
+          # WAS에 떠 있으면 안 된다. 볼륨은 지우지 않는다.
+          docker rm -f tmt-postgres 2>/dev/null || true
+          docker rm -f tmt-app 2>/dev/null || true
+
+          docker compose -f docker-compose.prod.yml pull app
+          docker compose -f docker-compose.prod.yml up -d --force-recreate
+          docker image prune -f
+
+          echo ">>> 배포 완료"
+          docker ps
+          EOF
+
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --instance-ids "$INSTANCE_ID" \
+            --comment "release ${{ github.event.release.tag_name }}" \
+            --parameters "$(jq -n --rawfile s /tmp/remote.sh '{commands: [$s], executionTimeout: ["600"]}')" \
+            --query 'Command.CommandId' --output text)
+
+          echo "SSM Command: $COMMAND_ID"
+
+          # aws ssm wait command-executed는 최대 100초라 이미지 pull이 끝나기 전에
+          # 타임아웃될 수 있어 직접 폴링한다. 발급 직후에는 조회가 404일 수 있다.
+          STATUS=Pending
+          for _ in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 10
+          done
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json | jq -r '"--- status: \(.Status)\n--- stdout\n\(.Stdout)\n--- stderr\n\(.Stderr)"'
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::배포 명령이 ${STATUS} 상태로 끝났습니다"
+            exit 1
+          fi
+
+      - name: 헬스체크
+        env:
+          PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
+        run: |
+          for _ in $(seq 1 36); do
+            if curl -sf "http://${PUBLIC_IP}:8080/api/health/db" >/dev/null; then
+              echo ">>> 헬스체크 통과"
+              exit 0
             fi
-
-            # ECR 로그인
-            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-
-            # SCP로 전송된 파일 정리 (strip_components=0이라 docker/ 폴더 안에 들어감)
-            mkdir -p $DEPLOY_DIR
-            mv -f $DEPLOY_DIR/docker/docker-compose.prod-postgres.yml $DEPLOY_DIR/docker-compose.prod-postgres.yml 2>/dev/null || true
-            mv -f $DEPLOY_DIR/docker/docker-compose.prod.yml $DEPLOY_DIR/docker-compose.prod.yml 2>/dev/null || true
-            rmdir $DEPLOY_DIR/docker 2>/dev/null || true
-
-            # .env 파일 생성
-            echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" > $DEPLOY_DIR/.env
-            echo "ECR_REGISTRY=${ECR_REGISTRY}" >> $DEPLOY_DIR/.env
-            echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> $DEPLOY_DIR/.env
-            chmod 600 $DEPLOY_DIR/.env
-
-            cd $DEPLOY_DIR
-
-            # PostgreSQL: 이미 실행 중이면 skip (데이터 볼륨 보존)
-            if docker ps --format '{{.Names}}' | grep -q '^tmt-postgres$'; then
-              echo ">>> tmt-postgres 이미 실행 중 → 스킵"
-            else
-              echo ">>> tmt-postgres 신규 기동"
-              docker compose -f docker-compose.prod-postgres.yml up -d
-            fi
-
-            # 네트워크 보장 (없으면 생성)
-            docker network create tmt-network 2>/dev/null || true
-
-            # 기존 app 컨테이너 정리 (docker run으로 만든 잔여 컨테이너)
-            docker stop tmt-app 2>/dev/null || true
-            docker rm tmt-app 2>/dev/null || true
-
-            # App: 매 배포마다 재기동
-            docker compose -f docker-compose.prod.yml pull app
-            docker compose -f docker-compose.prod.yml up -d --force-recreate
-            docker image prune -f
-
-            echo ">>> 배포 완료"
-            docker ps
+            sleep 5
+          done
+          echo "::error::3분 내에 /api/health/db가 응답하지 않았습니다"
+          exit 1
 
       - name: 디스코드 배포 알림
         if: success()

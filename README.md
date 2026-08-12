@@ -63,11 +63,11 @@ docker compose -f docker/docker-compose.local.yml up -d
 | | `local` | `prod` |
 |---|---|---|
 | 설정 파일 | `application-local.yml` | `application-prod.yml` |
-| DB 기동 | `docker/docker-compose.local.yml` | `docker/docker-compose.prod-postgres.yml` |
+| DB 기동 | `docker/docker-compose.local.yml` | DB 인스턴스 user_data (`infra/terraform`) |
 | 앱 기동 | `./gradlew :tmt-bootstrap:bootRun` | `docker/docker-compose.prod.yml` |
-| DB 접속 | `localhost:5432` | `tmt-postgres:5432` (`tmt-network`) |
+| DB 접속 | `localhost:5432` | 별도 DB 인스턴스 사설 IP (SSM 파라미터 `/tmt-prod/db/host`) |
 | `ddl-auto` | `update` | `validate` |
-| DB 비밀번호 | 기본값 `12345678` | `.env`의 `POSTGRES_PASSWORD` (미설정 시 기동 실패) |
+| DB 비밀번호 | 기본값 `12345678` | SSM SecureString `/tmt-prod/db/password` — 배포 시 주입 (미설정 시 기동 실패) |
 
 프로필을 지정하지 않으면 `local`로 뜬다. 다른 프로필로 실행하려면 `SPRING_PROFILES_ACTIVE` 또는 `--spring.profiles.active`를 쓴다.
 
@@ -84,6 +84,6 @@ docker compose -f docker/docker-compose.local.yml down -v
 |----------|--------|------|
 | `ci-pull-request.yml` | main 대상 PR | ktlintCheck + test (PR 코멘트 `빌드검증` 입력 시 전체 빌드 후 결과 코멘트) |
 | `ci-push.yml` | main push | 전체 빌드 |
-| `cicd-release.yml` | GitHub Release 발행 (vX.Y.Z) | bootJar → Docker 이미지 ECR push → EC2 SSH 배포 → 디스코드 알림 |
+| `cicd-release.yml` | GitHub Release 발행 (vX.Y.Z) | bootJar → Docker 이미지 ECR push → SSM Run Command로 WAS 배포 → 헬스체크 → 디스코드 알림 |
 
 **배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포).** 릴리즈 발행 절차·버전 규칙·롤백은 [docs/RELEASE.md](docs/RELEASE.md), 브랜치·머지 규칙은 [docs/BRANCHING.md](docs/BRANCHING.md) 참고.
