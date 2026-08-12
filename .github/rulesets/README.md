@@ -16,23 +16,17 @@
 
 `pull_request` 룰이 있으면 main 직접 push는 자동으로 막힌다 — 별도 룰이 필요 없다.
 
-## ⚠️ 적용 순서 — status check을 먼저 켜면 안 된다
-
-`required_status_checks`가 요구하는 체크가 **레포에 존재하지 않으면 모든 PR이 영구히 블록된다.** 없는 체크를 영원히 기다린다. 여기 적힌 두 컨텍스트는 PR #4의 `ci-pull-request.yml`에서 온 것이라, **#4가 머지되기 전에 적용하면 레포가 잠긴다.**
-
-**1단계 — 지금 (CI 머지 전).** main이 무방비이므로 status check만 빼고 먼저 적용한다:
+## 적용
 
 ```bash
-jq 'del(.rules[] | select(.type == "required_status_checks"))' .github/rulesets/main.json \
-  | GH_HOST=github.com gh api repos/mash-up-kr/TMT-BE/rulesets --input -
+GH_HOST=github.com gh api repos/mash-up-kr/TMT-BE/rulesets --input .github/rulesets/main.json
 ```
 
-**2단계 — CI 머지 후.** 전체 정의로 갱신한다:
+required check인 `자동 검증 (ktlint + test)`는 `ci-pull-request.yml`(PR #4, 머지됨)로 main에서 이미 PR마다 돌고 있으므로 바로 적용해도 안전하다. 단, **존재하지 않는 체크를 required로 걸면 모든 PR이 영구히 블록되므로**, 컨텍스트를 바꾸거나 추가할 때는 워크플로의 job `name`과 문자 단위로 일치하는지 반드시 확인한다.
 
-```bash
-RULESET_ID=$(GH_HOST=github.com gh api repos/mash-up-kr/TMT-BE/rulesets -q '.[] | select(.name=="main") | .id')
-GH_HOST=github.com gh api -X PUT repos/mash-up-kr/TMT-BE/rulesets/$RULESET_ID --input .github/rulesets/main.json
-```
+### `ready for launch (CI)`는 왜 없나
+
+같은 워크플로의 `build` job(`ready for launch (CI)`)은 required check으로 넣지 않았다. `issue_comment`(`빌드검증` 코멘트) 전용 job이라 `pull_request` 이벤트에서는 skip되고, 코멘트로 실행돼도 run이 PR head SHA에 붙지 않아 required check을 만족시킬 수단이 없다. 온디맨드 빌드 게이트를 머지 조건으로 강제하려면 워크플로를 `pull_request` 트리거로 고치는 게 선행돼야 하고, 그건 별도 이슈로 다룬다.
 
 ## ⚠️ `bypass_actors`의 `actor_id`를 확인할 것
 
@@ -41,6 +35,7 @@ GH_HOST=github.com gh api -X PUT repos/mash-up-kr/TMT-BE/rulesets/$RULESET_ID --
 **다만 이 ID는 이 조직에서 실제로 확인하지 못했다.** `admin:org` 스코프가 없어 조직 ruleset을 읽을 수 없었다. 적용 후 아래로 반드시 확인한다:
 
 ```bash
+RULESET_ID=$(GH_HOST=github.com gh api repos/mash-up-kr/TMT-BE/rulesets -q '.[] | select(.name=="main") | .id')
 GH_HOST=github.com gh api repos/mash-up-kr/TMT-BE/rulesets/$RULESET_ID \
   -q '.bypass_actors[] | "\(.actor_type) id=\(.actor_id) mode=\(.bypass_mode)"'
 ```
