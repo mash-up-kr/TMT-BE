@@ -25,7 +25,7 @@ class ReviewMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(ReviewMockController(saveStore, placeStore, assetStore, ticketLedger, aiSummaryStore))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
-            .setControllerAdvice(ExceptionAdvice(), MockReviewExceptionAdvice())
+            .setControllerAdvice(ExceptionAdvice(), MockTicketExceptionAdvice())
             .build()
 
     @Test
