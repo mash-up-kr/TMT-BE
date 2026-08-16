@@ -16,6 +16,8 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 - main은 항상 배포 가능한 상태를 유지하되, **실제 배포 타이밍은 태그로 통제**한다
 - 급하지 않은 변경은 모았다가 한 번에 릴리즈한다
 
+> **임시**: mock 개발 기간에는 main 머지 시 자동 배포가 함께 동작한다 ([ci-push.yml](../.github/workflows/ci-push.yml)의 `deploy` job). 위 정식 릴리즈 정책은 그대로이며, mock 기간이 끝나면 해당 job을 제거한다.
+
 ## 2. 버전 규칙 (semver)
 
 태그 형식: `v<major>.<minor>.<patch>` — 예) `v0.3.1`
