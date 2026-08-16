@@ -17,6 +17,7 @@ class HomeMockControllerTest {
     private val membershipStore = MockMembershipStore()
     private val shareStore = MockReviewShareStore()
     private val favoriteStore = MockFavoriteStore()
+    private val aiSummaryStore = MockAiSummaryStore()
     private val groupAssembler = GroupAssembler(saveStore, membershipStore, shareStore)
 
     private val mockMvc: MockMvc =
@@ -29,7 +30,7 @@ class HomeMockControllerTest {
                     membershipStore,
                     shareStore,
                     groupAssembler,
-                    ReviewCardAssembler(placeStore, favoriteStore),
+                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -103,18 +104,56 @@ class HomeMockControllerTest {
         shareStore.add(g1.groupId, 999, only.reviewId!!)
 
         mockMvc
-            .perform(get("/v1/home/feed").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/home/feed",
+                ).header(
+                    UserIdArgumentResolver.HEADER,
+                    "1",
+                ).param("latitude", "37.5399")
+                    .param("longitude", "126.9515"),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
+            // 같은 매장이라 거리가 같고, tie-breaker는 reviewId ASC다 (G19·E4)
+            .andExpect(jsonPath("$.items[0].reviewId").value("review_1"))
+            .andExpect(jsonPath("$.items[1].reviewId").value("review_2"))
+    }
+
+    @Test
+    fun `피드는 거리순으로 내려간다 (G19)`() {
+        val near = MockFixtures.place(placeStore, "가까운 집", 37.5399, 126.9515)
+        val far = MockFixtures.place(placeStore, "먼 집", 37.6205, 126.9127)
+        val g = seedGroup("성수 커피 탐험대")
+        membershipStore.join(g.groupId, 1, Instant.now())
+        val farReview = MockFixtures.review(saveStore, far.placeId, ownerId = 999, reviewId = "review_1")
+        val nearReview = MockFixtures.review(saveStore, near.placeId, ownerId = 999, reviewId = "review_2")
+        shareStore.add(g.groupId, 999, farReview.reviewId!!)
+        shareStore.add(g.groupId, 999, nearReview.reviewId!!)
+
+        mockMvc
+            .perform(
+                get("/v1/home/feed")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .param("latitude", "37.5399")
+                    .param("longitude", "126.9515"),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("review_2"))
+            .andExpect(jsonPath("$.items[0].distanceMeters").value(0))
             .andExpect(jsonPath("$.items[1].reviewId").value("review_1"))
     }
 
     @Test
     fun `가입 그룹이 없으면 피드는 빈 배열이다`() {
         mockMvc
-            .perform(get("/v1/home/feed").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/home/feed",
+                ).header(
+                    UserIdArgumentResolver.HEADER,
+                    "1",
+                ).param("latitude", "37.5399")
+                    .param("longitude", "126.9515"),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items").isEmpty)
             .andExpect(jsonPath("$.hasNext").value(false))
     }
@@ -127,7 +166,22 @@ class HomeMockControllerTest {
         shareStore.add(other.groupId, 999, review.reviewId!!)
 
         mockMvc
+            .perform(
+                get(
+                    "/v1/home/feed",
+                ).header(
+                    UserIdArgumentResolver.HEADER,
+                    "1",
+                ).param("latitude", "37.5399")
+                    .param("longitude", "126.9515"),
+            ).andExpect(jsonPath("$.items").isEmpty)
+    }
+
+    @Test
+    fun `피드는 좌표가 없으면 VALIDATION_FAILED다 — 근처보기와 같은 규칙`() {
+        mockMvc
             .perform(get("/v1/home/feed").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(jsonPath("$.items").isEmpty)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
 }

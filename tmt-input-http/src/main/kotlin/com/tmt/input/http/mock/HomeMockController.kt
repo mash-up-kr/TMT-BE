@@ -1,5 +1,7 @@
 package com.tmt.input.http.mock
 
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
 import io.swagger.v3.oas.annotations.Operation
@@ -49,11 +51,8 @@ class HomeMockController(
                 mockGroupStore
                     .findAll()
                     .map { groupAssembler.card(it, userId) }
-                    .sortedWith(
-                        compareByDescending<GroupAssembler.GroupCardResponse> { it.matchedSavedPlaceCount }
-                            .thenByDescending { it.memberCount }
-                            .thenByDescending { it.groupId.substringAfterLast('_').toLongOrNull() ?: 0 },
-                    ).take(RECOMMENDED_COUNT)
+                    .sortedWith(GroupAssembler.RECOMMENDED_ORDER)
+                    .take(RECOMMENDED_COUNT)
             } else {
                 emptyList()
             }
@@ -83,24 +82,28 @@ class HomeMockController(
                 .flatMap { (groupId, _) -> mockReviewShareStore.allShares(groupId) }
                 .toSet()
 
-        var reviews = mockSaveStore.findAll().filter { it.reviewId in sharedReviewIds }
-        reviews =
-            if (latitude != null && longitude != null) {
-                reviews.sortedWith(
+        // 좌표는 필수다 — G19의 정렬이 거리순이고, 좌표 유무로 정렬이 갈리면 규약 §5-3에 따라
+        // 이전 커서가 무효가 되는데 오프셋 커서는 그 조건을 담지 않는다. 권한 거부 시에도
+        // 클라이언트가 강남역 좌표를 채우므로(E3) 좌표는 항상 온다. nearbyReviews와 같은 규칙.
+        if (latitude == null || longitude == null || latitude !in -90.0..90.0 || longitude !in -180.0..180.0) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "latitude·longitude는 필수이고 위경도 범위 안이어야 합니다.")
+        }
+
+        val reviews =
+            mockSaveStore
+                .findAll()
+                .filter { it.reviewId in sharedReviewIds }
+                .sortedWith(
                     compareBy(
                         { save ->
                             mockPlaceStore
-                                .findById(
-                                    save.placeId,
-                                )?.let { MockGeo.distanceMeters(latitude, longitude, it.latitude, it.longitude) }
+                                .findById(save.placeId)
+                                ?.let { MockGeo.distanceMeters(latitude, longitude, it.latitude, it.longitude) }
                                 ?: Int.MAX_VALUE
                         },
                         { it.reviewId },
                     ),
                 )
-            } else {
-                reviews.sortedWith(compareByDescending<MockSave> { it.createdAt }.thenByDescending { it.reviewId })
-            }
 
         return MockCursor.paginate(
             reviews,

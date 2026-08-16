@@ -144,5 +144,15 @@ class GroupAssembler(
     companion object {
         // 상단 캐러셀은 공유 리뷰 사진 최신순 최대 5장 (G16)
         private const val MAX_COVER_IMAGES = 5
+
+        /**
+         * 추천순 정렬 (G17) — 내 저장 매장과 겹치는 수 → 가입자 수 → groupId.
+         * 그룹 탐색과 홈 추천 캐러셀이 같은 기준을 써야 두 화면이 갈리지 않는다.
+         * 카드만으로 세 키가 모두 나오므로 원본 그룹을 함께 들고 다닐 필요가 없다.
+         */
+        val RECOMMENDED_ORDER: Comparator<GroupCardResponse> =
+            compareByDescending<GroupCardResponse> { it.matchedSavedPlaceCount }
+                .thenByDescending { it.memberCount }
+                .thenByDescending { it.groupId.substringAfterLast('_').toLongOrNull() ?: 0 }
     }
 }
