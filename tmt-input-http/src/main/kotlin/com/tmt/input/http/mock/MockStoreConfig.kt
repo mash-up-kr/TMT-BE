@@ -35,11 +35,22 @@ class MockStoreConfig {
     @Bean
     fun mockIdempotencyRegistry(): MockIdempotencyRegistry = MockIdempotencyRegistry()
 
+    @Bean
+    fun mockFavoriteStore(): MockFavoriteStore = MockFavoriteStore()
+
+    @Bean
+    fun reviewCardAssembler(
+        mockPlaceStore: InMemoryStore<MockPlace>,
+        mockFavoriteStore: MockFavoriteStore,
+    ): ReviewCardAssembler = ReviewCardAssembler(mockPlaceStore, mockFavoriteStore)
+
     companion object {
         // 도그푸딩 시나리오용 시드 — 검색이 비어 있으면 FE가 1단계를 진행할 수 없다
         private val SEED_PLACES: List<(String) -> MockPlace> =
             listOf(
-                { id -> MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515) },
+                { id ->
+                    MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515, "010 5244 6041")
+                },
                 { id -> MockPlace(id, "오즈 커피", "서울 마포구 도화동 201-1", "마포구 도화동", "카페·디저트", 37.5401, 126.9520) },
                 { id -> MockPlace(id, "서북면옥", "서울 중구 을지로3가 296-1", "중구 을지로3가", "한식", 37.5663, 126.9910) },
                 { id -> MockPlace(id, "을지면옥", "서울 중구 입정동 161", "중구 입정동", "한식", 37.5667, 126.9925) },
@@ -56,6 +67,22 @@ class MockTicketLedger {
     private val counts = ConcurrentHashMap<Long, Int>()
 
     fun availableCount(userId: Long): Int = counts.getOrDefault(userId, SIGNUP_BONUS)
+
+    /** 티켓 1장 회수를 시도한다. 잔고가 0이면 false — 리뷰 삭제가 거부되는 조건이다 (R7). */
+    fun tryConsume(userId: Long): Boolean {
+        var consumed = false
+        counts.compute(userId) { _, current ->
+            val base = current ?: SIGNUP_BONUS
+            if (base > 0) {
+                consumed = true
+                base - 1
+            } else {
+                consumed = false
+                base
+            }
+        }
+        return consumed
+    }
 
     /** 티켓 1장 발급을 시도하고 실제 발급 수(0 또는 1)를 돌려준다. 상한 도달 시 0 (T6). */
     fun tryGrant(userId: Long): Int {

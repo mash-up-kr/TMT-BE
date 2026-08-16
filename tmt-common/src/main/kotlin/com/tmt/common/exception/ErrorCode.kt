@@ -36,4 +36,6 @@ enum class ErrorCode(
     SAVE_PLACE_IMMUTABLE(ErrorType.UNPROCESSABLE, "저장의 매장은 변경할 수 없습니다."),
     REVIEW_CONTENT_TOO_LONG(ErrorType.VALIDATION, "본문이 최대 길이를 초과했습니다."),
     REVIEW_TAG_NOT_FOUND(ErrorType.VALIDATION, "정의되지 않은 태그입니다."),
+    REVIEW_NOT_FOUND(ErrorType.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
+    REVIEW_DELETE_TICKET_REQUIRED(ErrorType.CONFLICT, "리뷰를 삭제하려면 티켓 1장이 필요합니다."),
 }
