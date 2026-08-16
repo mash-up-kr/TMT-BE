@@ -1,9 +1,12 @@
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://tmt-postgres:5432/tmt?reWriteBatchedInserts=true
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    # 호스트를 하드코딩하면 인프라가 바뀔 때마다 코드를 고쳐야 한다. 값은 배포 시
+    # SSM 파라미터(/tmt-prod/db/*)에서 주입된다 (TMT-107). 기본값을 두지 않아
+    # 누락 시 기동 단계에서 바로 실패한다.
+    url: jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}?reWriteBatchedInserts=true
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:

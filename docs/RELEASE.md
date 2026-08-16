@@ -38,9 +38,9 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
    gh release create v0.1.0 --generate-notes
    ```
 3. Publish 순간 [cicd-release.yml](../.github/workflows/cicd-release.yml)이 실행된다. Actions 탭에서 진행 상황 확인
-4. 완료되면 디스코드 배포 알림(웹훅 설정 시)과 서버 헬스체크로 확인:
+4. 완료되면 디스코드 배포 알림(웹훅 설정 시)과 서버 헬스체크로 확인 — 워크플로 자체도 마지막에 같은 헬스체크를 수행한다:
    ```bash
-   curl http://<SERVER_HOST>:8080/api/health/db
+   curl http://<WAS 공인 IP>:8080/api/health/db   # IP: infra/terraform → terraform output -raw was_public_ip
    ```
 
 > 릴리즈 노트는 자동 생성(Generate release notes)을 쓴다 — squash merge 덕에 PR 단위로 정리된다.
@@ -48,24 +48,35 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 
 ## 4. 파이프라인이 하는 일
 
+2대 구성(WAS/DB 분리, TMT-107) 기준이다. **배포는 SSH가 아니라 SSM Run Command로 간다** — 보안그룹 22번이 전면 차단이어도 동작하고, 배포 대상은 `Name=tmt-prod-was` 태그로 찾으므로 서버 주소·SSH 키 시크릿이 없다.
+
 | 단계 | 내용 |
 |------|------|
 | 빌드 | `./gradlew :tmt-bootstrap:bootJar` |
 | 이미지 | Docker 이미지 빌드 → ECR에 `latest` 태그로 push |
-| 전송 | `docker-compose.prod-postgres.yml`, `docker-compose.prod.yml`을 EC2 `~/tmt/`로 scp |
-| DB | `tmt-postgres` 컨테이너가 **이미 실행 중이면 스킵** (데이터 볼륨 보존), 없으면 신규 기동 |
-| 앱 | `tmt-app` 컨테이너를 매 배포마다 pull + `--force-recreate` 재기동 |
+| 대상 조회 | `Name=tmt-prod-was` 태그로 실행 중인 WAS 인스턴스 ID·공인 IP 조회 |
+| 배포 | SSM Run Command로 WAS에서 실행: compose 파일 갱신(명령 페이로드로 전달) → DB 접속 정보를 SSM 파라미터(`/tmt-prod/db/*`)에서 읽어 `.env` 생성 → ECR pull → `tmt-app` `--force-recreate` 재기동 |
+| DB | **건드리지 않는다** — PostgreSQL은 DB 인스턴스의 user_data 소관 (`infra/terraform`) |
+| 헬스체크 | `http://<WAS_IP>:8080/api/health/db`가 응답할 때까지 최대 3분 대기, 실패 시 워크플로 실패 |
 | 알림 | 성공 시 디스코드 웹훅으로 릴리즈 노트 전송 (미설정 시 스킵) |
+
+DB 비밀번호의 **정본은 SSM SecureString**(`/tmt-prod/db/password`) 하나다. GitHub Secrets에는 두지 않는다 — WAS 인스턴스가 자기 IAM 역할로 배포 시점에 읽는다.
 
 ### 필요한 Repository secrets
 
 | Secret | 용도 |
 |--------|------|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | ECR push 권한 IAM |
-| `ECR_REGISTRY` | 예) `123456789012.dkr.ecr.ap-northeast-2.amazonaws.com` |
-| `SERVER_HOST` / `SERVER_KEY` | 배포 대상 EC2 호스트, SSH 프라이빗 키 |
-| `POSTGRES_PASSWORD` | 운영 PostgreSQL 비밀번호 |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | 배포 IAM 사용자 — `infra/terraform/ci.tf`의 `ci_deploy` 정책 부착 필요 |
 | `DISCORD_WEBHOOK_RELEASE_URL` | (선택) 배포 알림 웹훅 |
+
+배포 IAM 사용자에 정책 부착 (최초 1회):
+
+```bash
+aws iam attach-user-policy --user-name <ci-user> \
+  --policy-arn "$(cd infra/terraform && terraform output -raw ci_deploy_policy_arn)"
+```
+
+> 종전의 `ECR_REGISTRY`(로그인 액션 출력으로 대체) · `SERVER_HOST` / `SERVER_KEY`(태그 조회 + SSM으로 대체) · `POSTGRES_PASSWORD`(정본이 SSM으로 일원화) 시크릿은 더 이상 쓰지 않으므로 지워도 된다.
 
 ## 5. 롤백
 
