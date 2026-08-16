@@ -51,7 +51,7 @@ class MockStoreConfig {
     }
 }
 
-/** 사용자별 보유 티켓. 회원가입 기본 1장(T?), 상한 999장(T6). */
+/** 사용자별 보유 티켓. 회원가입 기본 1장(T2), 상한 999장(T6). */
 class MockTicketLedger {
     private val counts = ConcurrentHashMap<Long, Int>()
 
@@ -90,9 +90,14 @@ class MockReviewIdGenerator {
  * 재현하고, 바디가 다르면 IDEMPOTENCY_CONFLICT다.
  */
 class MockIdempotencyRegistry {
+    /**
+     * 최초 응답을 통째로 들고 재현한다 — 상태에서 다시 조립하면 이번 요청으로 발급된
+     * 티켓 수(grantedCount) 같은 "그 순간의 값"이 복원되지 않는다.
+     * DB 스키마의 `idempotency_key.response_body JSONB`에 대응한다.
+     */
     data class Entry(
         val bodyFingerprint: String,
-        val saveId: String,
+        val response: Any,
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()
@@ -100,15 +105,25 @@ class MockIdempotencyRegistry {
     /** 등록된 항목이 있으면 돌려주고, 없으면 null. 바디가 다르면 예외를 던지는 판단은 호출부 몫. */
     fun find(
         userId: Long,
+        endpoint: String,
         key: String,
-    ): Entry? = entries["$userId:$key"]
+    ): Entry? = entries[keyOf(userId, endpoint, key)]
 
     fun register(
         userId: Long,
+        endpoint: String,
         key: String,
         bodyFingerprint: String,
-        saveId: String,
+        response: Any,
     ) {
-        entries["$userId:$key"] = Entry(bodyFingerprint, saveId)
+        entries[keyOf(userId, endpoint, key)] = Entry(bodyFingerprint, response)
     }
+
+    // 규약·DB PK와 같은 (user_id, endpoint, idem_key) 조합. endpoint가 빠지면
+    // 서로 다른 엔드포인트가 키 공간을 공유해 남의 응답이 재현된다.
+    private fun keyOf(
+        userId: Long,
+        endpoint: String,
+        key: String,
+    ): String = "$userId:$endpoint:$key"
 }

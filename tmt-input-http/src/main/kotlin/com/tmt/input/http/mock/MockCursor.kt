@@ -12,6 +12,7 @@ import java.util.Base64
 object MockCursor {
     private const val PREFIX = "offset:"
     const val DEFAULT_LIMIT = 20
+    const val MAX_LIMIT = 50
 
     fun <T, R> paginate(
         source: List<T>,
@@ -20,7 +21,9 @@ object MockCursor {
         transform: (T) -> R,
     ): CursorPage<R> {
         val offset = decode(cursor)
-        val pageSize = limit ?: DEFAULT_LIMIT
+        // 규약 §5-2: 기본 20, 상한 50, 초과분은 상한으로 절삭한다. 하한 1은 0·음수를 막는다 —
+        // 0이면 같은 커서가 무한히 반복되고, 음수면 take가 예외를 던져 500이 나간다.
+        val pageSize = (limit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
         val page = source.drop(offset).take(pageSize)
         val nextOffset = offset + page.size
         val nextCursor = if (nextOffset < source.size) encode(nextOffset) else null

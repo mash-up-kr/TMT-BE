@@ -42,14 +42,7 @@ class SaveMockController(
         @RequestBody request: SaveRequest,
     ): ResponseEntity<SaveResultResponse> {
         val key = requireIdempotencyKey(idempotencyKey)
-
-        mockIdempotencyRegistry.find(userId, key)?.let { entry ->
-            if (entry.bodyFingerprint != request.toString()) {
-                throw TmtException(ErrorCode.IDEMPOTENCY_CONFLICT)
-            }
-            val existing = mockSaveStore.findById(entry.saveId) ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
-            return created(toResult(existing, grantedCount = 0, userId = userId))
-        }
+        replayed(userId, ENDPOINT_CREATE, key, request)?.let { return created(it) }
 
         validate(request, ownerId = userId, existingSave = null)
 
@@ -73,10 +66,11 @@ class SaveMockController(
                 )
             }
         attachAssets(request.photoAssetIds)
-        mockIdempotencyRegistry.register(userId, key, request.toString(), save.saveId)
 
         val granted = if (completed) mockTicketLedger.tryGrant(userId) else 0
-        return created(toResult(save, granted, userId))
+        val result = toResult(save, granted, userId)
+        mockIdempotencyRegistry.register(userId, ENDPOINT_CREATE, key, request.toString(), result)
+        return created(result)
     }
 
     @Operation(summary = "작성 완료 (이어쓰기)", description = "전체 교체다. placeId는 바꿀 수 없고(S6), 서버는 같은 완성도 판정을 다시 돌린다 (C6).")
@@ -87,7 +81,10 @@ class SaveMockController(
         @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
         @RequestBody request: SaveRequest,
     ): SaveResultResponse {
-        requireIdempotencyKey(idempotencyKey)
+        val key = requireIdempotencyKey(idempotencyKey)
+        // 재현 검사가 아래 reviewId 가드보다 앞에 있어야 한다 — 뒤로 가면 성공한 요청의
+        // 재시도가 200 대신 409 SAVE_ALREADY_REVIEWED를 받는다 (규약 §9)
+        replayed(userId, endpointUpdate(saveId), key, request)?.let { return it }
 
         val save = findOwned(saveId, userId)
         if (save.reviewId != null) {
@@ -116,7 +113,9 @@ class SaveMockController(
         attachAssets(request.photoAssetIds)
 
         val granted = if (completed) mockTicketLedger.tryGrant(userId) else 0
-        return toResult(updated, granted, userId)
+        val result = toResult(updated, granted, userId)
+        mockIdempotencyRegistry.register(userId, endpointUpdate(saveId), key, request.toString(), result)
+        return result
     }
 
     @Operation(summary = "이어쓰기 목록", description = "미완성 저장만 내려간다 (C5·R8). 정렬은 updatedAt DESC, saveId DESC.")
@@ -182,6 +181,23 @@ class SaveMockController(
         key?.takeIf { it.isNotBlank() }
             ?: throw TmtException(ErrorCode.VALIDATION_FAILED, "$IDEMPOTENCY_KEY_HEADER 헤더는 필수입니다.")
 
+    /**
+     * 같은 사용자·엔드포인트·키의 재요청이면 최초 응답을 그대로 돌려준다 (규약 §9).
+     * 바디가 다르면 IDEMPOTENCY_CONFLICT다. 처음 보는 키면 null.
+     */
+    private fun replayed(
+        userId: Long,
+        endpoint: String,
+        key: String,
+        request: SaveRequest,
+    ): SaveResultResponse? {
+        val entry = mockIdempotencyRegistry.find(userId, endpoint, key) ?: return null
+        if (entry.bodyFingerprint != request.toString()) {
+            throw TmtException(ErrorCode.IDEMPOTENCY_CONFLICT)
+        }
+        return entry.response as SaveResultResponse
+    }
+
     private fun findOwned(
         saveId: String,
         userId: Long,
@@ -198,6 +214,11 @@ class SaveMockController(
 
         if (request.photoAssetIds.size > ReviewFormRules.PHOTO_MAX_COUNT) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "사진은 최대 ${ReviewFormRules.PHOTO_MAX_COUNT}장입니다.")
+        }
+        // DB가 save_photo.media_asset_id UNIQUE로 거부하는 자리다. mock이 더 관대하면
+        // FE가 mock 기준으로 맞춰둔 것이 실구현 전환에서 깨진다.
+        if (request.photoAssetIds.distinct().size != request.photoAssetIds.size) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "photoAssetIds에 같은 사진이 두 번 들어 있습니다.")
         }
         request.photoAssetIds.forEach { assetId ->
             val asset = mockAssetStore.findById(assetId)
@@ -344,5 +365,10 @@ class SaveMockController(
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+
+        // 멱등 등록부 키의 endpoint 성분 (규약·DB PK가 (user_id, endpoint, idem_key))
+        private const val ENDPOINT_CREATE = "POST /v1/saves"
+
+        private fun endpointUpdate(saveId: String) = "PUT /v1/saves/$saveId"
     }
 }

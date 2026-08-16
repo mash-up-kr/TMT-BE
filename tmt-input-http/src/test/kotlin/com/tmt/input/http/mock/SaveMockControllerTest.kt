@@ -108,13 +108,73 @@ class SaveMockControllerTest {
     fun `같은 키에 같은 바디면 최초 응답을 재현하고 티켓을 다시 발급하지 않는다`() {
         ownedAsset()
 
-        postSave(completeBody).andExpect(status().isCreated)
+        postSave(completeBody)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.ticket.availableCount").value(2))
+
+        // 최초 응답을 그대로 재현한다 — grantedCount를 0으로 다시 만들면 "이번 요청으로 몇 장
+        // 나갔는지"가 최초 응답과 달라진다. 티켓이 두 번 나가지 않았다는 것은 availableCount가
+        // 그대로 2인 것으로 확인된다 (3이 아니다)
         postSave(completeBody)
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.saveId").value("save_1"))
-            .andExpect(jsonPath("$.ticket.grantedCount").value(0))
+            .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.ticket.availableCount").value(2))
 
         assertEquals(1, saveStore.findAll().size)
+    }
+
+    @Test
+    fun `이어쓰기도 같은 키 재요청이면 최초 응답을 그대로 재현한다 (규약 §9)`() {
+        ownedAsset()
+        postSave("""{ "placeId": "place_1" }""").andExpect(status().isCreated)
+
+        val put =
+            put("/v1/saves/save_1")
+                .header(UserIdArgumentResolver.HEADER, "1")
+                .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "put-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(completeBody)
+
+        // 최초: 리뷰 성립 + 티켓 1장
+        mockMvc
+            .perform(put)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").value("review_1"))
+            .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+
+        // 재시도: 409가 아니라 최초 응답 그대로 (grantedCount까지 동일)
+        mockMvc
+            .perform(put)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").value("review_1"))
+            .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+    }
+
+    @Test
+    fun `POST와 PUT은 같은 키를 써도 서로의 응답을 재현하지 않는다`() {
+        postSave("""{ "placeId": "place_1" }""", idempotencyKey = "shared-key").andExpect(status().isCreated)
+
+        // 같은 키지만 endpoint가 다르므로 PUT은 새 요청으로 처리된다
+        mockMvc
+            .perform(
+                put("/v1/saves/save_1")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "shared-key")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{ "placeId": "place_1", "rating": 4 }"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").doesNotExist())
+    }
+
+    @Test
+    fun `같은 사진을 두 번 실어 보내면 VALIDATION_FAILED다`() {
+        ownedAsset()
+
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1", "asset_1"] }""")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
 
     @Test
