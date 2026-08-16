@@ -31,6 +31,7 @@ class GroupMembershipMockController(
     private val mockMembershipStore: MockMembershipStore,
     private val mockReviewShareStore: MockReviewShareStore,
     private val mockTicketLedger: MockTicketLedger,
+    private val mockIdempotencyRegistry: MockIdempotencyRegistry,
 ) {
     @Operation(summary = "가입 팝업 정보", description = "티켓 보유·부족 분기. preview는 참고값이고 가입이 조건을 다시 검증한다 (TX-3).")
     @GetMapping("/join-preview")
@@ -66,11 +67,27 @@ class GroupMembershipMockController(
         @UserId userId: Long,
         @PathVariable groupId: String,
         @RequestHeader(name = SaveMockController.IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
-        @RequestBody(required = false) request: JoinRequest?,
+        @RequestBody(required = false) requestBody: JoinRequest?,
     ): ResponseEntity<JoinResponse> {
-        if (idempotencyKey.isNullOrBlank()) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "${SaveMockController.IDEMPOTENCY_KEY_HEADER} 헤더는 필수입니다.")
+        val request = requestBody ?: JoinRequest()
+        val key =
+            idempotencyKey?.takeIf { it.isNotBlank() }
+                ?: throw TmtException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "${SaveMockController.IDEMPOTENCY_KEY_HEADER} 헤더는 필수입니다.",
+                )
+
+        // 재현 검사가 isMember 가드보다 앞에 있어야 한다 — 뒤로 가면 성공한 가입의 재시도가
+        // 409 ALREADY_GROUP_MEMBER를 받고, FE는 sourceReviewId가 공유됐는지 알 수 없다 (규약 §9)
+        val endpoint = "POST /v1/groups/$groupId/memberships"
+        mockIdempotencyRegistry.find(userId, endpoint, key)?.let { entry ->
+            if (entry.bodyFingerprint != request.toString()) {
+                throw TmtException(ErrorCode.IDEMPOTENCY_CONFLICT)
+            }
+            val replayed = entry.response as JoinResponse
+            return ResponseEntity.created(URI.create("/v1/groups/$groupId/memberships/me")).body(replayed)
         }
+
         findGroup(groupId)
 
         // 이미 가입은 티켓 부족보다 먼저 판정한다 (G8)
@@ -78,7 +95,7 @@ class GroupMembershipMockController(
             throw TmtException(ErrorCode.ALREADY_GROUP_MEMBER)
         }
 
-        val sourceReviewId = request?.sourceReviewId
+        val sourceReviewId = request.sourceReviewId
         val sourceReview =
             sourceReviewId?.let { reviewId ->
                 mockSaveStore.findAll().find { it.reviewId == reviewId && it.ownerId == userId }
@@ -93,20 +110,22 @@ class GroupMembershipMockController(
         mockMembershipStore.join(groupId, userId, joinedAt)
         sourceReview?.let { mockReviewShareStore.add(groupId, userId, it.reviewId!!) }
 
+        val response =
+            JoinResponse(
+                groupId = groupId,
+                joinedAt = joinedAt.toString(),
+                sharedReviewIds = listOfNotNull(sourceReview?.reviewId),
+                ticket =
+                    JoinResponse.TicketSummary(
+                        consumedCount = 1,
+                        availableCount = mockTicketLedger.availableCount(userId),
+                    ),
+            )
+        mockIdempotencyRegistry.register(userId, endpoint, key, request.toString(), response)
+
         return ResponseEntity
             .created(URI.create("/v1/groups/$groupId/memberships/me"))
-            .body(
-                JoinResponse(
-                    groupId = groupId,
-                    joinedAt = joinedAt.toString(),
-                    sharedReviewIds = listOfNotNull(sourceReview?.reviewId),
-                    ticket =
-                        JoinResponse.TicketSummary(
-                            consumedCount = 1,
-                            availableCount = mockTicketLedger.availableCount(userId),
-                        ),
-                ),
-            )
+            .body(response)
     }
 
     @Operation(summary = "탈퇴", description = "그 그룹에 공유했던 내 리뷰가 전부 내려간다 (G10). 티켓은 돌아오지 않는다 (T9).")
@@ -175,9 +194,6 @@ class GroupMembershipMockController(
         findGroup(groupId)
         if (!mockMembershipStore.isMember(groupId, userId)) {
             throw TmtException(ErrorCode.GROUP_MEMBERSHIP_REQUIRED)
-        }
-        if (request.reviewIds.size > SHARE_LIMIT_PER_GROUP) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "reviewIds는 그룹당 최대 ${SHARE_LIMIT_PER_GROUP}건입니다.")
         }
         val myReviewIds =
             mockSaveStore
@@ -257,8 +273,5 @@ class GroupMembershipMockController(
 
     companion object {
         private const val REQUIRED_TICKETS = 1
-
-        // 그룹당 공유 총량 상한 (H §3-2, 팀 확인 2026-08-14)
-        private const val SHARE_LIMIT_PER_GROUP = 50
     }
 }

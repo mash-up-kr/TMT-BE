@@ -22,6 +22,7 @@ class GroupMembershipMockControllerTest {
     private val membershipStore = MockMembershipStore()
     private val shareStore = MockReviewShareStore()
     private val ticketLedger = MockTicketLedger()
+    private val idempotencyRegistry = MockIdempotencyRegistry()
 
     private val place = MockFixtures.place(placeStore, "델리스피자")
     private val group: MockGroup =
@@ -50,6 +51,7 @@ class GroupMembershipMockControllerTest {
                     membershipStore,
                     shareStore,
                     ticketLedger,
+                    idempotencyRegistry,
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice(), MockTicketExceptionAdvice())
@@ -113,6 +115,26 @@ class GroupMembershipMockControllerTest {
             .andExpect(jsonPath("$.sharedReviewIds[0]").value("review_1"))
 
         assertEquals(setOf("review_1"), shareStore.userShares(group.groupId, 1))
+    }
+
+    @Test
+    fun `같은 키로 재시도하면 409가 아니라 최초 응답을 재현한다 (규약 §9)`() {
+        MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_1")
+        val body = """{ "sourceReviewId": "review_1" }"""
+
+        join(body = body)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.sharedReviewIds[0]").value("review_1"))
+            .andExpect(jsonPath("$.ticket.availableCount").value(0))
+
+        // 재시도해도 ALREADY_GROUP_MEMBER가 아니라 같은 응답 — 공유 결과를 FE가 다시 확인할 수 있다
+        join(body = body)
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.sharedReviewIds[0]").value("review_1"))
+            .andExpect(jsonPath("$.ticket.consumedCount").value(1))
+
+        // 티켓이 두 번 소비되지는 않았다
+        assertEquals(0, ticketLedger.availableCount(1))
     }
 
     @Test

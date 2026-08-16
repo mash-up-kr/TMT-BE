@@ -139,6 +139,7 @@ class GroupMockController(
             }
         // 그룹장은 탈퇴할 수 없다(G11) = 생성자는 멤버다. 자기 그룹 가입에 티켓은 들지 않는다
         mockMembershipStore.join(group.groupId, userId, group.createdAt)
+        attachImage(newAssetId = group.imageAssetId, previousAssetId = null)
 
         return ResponseEntity
             .created(URI.create("/v1/groups/${group.groupId}"))
@@ -209,7 +210,7 @@ class GroupMockController(
         if (group.ownerId != userId) {
             throw TmtException(ErrorCode.GROUP_OWNER_REQUIRED)
         }
-        validate(request, requesterId = userId)
+        validate(request, requesterId = userId, currentImageAssetId = group.imageAssetId)
         if (mockGroupStore.findAll().any { it.name == request.name && it.groupId != groupId }) {
             throw TmtException(ErrorCode.GROUP_NAME_DUPLICATED)
         }
@@ -225,6 +226,7 @@ class GroupMockController(
                     regionTagIds = request.regionTagIds,
                 )
             } ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
+        attachImage(newAssetId = updated.imageAssetId, previousAssetId = group.imageAssetId)
         return groupAssembler.detail(updated, userId)
     }
 
@@ -234,6 +236,7 @@ class GroupMockController(
     private fun validate(
         request: GroupRequest,
         requesterId: Long,
+        currentImageAssetId: String? = null,
     ) {
         if (request.name.isBlank() || request.oneLineDescription.isBlank()) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "name과 oneLineDescription은 필수입니다.")
@@ -259,7 +262,24 @@ class GroupMockController(
             if (asset == null || asset.ownerId != requesterId) {
                 throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
             }
+            if (asset.attached && assetId != currentImageAssetId) {
+                throw TmtException(ErrorCode.MEDIA_ALREADY_ATTACHED)
+            }
         }
+    }
+
+    /**
+     * 그룹 대표 이미지도 리뷰 사진과 같은 업로드 경로를 쓰므로(M7) 붙일 때 ATTACHED로 전이시켜야
+     * 한다 — STAGED로 남으면 TTL 정리(M4)가 사용 중인 그룹 이미지를 지운다.
+     * 이미지를 교체하면 이전 asset은 STAGED로 되돌려 TTL 정리 대상이 되게 한다.
+     */
+    private fun attachImage(
+        newAssetId: String?,
+        previousAssetId: String?,
+    ) {
+        if (newAssetId == previousAssetId) return
+        previousAssetId?.let { mockAssetStore.update(it) { asset -> asset.copy(attached = false) } }
+        newAssetId?.let { mockAssetStore.update(it) { asset -> asset.copy(attached = true) } }
     }
 
     data class GroupRequest(
