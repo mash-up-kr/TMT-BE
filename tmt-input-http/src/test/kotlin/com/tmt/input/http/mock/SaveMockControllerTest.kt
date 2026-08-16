@@ -21,6 +21,7 @@ class SaveMockControllerTest {
         }
     private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
+    private val aiSummaryStore = MockAiSummaryStore()
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
@@ -32,6 +33,7 @@ class SaveMockControllerTest {
                     MockTicketLedger(),
                     MockReviewIdGenerator(),
                     MockIdempotencyRegistry(),
+                    aiSummaryStore,
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -254,9 +256,23 @@ class SaveMockControllerTest {
     }
 
     @Test
-    fun `리뷰가 된 저장의 상세에는 AI 요약이 붙는다 (A1)`() {
+    fun `방금 작성한 리뷰에는 AI 요약이 아직 없다 (A2)`() {
         ownedAsset()
         postSave(completeBody).andExpect(status().isCreated)
+
+        // 요약은 리뷰 커밋 이후 별도로 생성된다 — 작성 직후 조회는 항상 null이다
+        mockMvc
+            .perform(get("/v1/saves/save_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").value("review_1"))
+            .andExpect(jsonPath("$.aiSummary").doesNotExist())
+    }
+
+    @Test
+    fun `요약이 생성된 뒤에는 상세에 붙는다 (A1)`() {
+        ownedAsset()
+        postSave(completeBody).andExpect(status().isCreated)
+        aiSummaryStore.put("review_1", pros = "분위기가 좋아요", cons = "웨이팅이 많아요")
 
         mockMvc
             .perform(get("/v1/saves/save_1").header(UserIdArgumentResolver.HEADER, "1"))

@@ -40,14 +40,7 @@ class PlaceMockController(
         }
 
         var results = mockPlaceStore.findAll()
-        query?.takeIf { it.isNotBlank() }?.let { q ->
-            results =
-                results.filter {
-                    it.name.contains(q, ignoreCase = true) ||
-                        it.roadAddress.contains(q) ||
-                        it.categoryName?.contains(q) == true
-                }
-        }
+        query?.takeIf { it.isNotBlank() }?.let { q -> results = results.filter { it.matchesQuery(q) } }
         curationTagId?.let { chip ->
             results = results.filter(CurationPresets.matcher(chip))
         }

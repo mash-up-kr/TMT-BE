@@ -49,7 +49,7 @@ class PlaceDetailMockController(
                                 reviewId = save.reviewId!!,
                             )
                         }
-                    },
+                    }.take(MAX_PHOTOS),
             roadAddress = place.roadAddress,
             latitude = place.latitude,
             longitude = place.longitude,
@@ -136,4 +136,10 @@ class PlaceDetailMockController(
         val placeId: String,
         val isFavorite: Boolean,
     )
+
+    companion object {
+        // 매장 사진은 리뷰에서 파생하므로(P7) 리뷰가 쌓이면 무한히 늘어난다. 화면에 전체보기
+        // 진입점이 없어 다 쓰지도 못하므로 최신순 5장으로 자른다 — 그룹 커버(G16)와 같은 수.
+        private const val MAX_PHOTOS = 5
+    }
 }

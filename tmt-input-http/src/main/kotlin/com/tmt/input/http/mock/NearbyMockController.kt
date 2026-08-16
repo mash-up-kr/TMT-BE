@@ -76,7 +76,7 @@ class NearbyMockController(
                 .findAll()
                 .filter { it.latitude in south..north && it.longitude in west..east }
                 .filter { (reviewCounts[it.placeId] ?: 0) > 0 }
-        query?.takeIf { it.isNotBlank() }?.let { q -> pins = pins.filter { it.name.contains(q, ignoreCase = true) } }
+        query?.takeIf { it.isNotBlank() }?.let { q -> pins = pins.filter { it.matchesQuery(q) } }
         curationTagId?.let { chip -> pins = pins.filter(CurationPresets.matcher(chip)) }
 
         val truncated = pins.size > MAX_PINS

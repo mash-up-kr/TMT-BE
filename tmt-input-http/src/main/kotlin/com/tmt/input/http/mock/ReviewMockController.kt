@@ -29,6 +29,7 @@ class ReviewMockController(
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockAssetStore: InMemoryStore<MockAsset>,
     private val mockTicketLedger: MockTicketLedger,
+    private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
     @Operation(summary = "공개 리뷰 상세", description = "완성된 리뷰만 대상이고 미완성 저장은 조회되지 않는다 (R8). 개인 리뷰 열람에는 게이트가 없다 (G2).")
     @GetMapping
@@ -62,7 +63,7 @@ class ReviewMockController(
                 },
             rating = requireNotNull(save.rating) { "리뷰는 별점이 필수라 null이 아니다 (C4)" },
             content = requireNotNull(save.content),
-            aiSummary = ReviewDetailResponse.AiSummary(pros = "분위기가 좋아요", cons = "가격이 좀 나가고 웨이팅이 많아요"),
+            aiSummary = mockAiSummaryStore.find(reviewId)?.let { ReviewDetailResponse.AiSummary(it.pros, it.cons) },
             isMine = userId != null && save.ownerId == userId,
             createdAt = save.createdAt.toString(),
         )

@@ -17,12 +17,13 @@ class ReviewMockControllerTest {
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
     private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
     private val ticketLedger = MockTicketLedger()
+    private val aiSummaryStore = MockAiSummaryStore()
 
     private val place = MockFixtures.place(placeStore, "델리스피자")
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(ReviewMockController(saveStore, placeStore, assetStore, ticketLedger))
+            .standaloneSetup(ReviewMockController(saveStore, placeStore, assetStore, ticketLedger, aiSummaryStore))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice(), MockReviewExceptionAdvice())
             .build()
@@ -96,5 +97,26 @@ class ReviewMockControllerTest {
             .perform(delete("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "1"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("REVIEW_NOT_FOUND"))
+    }
+
+    @Test
+    fun `요약이 생성되기 전에는 aiSummary가 null이다 (A2)`() {
+        MockFixtures.review(saveStore, place.placeId, ownerId = 7, reviewId = "review_1")
+
+        mockMvc
+            .perform(get("/v1/reviews/review_1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.aiSummary").doesNotExist())
+    }
+
+    @Test
+    fun `요약이 생성되면 aiSummary가 채워진다`() {
+        MockFixtures.review(saveStore, place.placeId, ownerId = 7, reviewId = "review_1")
+        aiSummaryStore.put("review_1", pros = "분위기가 좋아요", cons = "웨이팅이 많아요")
+
+        mockMvc
+            .perform(get("/v1/reviews/review_1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.aiSummary.pros").value("분위기가 좋아요"))
     }
 }

@@ -7,6 +7,7 @@ package com.tmt.input.http.mock
 class ReviewCardAssembler(
     private val placeStore: InMemoryStore<MockPlace>,
     private val favoriteStore: MockFavoriteStore,
+    private val aiSummaryStore: MockAiSummaryStore,
 ) {
     fun assemble(
         save: MockSave,
@@ -34,7 +35,7 @@ class ReviewCardAssembler(
                         order = index,
                     )
                 },
-            aiSummary = MOCK_AI_SUMMARY,
+            aiSummary = aiSummaryStore.find(reviewId)?.let { ReviewCardResponse.AiSummary(it.pros, it.cons) },
             content = requireNotNull(save.content) { "리뷰는 본문이 필수다 (C4)" },
             tags =
                 (save.companionTagIds + save.positivePointTagIds).map {
@@ -85,11 +86,6 @@ class ReviewCardAssembler(
             val regionName: String,
             val isFavorite: Boolean,
         )
-    }
-
-    companion object {
-        // AI 요약은 별도 트랜잭션에서 생성된다 (A2) — mock은 고정 요약을 내린다
-        private val MOCK_AI_SUMMARY = ReviewCardResponse.AiSummary(pros = "분위기가 좋아요", cons = "가격이 좀 나가고 웨이팅이 많아요")
     }
 }
 

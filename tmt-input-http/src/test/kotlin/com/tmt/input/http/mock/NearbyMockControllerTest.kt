@@ -13,6 +13,7 @@ class NearbyMockControllerTest {
     private val placeStore = InMemoryStore<MockPlace>(idPrefix = "place")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
     private val favoriteStore = MockFavoriteStore()
+    private val aiSummaryStore = MockAiSummaryStore()
 
     // 기준점(37.5399, 126.9515) / 800m쯤 북쪽 / 5km 밖 세 곳
     private val near = MockFixtures.place(placeStore, "가까운 집", 37.5399, 126.9515)
@@ -22,7 +23,11 @@ class NearbyMockControllerTest {
     private val mockMvc: MockMvc =
         MockMvcBuilders
             .standaloneSetup(
-                NearbyMockController(saveStore, placeStore, ReviewCardAssembler(placeStore, favoriteStore)),
+                NearbyMockController(
+                    saveStore,
+                    placeStore,
+                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore),
+                ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
@@ -101,6 +106,24 @@ class NearbyMockControllerTest {
             .andExpect(jsonPath("$.items[0].placeId").value(near.placeId))
             .andExpect(jsonPath("$.items[0].reviewCount").value(2))
             .andExpect(jsonPath("$.truncated").value(false))
+    }
+
+    @Test
+    fun `지도 핀 검색어는 목록과 같은 대상을 본다 — 주소로도 찾힌다 (E9)`() {
+        MockFixtures.review(saveStore, near.placeId, reviewId = "review_1")
+
+        // near 픽스처의 주소가 "서울 마포구 도화동 200-14"라 가게명이 아닌 주소로도 걸려야 한다
+        mockMvc
+            .perform(
+                get("/v1/nearby/places")
+                    .param("north", "38.0")
+                    .param("south", "37.0")
+                    .param("east", "127.5")
+                    .param("west", "126.5")
+                    .param("query", "도화동"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].placeId").value(near.placeId))
     }
 
     @Test
