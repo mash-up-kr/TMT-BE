@@ -28,6 +28,10 @@ class MockMembershipStore {
     ): Boolean = userId != null && membersByGroup[groupId]?.containsKey(userId) == true
 
     fun memberCount(groupId: String): Int = membersByGroup[groupId]?.size ?: 0
+
+    /** 내가 가입한 그룹과 가입 시각 — 홈의 내 그룹 목록은 가입 오래된 순이다 (A §2). */
+    fun joinedGroups(userId: Long): List<Pair<String, Instant>> =
+        membersByGroup.entries.mapNotNull { (groupId, members) -> members[userId]?.let { groupId to it } }
 }
 
 /** 그룹 리뷰 공유 — 사용자별 집합으로 관리한다 (G14). PUT 전체 교체의 단위가 (그룹, 사용자)다. */
