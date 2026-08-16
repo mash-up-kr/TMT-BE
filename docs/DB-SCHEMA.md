@@ -86,6 +86,7 @@ erDiagram
 | 홈 피드 (G19) | 내 ACTIVE 멤버십의 그룹들 → share → review 합집합 DISTINCT | `membership_user_ix` + `share_gate_ix` |
 | 티켓 잔액·소비 (T5·T7) | `COUNT(*)` / 조건부 UPDATE 오래된 순 1장 | `ticket_available_ix` |
 | 보유 상한 999 (T6) | 발급 전 잔액 COUNT — 같은 인덱스 | `ticket_available_ix` |
+| 방문 횟수 (S7) | `save WHERE user_id=:me AND place_id=:p AND deleted_at IS NULL` COUNT — 저장(Save) 기준 (질문 4) | `save_owner_ix` |
 
 ## 5. mock과의 대응
 

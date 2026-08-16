@@ -36,7 +36,9 @@ CREATE TABLE place (
     CONSTRAINT place_external_uq UNIQUE (external_source, external_id)   -- P5
 );
 CREATE INDEX place_location_gix ON place USING GIST (location);          -- 반경·viewport (E1·E8)
-CREATE INDEX place_name_trgm    ON place USING GIN (name gin_trgm_ops);  -- E9
+-- E9 대상(가게명·주소·카테고리) 중 가게명만 커버한다. 주소·카테고리 검색은
+-- 인덱스 없이도 동작하므로 느려지면 후속으로 붙인다.
+CREATE INDEX place_name_trgm    ON place USING GIN (name gin_trgm_ops);
 CREATE INDEX place_pins_ix      ON place (review_count) WHERE review_count > 0;  -- 지도 핀 (E6)
 
 -- ── 찜 (F1·F2) ──────────────────────────────────────────
@@ -138,7 +140,9 @@ CREATE TABLE group_join_ticket (
     user_id         BIGINT NOT NULL REFERENCES users(id),
     reward_grant_id BIGINT NOT NULL UNIQUE REFERENCES reward_grant(id),  -- 근거 1건당 1장 (§3)
     status          VARCHAR(10) NOT NULL DEFAULT 'AVAILABLE',   -- T4: EXPIRED 없음
-    consumed_group_id BIGINT,                                   -- 소비처 추적
+    -- 소비처 로그. TX-3의 티켓 확보 UPDATE가 consumed_at과 함께 채운다 (도메인 v2 반영 예정).
+    -- 로그 성격이라 FK를 걸지 않는다 — 그룹 삭제가 생겨도 로그가 지워지거나 삭제를 막지 않게.
+    consumed_group_id BIGINT,
     consumed_at     timestamptz,
     revoked_at      timestamptz,
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -161,7 +165,9 @@ CREATE TABLE groups (                                           -- "group"은 �
     created_at       timestamptz NOT NULL DEFAULT now(),
     updated_at       timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX groups_name_trgm ON groups USING GIN (name gin_trgm_ops);   -- G18
+-- G18 대상(그룹명·한줄 소개·그룹 태그) 중 그룹명만 커버한다. one_line_description·
+-- group_region_tag 경로는 인덱스 없이도 동작하므로 느려지면 후속으로 붙인다.
+CREATE INDEX groups_name_trgm ON groups USING GIN (name gin_trgm_ops);
 CREATE INDEX groups_recommend_ix ON groups (member_count DESC, id DESC); -- G17 2·3차 키
 
 CREATE TABLE group_region_tag (
