@@ -23,8 +23,30 @@ class MockStoreConfig {
     @Bean
     fun mockAssetStore(): InMemoryStore<MockAsset> = InMemoryStore(idPrefix = "asset")
 
+    /**
+     * 시드 리뷰를 함께 넣는다 — 부팅 직후 피드·가게 상세·검색이 비어 있으면 FE가 화면을
+     * 그려볼 수 없다. 시드 리뷰만 AI 요약을 갖고(A2), 런타임에 작성한 리뷰는 요약이 없다.
+     */
     @Bean
-    fun mockSaveStore(): InMemoryStore<MockSave> = InMemoryStore(idPrefix = "save")
+    fun mockSaveStore(
+        mockReviewIdGenerator: MockReviewIdGenerator,
+        mockAiSummaryStore: MockAiSummaryStore,
+        mockAssetStore: InMemoryStore<MockAsset>,
+    ): InMemoryStore<MockSave> =
+        InMemoryStore<MockSave>(idPrefix = "save").apply {
+            SEED_REVIEWS.forEach { seed ->
+                val asset =
+                    mockAssetStore.create { id ->
+                        MockAsset(assetId = id, ownerId = SEED_USER_ID, contentType = "image/jpeg", attached = true)
+                    }
+                val reviewId = mockReviewIdGenerator.next()
+                create { id -> seed(id, reviewId, asset.assetId) }
+                mockAiSummaryStore.put(reviewId, pros = "분위기가 좋아요", cons = "가격이 좀 나가고 웨이팅이 많아요")
+            }
+        }
+
+    @Bean
+    fun mockAiSummaryStore(): MockAiSummaryStore = MockAiSummaryStore()
 
     @Bean
     fun mockTicketLedger(): MockTicketLedger = MockTicketLedger()
@@ -35,11 +57,78 @@ class MockStoreConfig {
     @Bean
     fun mockIdempotencyRegistry(): MockIdempotencyRegistry = MockIdempotencyRegistry()
 
+    @Bean
+    fun mockFavoriteStore(): MockFavoriteStore = MockFavoriteStore()
+
+    @Bean
+    fun reviewCardAssembler(
+        mockPlaceStore: InMemoryStore<MockPlace>,
+        mockFavoriteStore: MockFavoriteStore,
+        mockAiSummaryStore: MockAiSummaryStore,
+    ): ReviewCardAssembler = ReviewCardAssembler(mockPlaceStore, mockFavoriteStore, mockAiSummaryStore)
+
     companion object {
+        // 시드 데이터의 작성자 — 실제 사용자와 겹치지 않는 가상 ID (그룹 시드의 ownerId와 같다)
+        const val SEED_USER_ID = 999L
+
+        // 부팅 시드 리뷰 (saveId, reviewId, assetId) → 남이 예전에 써둔 완성 리뷰
+        private val SEED_REVIEWS: List<(String, String, String) -> MockSave> =
+            listOf(
+                { id, reviewId, assetId ->
+                    seedReview(
+                        id,
+                        reviewId,
+                        assetId,
+                        placeId = "place_1",
+                        rating = 5,
+                        content = "도우가 얇고 바삭해요. 재방문 의사 있습니다.",
+                    )
+                },
+                { id, reviewId, assetId ->
+                    seedReview(id, reviewId, assetId, placeId = "place_3", rating = 4, content = "육수가 깔끔하고 면이 쫄깃합니다.")
+                },
+                { id, reviewId, assetId ->
+                    seedReview(
+                        id,
+                        reviewId,
+                        assetId,
+                        placeId = "place_6",
+                        rating = 5,
+                        content = "오마카세 구성이 알차고 셰프님이 친절해요.",
+                    )
+                },
+            )
+
+        private fun seedReview(
+            saveId: String,
+            reviewId: String,
+            assetId: String,
+            placeId: String,
+            rating: Int,
+            content: String,
+        ): MockSave {
+            val at = java.time.Instant.parse("2026-08-12T09:11:03.412Z")
+            return MockSave(
+                saveId = saveId,
+                ownerId = SEED_USER_ID,
+                placeId = placeId,
+                photoAssetIds = listOf(assetId),
+                companionTagIds = listOf("tag_friend"),
+                positivePointTagIds = listOf("tag_tasty"),
+                rating = rating,
+                content = content,
+                reviewId = reviewId,
+                createdAt = at,
+                updatedAt = at,
+            )
+        }
+
         // 도그푸딩 시나리오용 시드 — 검색이 비어 있으면 FE가 1단계를 진행할 수 없다
         private val SEED_PLACES: List<(String) -> MockPlace> =
             listOf(
-                { id -> MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515) },
+                { id ->
+                    MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515, "010 5244 6041")
+                },
                 { id -> MockPlace(id, "오즈 커피", "서울 마포구 도화동 201-1", "마포구 도화동", "카페·디저트", 37.5401, 126.9520) },
                 { id -> MockPlace(id, "서북면옥", "서울 중구 을지로3가 296-1", "중구 을지로3가", "한식", 37.5663, 126.9910) },
                 { id -> MockPlace(id, "을지면옥", "서울 중구 입정동 161", "중구 입정동", "한식", 37.5667, 126.9925) },
@@ -56,6 +145,22 @@ class MockTicketLedger {
     private val counts = ConcurrentHashMap<Long, Int>()
 
     fun availableCount(userId: Long): Int = counts.getOrDefault(userId, SIGNUP_BONUS)
+
+    /** 티켓 1장 회수를 시도한다. 잔고가 0이면 false — 리뷰 삭제가 거부되는 조건이다 (R7). */
+    fun tryConsume(userId: Long): Boolean {
+        var consumed = false
+        counts.compute(userId) { _, current ->
+            val base = current ?: SIGNUP_BONUS
+            if (base > 0) {
+                consumed = true
+                base - 1
+            } else {
+                consumed = false
+                base
+            }
+        }
+        return consumed
+    }
 
     /** 티켓 1장 발급을 시도하고 실제 발급 수(0 또는 1)를 돌려준다. 상한 도달 시 0 (T6). */
     fun tryGrant(userId: Long): Int {

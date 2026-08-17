@@ -10,6 +10,8 @@ data class MockPlace(
     val categoryName: String?,
     val latitude: Double,
     val longitude: Double,
+    // 공공데이터에 결측이 많아 null이 흔하다 (B §3-1) — 시드도 일부만 채운다
+    val phoneNumber: String? = null,
 )
 
 data class MockAddress(

@@ -33,6 +33,7 @@ class SaveMockController(
     private val mockTicketLedger: MockTicketLedger,
     private val mockReviewIdGenerator: MockReviewIdGenerator,
     private val mockIdempotencyRegistry: MockIdempotencyRegistry,
+    private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
     @Operation(summary = "작성 완료 (신규)", description = "저장이 생기고, 완성도 판정(C4)을 충족하면 리뷰와 티켓까지 같은 트랜잭션에서 나간다.")
     @PostMapping
@@ -168,11 +169,8 @@ class SaveMockController(
                 },
             rating = save.rating,
             content = save.content,
-            aiSummary =
-                save.reviewId?.let {
-                    // AI 요약은 별도 트랜잭션에서 생성된다 (A2) — mock은 리뷰가 되는 즉시 고정 요약을 내린다
-                    AiSummaryResponse(pros = "분위기가 좋아요", cons = "가격이 좀 나가고 웨이팅이 많아요")
-                },
+            // 리뷰가 아니거나 요약이 아직 생성되지 않았으면 null (A2)
+            aiSummary = save.reviewId?.let { mockAiSummaryStore.find(it) }?.let { AiSummaryResponse(it.pros, it.cons) },
             createdAt = save.createdAt.toString(),
         )
     }
