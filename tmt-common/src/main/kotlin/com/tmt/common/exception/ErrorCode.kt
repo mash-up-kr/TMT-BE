@@ -38,4 +38,14 @@ enum class ErrorCode(
     REVIEW_TAG_NOT_FOUND(ErrorType.VALIDATION, "정의되지 않은 태그입니다."),
     REVIEW_NOT_FOUND(ErrorType.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
     REVIEW_DELETE_TICKET_REQUIRED(ErrorType.CONFLICT, "리뷰를 삭제하려면 티켓 1장이 필요합니다."),
+
+    // 그룹
+    GROUP_NOT_FOUND(ErrorType.NOT_FOUND, "그룹을 찾을 수 없습니다."),
+    GROUP_TAG_NOT_FOUND(ErrorType.VALIDATION, "정의되지 않은 카테고리·지역 값입니다."),
+    GROUP_NAME_DUPLICATED(ErrorType.CONFLICT, "같은 이름의 그룹이 있습니다."),
+    GROUP_OWNER_REQUIRED(ErrorType.FORBIDDEN, "그룹 생성자만 할 수 있습니다."),
+    GROUP_OWNER_CANNOT_LEAVE(ErrorType.UNPROCESSABLE, "그룹장은 탈퇴할 수 없습니다."),
+    GROUP_MEMBERSHIP_REQUIRED(ErrorType.FORBIDDEN, "가입하지 않은 그룹입니다."),
+    ALREADY_GROUP_MEMBER(ErrorType.CONFLICT, "이미 가입한 그룹입니다."),
+    GROUP_JOIN_TICKET_REQUIRED(ErrorType.CONFLICT, "그룹 가입에 필요한 티켓이 부족합니다."),
 }

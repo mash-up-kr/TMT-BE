@@ -42,3 +42,15 @@ data class MockSave(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
+
+data class MockGroup(
+    val groupId: String,
+    val name: String,
+    val oneLineDescription: String,
+    val description: String?,
+    val imageAssetId: String?,
+    val foodCategoryId: String,
+    val regionTagIds: List<String>,
+    val ownerId: Long,
+    val createdAt: Instant,
+)

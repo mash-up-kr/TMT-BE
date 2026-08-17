@@ -61,6 +61,29 @@ class MockStoreConfig {
     fun mockFavoriteStore(): MockFavoriteStore = MockFavoriteStore()
 
     @Bean
+    fun mockGroupStore(mockMembershipStore: MockMembershipStore): InMemoryStore<MockGroup> =
+        InMemoryStore<MockGroup>(idPrefix = "group").apply {
+            SEED_GROUPS.forEach { seed ->
+                val group = create { id -> seed(id) }
+                // 생성자는 자동 가입 (그룹장은 탈퇴 불가 = 멤버)
+                mockMembershipStore.join(group.groupId, group.ownerId, group.createdAt)
+            }
+        }
+
+    @Bean
+    fun mockMembershipStore(): MockMembershipStore = MockMembershipStore()
+
+    @Bean
+    fun mockReviewShareStore(): MockReviewShareStore = MockReviewShareStore()
+
+    @Bean
+    fun groupAssembler(
+        mockSaveStore: InMemoryStore<MockSave>,
+        mockMembershipStore: MockMembershipStore,
+        mockReviewShareStore: MockReviewShareStore,
+    ): GroupAssembler = GroupAssembler(mockSaveStore, mockMembershipStore, mockReviewShareStore)
+
+    @Bean
     fun reviewCardAssembler(
         mockPlaceStore: InMemoryStore<MockPlace>,
         mockFavoriteStore: MockFavoriteStore,
@@ -95,6 +118,37 @@ class MockStoreConfig {
                         placeId = "place_6",
                         rating = 5,
                         content = "오마카세 구성이 알차고 셰프님이 친절해요.",
+                    )
+                },
+            )
+
+        // 그룹 탐색이 비어 있으면 FE가 목록 화면을 못 그린다 — 시드 그룹 2개 (owner는 가상 사용자 999)
+        private val SEED_GROUPS: List<(String) -> MockGroup> =
+            listOf(
+                { id ->
+                    MockGroup(
+                        groupId = id,
+                        name = "성수 커피 탐험대",
+                        oneLineDescription = "조용히 커피 맛에 집중하는 사람들",
+                        description = "아직 뚫리지 않은 느좋 카페들을 다 모아보고싶어요. 좋은데 있으면 공유합시다.",
+                        imageAssetId = null,
+                        foodCategoryId = "cat_cafe",
+                        regionTagIds = listOf("region_seongdong"),
+                        ownerId = 999,
+                        createdAt = java.time.Instant.parse("2026-08-10T00:00:00Z"),
+                    )
+                },
+                { id ->
+                    MockGroup(
+                        groupId = id,
+                        name = "나는야 초밥왕",
+                        oneLineDescription = "회전 초밥부터 오마카세까지",
+                        description = null,
+                        imageAssetId = null,
+                        foodCategoryId = "cat_japanese",
+                        regionTagIds = listOf("region_seoul_all"),
+                        ownerId = 999,
+                        createdAt = java.time.Instant.parse("2026-08-11T00:00:00Z"),
                     )
                 },
             )

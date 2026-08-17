@@ -3,23 +3,15 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
-import com.tmt.input.http.exception.toHttpStatus
-import com.tmt.input.http.filter.RequestIdFilter
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.core.Ordered
-import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
-import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.bind.annotation.RestControllerAdvice
-import java.time.Instant
 
 @Tag(name = "리뷰 상세 (mock)", description = "명세 v2 — I §6-3·§6-4")
 @RestController
@@ -126,34 +118,5 @@ class ReviewMockController(
             val pros: String?,
             val cons: String?,
         )
-    }
-}
-
-/** 화면 갱신용 티켓 상태를 오류 응답에 함께 싣는다 (I §6-4, 공통 규약 §3-2). */
-class ReviewDeleteTicketRequiredException(
-    val availableCount: Int,
-) : RuntimeException(ErrorCode.REVIEW_DELETE_TICKET_REQUIRED.defaultMessage)
-
-// ExceptionAdvice의 Exception 캐치올보다 먼저 평가돼야 한다 — 어드바이스 간 우선순위는 @Order가 정한다
-@Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice
-class MockReviewExceptionAdvice {
-    @ExceptionHandler(ReviewDeleteTicketRequiredException::class)
-    fun handleTicketRequired(e: ReviewDeleteTicketRequiredException): ProblemDetail {
-        val errorCode = ErrorCode.REVIEW_DELETE_TICKET_REQUIRED
-        return ProblemDetail.forStatus(errorCode.errorType.toHttpStatus()).apply {
-            title = errorCode.defaultMessage
-            setProperty("code", errorCode.name)
-            setProperty("timestamp", Instant.now())
-            setProperty(
-                "ticket",
-                mapOf(
-                    "requiredCount" to 1,
-                    "availableCount" to e.availableCount,
-                    "shortageCount" to 1 - e.availableCount,
-                ),
-            )
-            RequestIdFilter.current()?.let { setProperty("requestId", it) }
-        }
     }
 }

@@ -1,0 +1,317 @@
+package com.tmt.input.http.mock
+
+import com.tmt.input.http.auth.UserIdArgumentResolver
+import com.tmt.input.http.exception.ExceptionAdvice
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
+
+class GroupMockControllerTest {
+    private val placeStore = InMemoryStore<MockPlace>(idPrefix = "place")
+    private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
+    private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
+    private val groupStore = InMemoryStore<MockGroup>(idPrefix = "group")
+    private val membershipStore = MockMembershipStore()
+    private val shareStore = MockReviewShareStore()
+    private val favoriteStore = MockFavoriteStore()
+    private val aiSummaryStore = MockAiSummaryStore()
+    private val groupAssembler = GroupAssembler(saveStore, membershipStore, shareStore)
+
+    private val mockMvc: MockMvc =
+        MockMvcBuilders
+            .standaloneSetup(
+                GroupMockController(
+                    groupStore,
+                    assetStore,
+                    membershipStore,
+                    groupAssembler,
+                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore),
+                ),
+            ).setCustomArgumentResolvers(UserIdArgumentResolver())
+            .setControllerAdvice(ExceptionAdvice())
+            .build()
+
+    private fun seedGroup(
+        name: String = "성수 커피 탐험대",
+        ownerId: Long = 999,
+        oneLine: String = "조용히 커피 맛에 집중하는 사람들",
+        foodCategoryId: String = "cat_cafe",
+    ): MockGroup {
+        val group =
+            groupStore.create { id ->
+                MockGroup(
+                    id,
+                    name,
+                    oneLine,
+                    null,
+                    null,
+                    foodCategoryId,
+                    listOf("region_seongdong"),
+                    ownerId,
+                    Instant.now(),
+                )
+            }
+        membershipStore.join(group.groupId, ownerId, group.createdAt)
+        return group
+    }
+
+    private val createBody =
+        """
+        {
+          "name": "나는야 초밥왕",
+          "oneLineDescription": "회전 초밥부터 오마카세까지",
+          "foodCategoryId": "cat_japanese",
+          "regionTagIds": ["region_seoul_all"]
+        }
+        """.trimIndent()
+
+    @Test
+    fun `그룹을 만들면 생성자가 그룹장이자 멤버가 된다 (G13)`() {
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody),
+            ).andExpect(status().isCreated)
+            .andExpect(header().string("Location", "/v1/groups/group_1"))
+            .andExpect(jsonPath("$.groupId").value("group_1"))
+            .andExpect(jsonPath("$.isOwner").value(true))
+            .andExpect(jsonPath("$.isMember").value(true))
+            .andExpect(jsonPath("$.memberCount").value(1))
+            .andExpect(jsonPath("$.foodCategory.label").value("일식"))
+            .andExpect(jsonPath("$.regionTags[0].label").value("서울 전체"))
+            .andExpect(jsonPath("$.coverImages").isEmpty)
+    }
+
+    @Test
+    fun `같은 이름의 그룹은 만들 수 없다 (G6)`() {
+        seedGroup(name = "나는야 초밥왕")
+
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("GROUP_NAME_DUPLICATED"))
+    }
+
+    @Test
+    fun `지역 태그가 비어 있으면 VALIDATION_FAILED다 (G7)`() {
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.replace("""["region_seoul_all"]""", "[]")),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `정의에 없는 태그는 GROUP_TAG_NOT_FOUND다`() {
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.replace("cat_japanese", "cat_ghost")),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("GROUP_TAG_NOT_FOUND"))
+    }
+
+    @Test
+    fun `이름 중복 확인은 참고값을 돌려준다`() {
+        seedGroup(name = "성수 커피 탐험대")
+
+        mockMvc
+            .perform(
+                get("/v1/groups/name-availability")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .param("name", "성수 커피 탐험대"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.available").value(false))
+
+        mockMvc
+            .perform(
+                get("/v1/groups/name-availability")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .param("name", "새 그룹"),
+            ).andExpect(jsonPath("$.available").value(true))
+    }
+
+    @Test
+    fun `탐색은 그룹명·한줄 소개·태그를 검색한다 (G18)`() {
+        seedGroup(name = "성수 커피 탐험대")
+        seedGroup(name = "나는야 초밥왕", oneLine = "회전 초밥부터 오마카세까지", foodCategoryId = "cat_japanese")
+
+        mockMvc
+            .perform(get("/v1/groups").param("query", "커피"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].name").value("성수 커피 탐험대"))
+
+        // 태그 라벨(카페·디저트)로도 찾는다
+        mockMvc
+            .perform(get("/v1/groups").param("query", "카페"))
+            .andExpect(jsonPath("$.items.length()").value(1))
+    }
+
+    @Test
+    fun `지원하지 않는 sort 값은 VALIDATION_FAILED다`() {
+        mockMvc
+            .perform(get("/v1/groups").param("sort", "NEWEST"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `추천순은 내 저장 매장과 겹치는 그룹을 먼저 놓는다 (G17)`() {
+        val cafe = seedGroup(name = "성수 커피 탐험대")
+        val sushi = seedGroup(name = "나는야 초밥왕")
+        // 초밥왕 그룹에 place_1 리뷰가 공유돼 있고, 나(user 1)도 place_1을 저장했다
+        val place = MockFixtures.place(placeStore, "델리스피자")
+        val review = MockFixtures.review(saveStore, place.placeId, ownerId = 999, reviewId = "review_1")
+        shareStore.add(sushi.groupId, 999, review.reviewId!!)
+        saveStore.create { id ->
+            MockSave(
+                id,
+                1,
+                place.placeId,
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                null,
+                Instant.now(),
+                Instant.now(),
+            )
+        }
+
+        mockMvc
+            .perform(get("/v1/groups").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].groupId").value(sushi.groupId))
+            .andExpect(jsonPath("$.items[0].matchedSavedPlaceCount").value(1))
+            .andExpect(jsonPath("$.items[1].groupId").value(cafe.groupId))
+    }
+
+    @Test
+    fun `그룹 리뷰 목록은 미가입이면 3건 게이트가 걸린다 (G1)`() {
+        val group = seedGroup()
+        val place = MockFixtures.place(placeStore, "델리스피자")
+        (1..5).forEach { i ->
+            val review = MockFixtures.review(saveStore, place.placeId, ownerId = 999, reviewId = "review_$i")
+            shareStore.add(group.groupId, 999, review.reviewId!!)
+        }
+
+        // 미가입 (user 1)
+        mockMvc
+            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(3))
+            .andExpect(jsonPath("$.gate.gated").value(true))
+            .andExpect(jsonPath("$.gate.reason").value("MEMBERSHIP_REQUIRED"))
+            .andExpect(jsonPath("$.gate.visibleCount").value(3))
+            .andExpect(jsonPath("$.hasNext").value(false))
+
+        // 가입자 (owner 999)
+        mockMvc
+            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "999"))
+            .andExpect(jsonPath("$.items.length()").value(5))
+            .andExpect(jsonPath("$.gate.gated").value(false))
+    }
+
+    @Test
+    fun `편집은 생성자만 할 수 있다 (G13)`() {
+        val group = seedGroup(ownerId = 999)
+
+        mockMvc
+            .perform(
+                put("/v1/groups/${group.groupId}")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("GROUP_OWNER_REQUIRED"))
+
+        mockMvc
+            .perform(
+                put("/v1/groups/${group.groupId}")
+                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.name").value("나는야 초밥왕"))
+    }
+
+    @Test
+    fun `대표 이미지로 쓴 asset은 ATTACHED가 된다 (M4·M7)`() {
+        val asset = assetStore.create { id -> MockAsset(assetId = id, ownerId = 1, contentType = "image/jpeg") }
+
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "${asset.assetId}" }"""),
+            ).andExpect(status().isCreated)
+
+        // STAGED로 남으면 TTL 정리가 사용 중인 그룹 이미지를 지운다
+        assertEquals(true, assetStore.findById(asset.assetId)?.attached)
+    }
+
+    @Test
+    fun `이미 붙은 asset은 그룹 이미지로 다시 쓸 수 없다`() {
+        assetStore.create { id -> MockAsset(assetId = id, ownerId = 1, contentType = "image/jpeg", attached = true) }
+
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "asset_1" }"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("MEDIA_ALREADY_ATTACHED"))
+    }
+
+    @Test
+    fun `이미지를 교체하면 이전 asset은 STAGED로 돌아간다`() {
+        val old = assetStore.create { id -> MockAsset(assetId = id, ownerId = 999, contentType = "image/jpeg") }
+        val new = assetStore.create { id -> MockAsset(assetId = id, ownerId = 999, contentType = "image/jpeg") }
+        val group = seedGroup()
+        groupStore.update(group.groupId) { it.copy(imageAssetId = old.assetId) }
+        assetStore.update(old.assetId) { it.copy(attached = true) }
+
+        mockMvc
+            .perform(
+                put("/v1/groups/${group.groupId}")
+                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "${new.assetId}" }"""),
+            ).andExpect(status().isOk)
+
+        assertEquals(false, assetStore.findById(old.assetId)?.attached)
+        assertEquals(true, assetStore.findById(new.assetId)?.attached)
+    }
+
+    @Test
+    fun `없는 그룹은 GROUP_NOT_FOUND다`() {
+        mockMvc
+            .perform(get("/v1/groups/group_999"))
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("GROUP_NOT_FOUND"))
+    }
+}
