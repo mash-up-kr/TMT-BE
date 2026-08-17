@@ -70,34 +70,27 @@ class GroupMockController(
             groups = groups.filter { g -> g.regionTagIds.any { it in regions } }
         }
 
-        val cards = groups.map { it to groupAssembler.card(it, userId) }
+        val cards = groups.map { groupAssembler.card(it, userId) }
         val sorted =
             when (sort ?: SORT_RECOMMENDED) {
-                // 추천순: 내 저장 매장과 겹치는 그룹 → 가입자 수 → groupId (G17)
-                SORT_RECOMMENDED ->
-                    cards.sortedWith(
-                        compareByDescending<Pair<MockGroup, GroupAssembler.GroupCardResponse>> {
-                            it.second.matchedSavedPlaceCount
-                        }.thenByDescending { it.second.memberCount }
-                            .thenByDescending { groupSeq(it.first.groupId) },
-                    )
+                SORT_RECOMMENDED -> cards.sortedWith(GroupAssembler.RECOMMENDED_ORDER)
 
                 SORT_MEMBER_COUNT ->
                     cards.sortedWith(
-                        compareByDescending<Pair<MockGroup, GroupAssembler.GroupCardResponse>> { it.second.memberCount }
-                            .thenByDescending { groupSeq(it.first.groupId) },
+                        compareByDescending<GroupAssembler.GroupCardResponse> { it.memberCount }
+                            .thenByDescending { groupSeq(it.groupId) },
                     )
 
                 SORT_REVIEW_COUNT ->
                     cards.sortedWith(
-                        compareByDescending<Pair<MockGroup, GroupAssembler.GroupCardResponse>> { it.second.reviewCount }
-                            .thenByDescending { groupSeq(it.first.groupId) },
+                        compareByDescending<GroupAssembler.GroupCardResponse> { it.reviewCount }
+                            .thenByDescending { groupSeq(it.groupId) },
                     )
 
                 else -> throw TmtException(ErrorCode.VALIDATION_FAILED, "지원하지 않는 sort 값: $sort")
             }
 
-        return MockCursor.paginate(sorted, cursor, limit) { it.second }
+        return MockCursor.paginate(sorted, cursor, limit) { it }
     }
 
     @Operation(summary = "그룹 이름 중복 확인", description = "참고값이다 — 생성이 유일성을 다시 검증하고 GROUP_NAME_DUPLICATED로 거절한다.")
