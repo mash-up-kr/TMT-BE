@@ -83,7 +83,11 @@ docker compose -f docker/docker-compose.local.yml down -v
 | 워크플로 | 트리거 | 동작 |
 |----------|--------|------|
 | `ci-pull-request.yml` | main 대상 PR | ktlintCheck + test (PR 코멘트 `빌드검증` 입력 시 전체 빌드 후 결과 코멘트) |
-| `ci-push.yml` | main push | 전체 빌드 |
+| `ci-push.yml` | main push | 전체 빌드 → **자동 배포** (mock 기간 한정, TMT-155) |
 | `cicd-release.yml` | GitHub Release 발행 (vX.Y.Z) | bootJar → Docker 이미지 ECR push → SSM Run Command로 WAS 배포 → 헬스체크 → 디스코드 알림 |
 
-**배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포).** 릴리즈 발행 절차·버전 규칙·롤백은 [docs/RELEASE.md](docs/RELEASE.md), 브랜치·머지 규칙은 [docs/BRANCHING.md](docs/BRANCHING.md) 참고.
+**정식 배포는 릴리즈 태그 기준이다 (main 머지 ≠ 배포).** 다만 FE가 mock 서버를 바로 쓸 수 있도록 mock 기간에 한해 main 머지 시 자동 배포를 켜 뒀고, 실구현 전환 시 되돌린다. 릴리즈 발행 절차·버전 규칙·롤백은 [docs/RELEASE.md](docs/RELEASE.md), 브랜치·머지 규칙은 [docs/BRANCHING.md](docs/BRANCHING.md) 참고.
+
+## 작업 규칙 (사람·에이전트 공통)
+
+스키마·API 계약을 바꿀 때 **어떤 문서를 같은 PR에서 함께 고쳐야 하는지**는 [CLAUDE.md](CLAUDE.md)에 있다. AI 에이전트가 자동으로 읽고, `AGENTS.md`도 같은 파일을 가리킨다.
