@@ -25,9 +25,17 @@ class WebConfigCorsTest {
     }
 
     @Test
-    fun `vercel 프리뷰 서브도메인을 허용한다`() {
-        assertThat(config.checkOrigin("https://tmt-fe-git-feat-home.vercel.app"))
-            .isEqualTo("https://tmt-fe-git-feat-home.vercel.app")
+    fun `ttomatto 고정 URL과 프리뷰 배포를 허용한다`() {
+        listOf(
+            "https://ttomatto-web.vercel.app",
+            "https://ttomatto-git-develop-ttalkkakfe.vercel.app",
+            "https://ttomatto-511eil6hh-ttalkkakfe.vercel.app",
+        ).forEach { origin -> assertThat(config.checkOrigin(origin)).isEqualTo(origin) }
+    }
+
+    @Test
+    fun `같은 vercel 도메인이어도 다른 프로젝트는 거부한다`() {
+        assertThat(config.checkOrigin("https://someone-else.vercel.app")).isNull()
     }
 
     @Test

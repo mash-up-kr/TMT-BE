@@ -31,7 +31,7 @@ class WebConfig : WebMvcConfigurer {
         private val ALLOWED_ORIGIN_PATTERNS =
             arrayOf(
                 "http://localhost:3000",
-                "https://*.vercel.app",
+                "https://ttomatto-*.vercel.app",
             )
 
         private const val PREFLIGHT_CACHE_SECONDS = 600L
