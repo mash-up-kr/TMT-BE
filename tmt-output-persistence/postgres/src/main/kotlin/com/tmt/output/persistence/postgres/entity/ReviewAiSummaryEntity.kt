@@ -11,7 +11,9 @@ import jakarta.persistence.Table
 class ReviewAiSummaryEntity(
     @Id
     val reviewId: Long,
+    @Column(columnDefinition = "text")
     var pros: String? = null,
+    @Column(columnDefinition = "text")
     var cons: String? = null,
     @Column(length = 50)
     var model: String? = null,
