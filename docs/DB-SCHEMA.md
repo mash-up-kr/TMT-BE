@@ -70,7 +70,7 @@ erDiagram
 
 ## 3. DDL
 
-정본은 Flyway 마이그레이션 [`V1__init.sql`](../tmt-output-persistence/postgres/src/main/resources/db/migration/V1__init.sql)이다 — 기동 시 실제로 적용되는 그 파일이고, postgis:17 컨테이너에서 실행 검증됐다(테이블 18종). 여기 본문에 복사해 두지 않는 이유: 두 벌이 되는 순간 어긋난다.
+정본은 Flyway 마이그레이션 [`V1__init.sql`](../tmt-output-persistence/postgres/src/main/resources/db/migration/V1__init.sql)이다 — 기동 시 실제로 적용되는 그 파일이고, postgis 16-3.4 컨테이너에서 실행 검증됐다(테이블 18종). 여기 본문에 복사해 두지 않는 이유: 두 벌이 되는 순간 어긋난다.
 
 ## 4. 주요 조회 → 인덱스 매핑
 
@@ -103,7 +103,6 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 
 ## 6. TMT-96(ERD·DDL 확정)으로 넘기는 것
 
-- **시드**: `review_tag_definition` 12행. 카테고리·지역·큐레이션은 상수라 시드 없음 (D4)
 - **공공데이터 적재 파이프라인용 스테이징 테이블** 여부 — 적재는 별도 이슈 범위
 - `users` 상세 (카카오 OAuth 필드 — 토큰 저장 여부는 인증 구현 이슈에서)
 - 미결 정책 반영분: 매장 직접 등록이 P0에 들어오면 `place.external_source`에 `USER_SUBMITTED` 추가 (도메인 §7-1), heic 허용 여부(M3)
