@@ -1,5 +1,7 @@
 package com.tmt.input.http.mock
 
+import com.tmt.input.http.controller.dto.response.GroupCardResponse
+
 /** GroupCard(D_01 §2)·그룹 상세(D_02 §3-1) 조립 — 집계와 커버는 공유 리뷰에서 파생한다. */
 class GroupAssembler(
     private val saveStore: InMemoryStore<MockSave>,
@@ -96,17 +98,6 @@ class GroupAssembler(
         val reviewCount: Int,
         val placeCount: Int,
         val coverPhotos: List<GroupDetailResponse.CoverImage>,
-    )
-
-    data class GroupCardResponse(
-        val groupId: String,
-        val name: String,
-        val oneLineDescription: String,
-        val coverImageUrl: String?,
-        val memberCount: Int,
-        val reviewCount: Int,
-        val placeCount: Int,
-        val matchedSavedPlaceCount: Int,
     )
 
     data class GroupDetailResponse(

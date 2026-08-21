@@ -4,6 +4,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
@@ -27,7 +28,7 @@ class NearbyMockController(
         @RequestParam(required = false) longitude: Double?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
-    ): CursorPage<ReviewCardAssembler.ReviewCardResponse> {
+    ): CursorPage<ReviewCardResponse> {
         val (lat, lng) = requireCoordinates(latitude, longitude)
 
         val reviews =

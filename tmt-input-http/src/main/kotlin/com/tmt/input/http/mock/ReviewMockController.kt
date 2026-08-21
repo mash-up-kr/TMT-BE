@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.controller.dto.response.Author
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
@@ -86,7 +87,7 @@ class ReviewMockController(
 
     data class ReviewDetailResponse(
         val reviewId: String,
-        val author: MockUsers.Author,
+        val author: Author,
         val place: PlaceSummary,
         val photos: List<Photo>,
         val tags: List<Tag>,

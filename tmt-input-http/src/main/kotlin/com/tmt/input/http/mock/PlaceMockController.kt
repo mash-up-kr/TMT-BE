@@ -4,6 +4,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.controller.dto.response.PlaceCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
@@ -142,19 +143,6 @@ class PlaceMockController(
         val name: String,
         val addressId: String,
         val categoryId: String? = null,
-    )
-
-    data class PlaceCardResponse(
-        val placeId: String,
-        val name: String,
-        val roadAddress: String,
-        val regionName: String,
-        val categoryName: String?,
-        val averageRating: Double?,
-        val reviewCount: Int,
-        val thumbnailUrl: String?,
-        val distanceMeters: Int?,
-        val isFavorite: Boolean,
     )
 
     companion object {

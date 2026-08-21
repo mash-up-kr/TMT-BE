@@ -4,6 +4,8 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.controller.dto.response.GroupCardResponse
+import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
@@ -38,7 +40,7 @@ class GroupMockController(
         @RequestParam(required = false) sort: String?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
-    ): CursorPage<GroupAssembler.GroupCardResponse> {
+    ): CursorPage<GroupCardResponse> {
         foodCategoryId?.let {
             if (it !in
                 GroupTags.FOOD_CATEGORY_IDS
@@ -77,13 +79,13 @@ class GroupMockController(
 
                 SORT_MEMBER_COUNT ->
                     cards.sortedWith(
-                        compareByDescending<GroupAssembler.GroupCardResponse> { it.memberCount }
+                        compareByDescending<GroupCardResponse> { it.memberCount }
                             .thenByDescending { groupSeq(it.groupId) },
                     )
 
                 SORT_REVIEW_COUNT ->
                     cards.sortedWith(
-                        compareByDescending<GroupAssembler.GroupCardResponse> { it.reviewCount }
+                        compareByDescending<GroupCardResponse> { it.reviewCount }
                             .thenByDescending { groupSeq(it.groupId) },
                     )
 
@@ -290,7 +292,7 @@ class GroupMockController(
     )
 
     data class GatedReviewsResponse(
-        val items: List<ReviewCardAssembler.ReviewCardResponse>,
+        val items: List<ReviewCardResponse>,
         val gate: Gate,
         val nextCursor: String?,
         val hasNext: Boolean,
