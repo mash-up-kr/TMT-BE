@@ -14,6 +14,7 @@ class UserEntity(
     val kakaoId: Long,
     @Column(length = 10, nullable = false)
     var nickname: String,
+    @Column(columnDefinition = "text")
     var profileImageUrl: String? = null,
 ) : BaseTimeEntity() {
     @Id
