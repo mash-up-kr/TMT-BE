@@ -36,6 +36,7 @@ class WebConfigCorsTest {
     @Test
     fun `같은 vercel 도메인이어도 다른 프로젝트는 거부한다`() {
         assertThat(config.checkOrigin("https://someone-else.vercel.app")).isNull()
+        assertThat(config.checkOrigin("https://ttomatto-evil-someoneelse.vercel.app")).isNull()
     }
 
     @Test
@@ -52,8 +53,14 @@ class WebConfigCorsTest {
 
     @Test
     fun `mock API가 쓰는 메서드를 모두 허용한다`() {
-        listOf(HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)
-            .forEach { method -> assertThat(config.checkHttpMethod(method)).isNotNull() }
+        listOf(
+            HttpMethod.GET,
+            HttpMethod.HEAD,
+            HttpMethod.POST,
+            HttpMethod.PUT,
+            HttpMethod.PATCH,
+            HttpMethod.DELETE,
+        ).forEach { method -> assertThat(config.checkHttpMethod(method)).isNotNull() }
     }
 
     @Test

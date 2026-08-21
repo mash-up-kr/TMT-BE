@@ -21,7 +21,7 @@ class WebConfig : WebMvcConfigurer {
         registry
             .addMapping("/**")
             .allowedOriginPatterns(*ALLOWED_ORIGIN_PATTERNS)
-            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            .allowedMethods("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .exposedHeaders(RequestIdFilter.HEADER)
             .maxAge(PREFLIGHT_CACHE_SECONDS)
@@ -31,7 +31,8 @@ class WebConfig : WebMvcConfigurer {
         private val ALLOWED_ORIGIN_PATTERNS =
             arrayOf(
                 "http://localhost:3000",
-                "https://ttomatto-*.vercel.app",
+                "https://ttomatto-web.vercel.app",
+                "https://ttomatto-*-ttalkkakfe.vercel.app",
             )
 
         private const val PREFLIGHT_CACHE_SECONDS = 600L
