@@ -116,7 +116,7 @@ class GroupMembershipMockController(
                 joinedAt = joinedAt.toString(),
                 sharedReviewIds = listOfNotNull(sourceReview?.reviewId),
                 ticket =
-                    JoinResponse.TicketSummary(
+                    JoinResponse.TicketConsumeSummary(
                         consumedCount = 1,
                         availableCount = mockTicketLedger.availableCount(userId),
                     ),
@@ -237,9 +237,9 @@ class GroupMembershipMockController(
         val groupId: String,
         val joinedAt: String,
         val sharedReviewIds: List<String>,
-        val ticket: TicketSummary,
+        val ticket: TicketConsumeSummary,
     ) {
-        data class TicketSummary(
+        data class TicketConsumeSummary(
             val consumedCount: Int,
             val availableCount: Int,
         )

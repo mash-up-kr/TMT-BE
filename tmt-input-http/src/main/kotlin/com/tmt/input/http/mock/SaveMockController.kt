@@ -275,7 +275,7 @@ class SaveMockController(
         SaveResultResponse(
             saveId = save.saveId,
             reviewId = save.reviewId,
-            ticket = SaveResultResponse.TicketSummary(grantedCount, mockTicketLedger.availableCount(userId)),
+            ticket = SaveResultResponse.TicketGrantSummary(grantedCount, mockTicketLedger.availableCount(userId)),
         )
 
     private fun toListItem(save: MockSave): SaveListItemResponse {
@@ -305,9 +305,9 @@ class SaveMockController(
     data class SaveResultResponse(
         val saveId: String,
         val reviewId: String?,
-        val ticket: TicketSummary,
+        val ticket: TicketGrantSummary,
     ) {
-        data class TicketSummary(
+        data class TicketGrantSummary(
             val grantedCount: Int,
             val availableCount: Int,
         )
