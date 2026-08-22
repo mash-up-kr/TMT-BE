@@ -1,5 +1,8 @@
 package com.tmt.input.http.mock
 
+import com.tmt.input.http.controller.dto.response.Author
+import com.tmt.input.http.controller.dto.response.ReviewCardResponse
+
 /**
  * ReviewCard (명세 v2 B §1-1) — 피드·가게 상세·그룹 상세가 같은 카드를 쓴다.
  * 여기서 한 번 조립하고 각 컨트롤러가 재사용한다.
@@ -51,52 +54,10 @@ class ReviewCardAssembler(
             createdAt = save.createdAt.toString(),
         )
     }
-
-    data class ReviewCardResponse(
-        val reviewId: String,
-        val author: MockUsers.Author,
-        val rating: Int,
-        val distanceMeters: Int?,
-        val photos: List<Photo>,
-        val aiSummary: AiSummary?,
-        val content: String,
-        val tags: List<Tag>,
-        val place: PlaceRegionSummary,
-        val createdAt: String,
-    ) {
-        data class Photo(
-            val photoId: String,
-            val url: String,
-            val order: Int,
-        )
-
-        data class AiSummary(
-            val pros: String?,
-            val cons: String?,
-        )
-
-        data class Tag(
-            val tagId: String,
-            val label: String,
-        )
-
-        data class PlaceRegionSummary(
-            val placeId: String,
-            val name: String,
-            val regionName: String,
-            val isFavorite: Boolean,
-        )
-    }
 }
 
 /** mock 사용자 — 인증 스텁(X-User-Id)의 숫자 ID를 명세 표기(user_1)와 닉네임으로 바꾼다. */
 object MockUsers {
-    data class Author(
-        val userId: String,
-        val nickname: String,
-        val profileImageUrl: String?,
-    )
-
     fun authorOf(userId: Long): Author =
         Author(userId = "user_$userId", nickname = "미식가$userId", profileImageUrl = null)
 }

@@ -4,6 +4,8 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.controller.dto.response.GroupCardResponse
+import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
@@ -75,7 +77,7 @@ class HomeMockController(
         @RequestParam(required = false) longitude: Double?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
-    ): CursorPage<ReviewCardAssembler.ReviewCardResponse> {
+    ): CursorPage<ReviewCardResponse> {
         val sharedReviewIds =
             mockMembershipStore
                 .joinedGroups(userId)
@@ -115,7 +117,7 @@ class HomeMockController(
     data class HomeResponse(
         val nickname: String,
         val myGroups: List<MyGroup>,
-        val recommendedGroups: List<GroupAssembler.GroupCardResponse>,
+        val recommendedGroups: List<GroupCardResponse>,
     ) {
         data class MyGroup(
             val groupId: String,
