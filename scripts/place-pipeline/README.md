@@ -47,14 +47,20 @@ python3 transform.py --sigungu 마포구 ... > mapo.tsv
 
 ### 운영 적재 (TMT-163)
 
-SSM Run Command 페이로드 한도(8KB) 때문에 TSV를 직접 실을 수 없다. S3를 경유한다:
+SSM Run Command 페이로드 한도(8KB) 때문에 TSV를 직접 실을 수 없다. **S3 `data/` 프리픽스를 경유한다** —
+DB 인스턴스 역할에 `s3:GetObject`가 `data/*`에만 열려 있다 (`infra/terraform/backup.tf`의 `data_read`.
+백업 `pg/*`는 읽을 수 없어 덤프 유출 경로가 되지 않는다).
 
 ```bash
-aws s3 cp clean.tsv s3://ttalkkak-tmt-tfstate/../   # 적재용 경로는 TMT-163에서 확정
-# DB 인스턴스에서: aws s3 cp → docker exec -i postgres psql ... (load.sh와 같은 단계)
+# 1) 로컬에서 업로드 (tmt-admin 자격)
+gzip -k clean.tsv
+aws s3 cp clean.tsv.gz s3://ttalkkak-tmt-db-backup/data/place/seoul-<기준분기>.tsv.gz
+
+# 2) DB 인스턴스에서 (SSM Run Command): aws s3 cp → gunzip →
+#    docker exec -i postgres psql ... (load.sh와 같은 staging→COPY→upsert 단계)
 ```
 
-주의 — place 테이블은 Flyway V1(PR #24)이 prod에 적용된 뒤에 존재한다. 그 전에는 적재 불가.
+place 테이블은 Flyway V1이 적용된 2026-08-22부터 존재한다.
 
 ## 검증 (승인 기준 대응)
 
