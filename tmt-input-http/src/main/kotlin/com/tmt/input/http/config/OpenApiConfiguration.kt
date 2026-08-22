@@ -33,8 +33,8 @@ class OpenApiConfiguration {
     }
 
     @Bean
-    fun kotlinRequiredPropertyConverter(objectMapperProvider: ObjectMapperProvider): ModelConverter =
-        KotlinRequiredPropertyConverter(objectMapperProvider)
+    fun kotlinPropertyConverter(objectMapperProvider: ObjectMapperProvider): ModelConverter =
+        KotlinPropertyConverter(objectMapperProvider)
 
     @Bean
     fun errorResponseSchema(): OpenApiCustomizer =

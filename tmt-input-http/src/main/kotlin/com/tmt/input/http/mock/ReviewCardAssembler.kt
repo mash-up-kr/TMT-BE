@@ -42,7 +42,7 @@ class ReviewCardAssembler(
                     ReviewCardResponse.Tag(it, ReviewFormRules.labelOf(it))
                 },
             place =
-                ReviewCardResponse.PlaceSummary(
+                ReviewCardResponse.PlaceRegionSummary(
                     placeId = save.placeId,
                     name = place?.name ?: "(삭제된 매장)",
                     regionName = place?.regionName ?: "",
@@ -61,7 +61,7 @@ class ReviewCardAssembler(
         val aiSummary: AiSummary?,
         val content: String,
         val tags: List<Tag>,
-        val place: PlaceSummary,
+        val place: PlaceRegionSummary,
         val createdAt: String,
     ) {
         data class Photo(
@@ -80,7 +80,7 @@ class ReviewCardAssembler(
             val label: String,
         )
 
-        data class PlaceSummary(
+        data class PlaceRegionSummary(
             val placeId: String,
             val name: String,
             val regionName: String,

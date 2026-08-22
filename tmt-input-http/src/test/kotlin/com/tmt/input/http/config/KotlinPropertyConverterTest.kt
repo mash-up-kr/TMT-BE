@@ -1,5 +1,6 @@
 package com.tmt.input.http.config
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.models.media.Schema
 import org.junit.jupiter.api.Test
@@ -8,10 +9,10 @@ import org.springdoc.core.providers.ObjectMapperProvider
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class KotlinRequiredPropertyConverterTest {
+class KotlinPropertyConverterTest {
     private val converters =
         ModelConverters().apply {
-            addConverter(KotlinRequiredPropertyConverter(ObjectMapperProvider(SpringDocConfigProperties())))
+            addConverter(KotlinPropertyConverter(ObjectMapperProvider(SpringDocConfigProperties())))
         }
 
     private fun schemasOf(type: Class<*>): Map<String, Schema<*>> =
@@ -36,6 +37,21 @@ class KotlinRequiredPropertyConverterTest {
     class JavaStyle {
         var anything: String? = null
     }
+
+    data class Flags(
+        val placeId: String,
+        val isFavorite: Boolean,
+        val isMine: Boolean?,
+    )
+
+    data class Renamed(
+        @param:JsonProperty("favorite") val isFavorite: Boolean,
+    )
+
+    data class NotAPrefix(
+        val island: String,
+        val isle: String,
+    )
 
     @Test
     fun `non-null 프로퍼티를 required에 싣는다`() {
@@ -80,5 +96,54 @@ class KotlinRequiredPropertyConverterTest {
         val schemas = schemasOf(Outer::class.java)
 
         assertEquals(listOf("value"), schemas.getValue("Inner").required)
+    }
+
+    @Test
+    fun `is 접두 boolean은 직렬화 이름 그대로 나간다`() {
+        // swagger는 Java bean 규약으로 읽어 favorite으로 잡지만 앱은 isFavorite을 내보낸다
+        val flags = schemasOf(Flags::class.java).getValue("Flags")
+
+        assertEquals(setOf("placeId", "isFavorite", "isMine"), flags.properties.keys)
+    }
+
+    @Test
+    fun `이름을 되돌려도 필드 순서는 그대로다`() {
+        val untouched = ModelConverters().readAll(Flags::class.java).getValue("Flags")
+        val converted = schemasOf(Flags::class.java).getValue("Flags")
+
+        assertEquals(
+            untouched.properties.keys.indexOf("favorite"),
+            converted.properties.keys.indexOf("isFavorite"),
+        )
+    }
+
+    @Test
+    fun `이름을 되돌린 is 접두 boolean도 required에 실린다`() {
+        val flags = schemasOf(Flags::class.java).getValue("Flags")
+
+        assertEquals(listOf("isFavorite", "placeId"), flags.required.sorted())
+    }
+
+    @Test
+    fun `JsonProperty로 지정한 이름은 건드리지 않는다`() {
+        // 지정한 이름이 실제 직렬화 이름이다
+        val renamed = schemasOf(Renamed::class.java).getValue("Renamed")
+
+        assertEquals(listOf("favorite"), renamed.properties.keys.toList())
+    }
+
+    @Test
+    fun `is 뒤가 소문자면 접두사가 아니라 이름의 일부다`() {
+        val schema = schemasOf(NotAPrefix::class.java).getValue("NotAPrefix")
+
+        assertEquals(listOf("island", "isle"), schema.properties.keys.toList())
+    }
+
+    @Test
+    fun `같은 타입을 여러 번 읽어도 이름이 어긋나지 않는다`() {
+        schemasOf(Flags::class.java)
+        val flags = schemasOf(Flags::class.java).getValue("Flags")
+
+        assertEquals(setOf("placeId", "isFavorite", "isMine"), flags.properties.keys)
     }
 }
