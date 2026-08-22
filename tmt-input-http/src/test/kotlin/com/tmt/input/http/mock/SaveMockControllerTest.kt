@@ -335,4 +335,115 @@ class SaveMockControllerTest {
             ).andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("SAVE_PLACE_IMMUTABLE"))
     }
+
+    // ── 매장 직접 등록 (F §4-1) ──────────────────────────────
+
+    private fun addressToken(hasCoordinate: Boolean = true) =
+        MockAddressToken.encode(
+            MockAddress(
+                roadAddress = "서울특별시 양천구 오목로32길 1",
+                jibunAddress = "서울특별시 양천구 신정동 948-1",
+                regionName = "양천구 신정동",
+                latitude = 37.5261,
+                longitude = 126.8558,
+                hasCoordinate = hasCoordinate,
+            ),
+        )
+
+    @Test
+    fun `기존 매장으로 작성해도 응답에 placeId가 실린다`() {
+        postSave("""{ "placeId": "place_1" }""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.placeId").value("place_1"))
+    }
+
+    @Test
+    fun `placeId와 newPlace를 둘 다 보내면 VALIDATION_FAILED다`() {
+        postSave(
+            """{ "placeId": "place_1", "newPlace": { "name": "한판승부", "addressId": "${addressToken()}" } }""",
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `placeId도 newPlace도 없으면 VALIDATION_FAILED다 (C1)`() {
+        postSave("""{ "rating": 5 }""")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `newPlace로 매장이 저장과 함께 생기고 응답 placeId로 이어진다`() {
+        postSave(
+            """
+            {
+              "newPlace": { "name": "한판승부", "addressId": "${addressToken()}", "categoryId": "cat_western" }
+            }
+            """.trimIndent(),
+        ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.placeId").value("place_2"))
+            .andExpect(jsonPath("$.reviewId").doesNotExist())
+
+        val created = placeStore.findById("place_2")!!
+        assertEquals("한판승부", created.name)
+        assertEquals("양천구 신정동", created.regionName)
+        assertEquals("양식", created.categoryName)
+    }
+
+    @Test
+    fun `좌표를 확보하지 못하는 주소면 ADDRESS_NOT_FOUND이고 매장이 생기지 않는다`() {
+        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "${addressToken(hasCoordinate = false)}" } }""")
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("ADDRESS_NOT_FOUND"))
+
+        assertEquals(1, placeStore.findAll().size)
+    }
+
+    @Test
+    fun `조작된 addressId는 VALIDATION_FAILED다`() {
+        val tampered = addressToken().substringBeforeLast('.') + ".deadbeef"
+
+        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "$tampered" } }""")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `newPlace 이름이 100자를 넘으면 VALIDATION_FAILED이고 매장이 생기지 않는다`() {
+        postSave("""{ "newPlace": { "name": "${"가".repeat(101)}", "addressId": "${addressToken()}" } }""")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+
+        assertEquals(1, placeStore.findAll().size)
+    }
+
+    @Test
+    fun `검증에 실패하면 매장을 만들지 않는다`() {
+        postSave(
+            """
+            {
+              "newPlace": { "name": "한판승부", "addressId": "${addressToken()}" },
+              "companionTagIds": ["tag_없는태그"]
+            }
+            """.trimIndent(),
+        ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("REVIEW_TAG_NOT_FOUND"))
+
+        assertEquals(1, placeStore.findAll().size)
+    }
+
+    @Test
+    fun `이어쓰기에 newPlace를 보내면 SAVE_PLACE_IMMUTABLE이다 (S6)`() {
+        postSave("""{ "placeId": "place_1" }""").andExpect(status().isCreated)
+
+        mockMvc
+            .perform(
+                put("/v1/saves/save_1")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "key-put")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{ "newPlace": { "name": "한판승부", "addressId": "${addressToken()}" } }"""),
+            ).andExpect(status().isUnprocessableEntity)
+            .andExpect(jsonPath("$.code").value("SAVE_PLACE_IMMUTABLE"))
+    }
 }

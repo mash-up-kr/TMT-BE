@@ -35,7 +35,10 @@ class SaveMockController(
     private val mockIdempotencyRegistry: MockIdempotencyRegistry,
     private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
-    @Operation(summary = "작성 완료 (신규)", description = "저장이 생기고, 완성도 판정(C4)을 충족하면 리뷰와 티켓까지 같은 트랜잭션에서 나간다.")
+    @Operation(
+        summary = "작성 완료 (신규)",
+        description = "placeId와 newPlace 중 정확히 하나를 보낸다. 완성도 판정(C4)을 충족하면 리뷰와 티켓까지 같은 트랜잭션에서 나간다.",
+    )
     @PostMapping
     fun createSave(
         @UserId userId: Long,
@@ -45,7 +48,10 @@ class SaveMockController(
         val key = requireIdempotencyKey(idempotencyKey)
         replayed(userId, ENDPOINT_CREATE, key, request)?.let { return created(it) }
 
+        // 검증을 다 끝낸 뒤에 매장을 만든다 — 먼저 만들면 뒤에서 실패했을 때 리뷰 없는 매장이 남는다
+        val selection = resolvePlaceSelection(request)
         validate(request, ownerId = userId, existingSave = null)
+        val placeId = materialize(selection)
 
         val now = Instant.now()
         val completed = satisfiesReviewCriteria(request)
@@ -55,7 +61,7 @@ class SaveMockController(
                 MockSave(
                     saveId = id,
                     ownerId = userId,
-                    placeId = request.placeId,
+                    placeId = placeId,
                     photoAssetIds = request.photoAssetIds,
                     companionTagIds = request.companionTagIds,
                     positivePointTagIds = request.positivePointTagIds,
@@ -74,7 +80,10 @@ class SaveMockController(
         return created(result)
     }
 
-    @Operation(summary = "작성 완료 (이어쓰기)", description = "전체 교체다. placeId는 바꿀 수 없고(S6), 서버는 같은 완성도 판정을 다시 돌린다 (C6).")
+    @Operation(
+        summary = "작성 완료 (이어쓰기)",
+        description = "전체 교체다. 매장은 바꿀 수 없어 newPlace를 받지 않는다(S6). 서버는 같은 완성도 판정을 다시 돌린다 (C6).",
+    )
     @PutMapping("/{saveId}")
     fun updateSave(
         @UserId userId: Long,
@@ -91,7 +100,7 @@ class SaveMockController(
         if (save.reviewId != null) {
             throw TmtException(ErrorCode.SAVE_ALREADY_REVIEWED)
         }
-        if (request.placeId != save.placeId) {
+        if (request.newPlace != null || request.placeId != save.placeId) {
             throw TmtException(ErrorCode.SAVE_PLACE_IMMUTABLE)
         }
         validate(request, ownerId = userId, existingSave = save)
@@ -208,8 +217,6 @@ class SaveMockController(
         ownerId: Long,
         existingSave: MockSave?,
     ) {
-        mockPlaceStore.findById(request.placeId) ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
-
         if (request.photoAssetIds.size > ReviewFormRules.PHOTO_MAX_COUNT) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "사진은 최대 ${ReviewFormRules.PHOTO_MAX_COUNT}장입니다.")
         }
@@ -248,6 +255,66 @@ class SaveMockController(
         }
     }
 
+    /**
+     * placeId·newPlace 중 하나를 확정한다. 부수 효과가 없다 — 매장 생성은 [materialize]에서만 일어난다.
+     */
+    private fun resolvePlaceSelection(request: SaveRequest): PlaceSelection {
+        val placeId = request.placeId
+        val newPlace = request.newPlace
+        if ((placeId == null) == (newPlace == null)) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "placeId와 newPlace 중 정확히 하나만 있어야 합니다.")
+        }
+        if (placeId != null) {
+            mockPlaceStore.findById(placeId) ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
+            return PlaceSelection.Existing(placeId)
+        }
+        requireNotNull(newPlace)
+
+        val name = newPlace.name.trim()
+        if (name.isEmpty() || name.length > PLACE_NAME_MAX_LENGTH) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 1~${PLACE_NAME_MAX_LENGTH}자여야 합니다.")
+        }
+        val address = MockAddressToken.decode(newPlace.addressId)
+        if (!address.hasCoordinate) {
+            throw TmtException(ErrorCode.ADDRESS_NOT_FOUND, "이 주소의 좌표를 확보하지 못했습니다.")
+        }
+        val categoryName =
+            newPlace.categoryId?.let {
+                ReviewFormRules.FOOD_CATEGORIES[it] ?: throw TmtException(ErrorCode.PLACE_CATEGORY_NOT_FOUND)
+            }
+        return PlaceSelection.New(name, address, categoryName)
+    }
+
+    private fun materialize(selection: PlaceSelection): String =
+        when (selection) {
+            is PlaceSelection.Existing -> selection.placeId
+            is PlaceSelection.New ->
+                mockPlaceStore
+                    .create { id ->
+                        MockPlace(
+                            placeId = id,
+                            name = selection.name,
+                            roadAddress = selection.address.roadAddress,
+                            regionName = selection.address.regionName,
+                            categoryName = selection.categoryName,
+                            latitude = selection.address.latitude,
+                            longitude = selection.address.longitude,
+                        )
+                    }.placeId
+        }
+
+    private sealed interface PlaceSelection {
+        data class Existing(
+            val placeId: String,
+        ) : PlaceSelection
+
+        data class New(
+            val name: String,
+            val address: MockAddress,
+            val categoryName: String?,
+        ) : PlaceSelection
+    }
+
     /** 리뷰 성립 판정 (C4) — 사진·동행 태그·좋은 점 태그·별점·본문(공백 제외 1자 이상)을 전부 충족해야 한다. */
     private fun satisfiesReviewCriteria(request: SaveRequest): Boolean =
         request.photoAssetIds.isNotEmpty() &&
@@ -275,6 +342,7 @@ class SaveMockController(
         SaveResultResponse(
             saveId = save.saveId,
             reviewId = save.reviewId,
+            placeId = save.placeId,
             ticket = SaveResultResponse.TicketGrantSummary(grantedCount, mockTicketLedger.availableCount(userId)),
         )
 
@@ -294,17 +362,25 @@ class SaveMockController(
     }
 
     data class SaveRequest(
-        val placeId: String,
+        val placeId: String? = null,
+        val newPlace: NewPlaceRequest? = null,
         val photoAssetIds: List<String> = emptyList(),
         val companionTagIds: List<String> = emptyList(),
         val positivePointTagIds: List<String> = emptyList(),
         val rating: Int? = null,
         val content: String? = null,
-    )
+    ) {
+        data class NewPlaceRequest(
+            val name: String,
+            val addressId: String,
+            val categoryId: String? = null,
+        )
+    }
 
     data class SaveResultResponse(
         val saveId: String,
         val reviewId: String?,
+        val placeId: String,
         val ticket: TicketGrantSummary,
     ) {
         data class TicketGrantSummary(
@@ -363,6 +439,9 @@ class SaveMockController(
 
     companion object {
         const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+
+        // place.name VARCHAR(100)
+        private const val PLACE_NAME_MAX_LENGTH = 100
 
         // 멱등 등록부 키의 endpoint 성분 (규약·DB PK가 (user_id, endpoint, idem_key))
         private const val ENDPOINT_CREATE = "POST /v1/saves"
