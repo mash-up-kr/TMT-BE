@@ -38,6 +38,11 @@ querydsl-apt = { group = "com.querydsl", name = "querydsl-apt", version.ref = "q
 # PostgreSQL
 postgresql = { group = "org.postgresql", name = "postgresql" }
 
+# Flyway (버전은 Spring Boot BOM이 관리)
+# Boot 4에서 FlywayAutoConfiguration이 별도 모듈로 빠져, flyway-core만 넣으면 자동설정이 붙지 않는다.
+spring-boot-starter-flyway = { group = "org.springframework.boot", name = "spring-boot-starter-flyway" }
+flyway-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql" }
+
 # Test
 spring-boot-annotation-processor = { group = "org.springframework.boot", name = "spring-boot-configuration-processor" }
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
@@ -56,4 +61,4 @@ test-runtime = ["junit"]
 bootstrap = ["spring-boot-starter-web", "spring-boot-starter-actuator"]
 domain-application = ["spring-transaction"]
 adaptor-input-http = ["spring-boot-starter-web", "spring-boot-docs", "spring-boot-starter-validation"]
-adaptor-persistence-postgres = ["spring-boot-starter-jpa", "postgresql"]
+adaptor-persistence-postgres = ["spring-boot-starter-jpa", "postgresql", "spring-boot-starter-flyway", "flyway-postgresql"]

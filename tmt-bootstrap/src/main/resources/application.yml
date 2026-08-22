@@ -6,6 +6,12 @@ spring:
       - classpath:application-actuator.yml
       - classpath:application-http.yml
 
+  flyway:
+    # history 테이블 없이 public에 객체가 있으면 기동이 막히는 것을 막는다.
+    # baseline-version이 기본값 1이면 V1이 적용된 것으로 기록돼 건너뛰므로 0으로 둔다.
+    baseline-on-migrate: true
+    baseline-version: "0"
+
   jpa:
     open-in-view: true
     properties:

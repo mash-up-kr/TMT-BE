@@ -1,7 +1,5 @@
--- DB 스키마 v1 초안 (TMT-93) — 설계 근거는 docs/DB-SCHEMA.md
--- postgis:17 컨테이너에서 실행 검증됨. 실행 가능한 마이그레이션 분할·시드는 TMT-96에서 확정한다.
--- 검증: podman run --rm -d --name ddl -e POSTGRES_PASSWORD=t -e POSTGRES_DB=tmt imresamu/postgis:17-3.5
---       psql -v ON_ERROR_STOP=1 -f docs/DB-SCHEMA.sql
+-- 초기 스키마 (TMT-96). 설계 문서: docs/DB-SCHEMA.md
+-- 적용된 마이그레이션 파일은 수정하지 않는다 — 변경은 V2__*.sql을 새로 추가한다.
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;   -- 매장·그룹 검색 (E9·G18)
