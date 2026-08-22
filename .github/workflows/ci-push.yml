@@ -127,6 +127,7 @@ jobs:
           # compose 파일은 scp 대신 명령 페이로드에 실어 보낸다. Run Command 인라인
           # 파라미터 한도(약 8KB) 안에 넉넉히 들어가는 크기다.
           COMPOSE_B64=$(base64 < docker/docker-compose.prod.yml | tr -d '\n')
+          CADDYFILE_B64=$(base64 < docker/Caddyfile | tr -d '\n')
 
           # 원격 스크립트. $VAR는 여기서 치환되어 들어가고, 원격에서 평가될 변수는 \$로 남긴다.
           cat > /tmp/remote.sh <<EOF
@@ -154,6 +155,7 @@ jobs:
             | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
           echo "${COMPOSE_B64}" | base64 -d > "\$DEPLOY_DIR/docker-compose.prod.yml"
+          echo "${CADDYFILE_B64}" | base64 -d > "\$DEPLOY_DIR/Caddyfile"
 
           umask 077
           cat > "\$DEPLOY_DIR/.env" <<ENV
@@ -215,13 +217,28 @@ jobs:
       - name: 헬스체크
         env:
           PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
+          API_HOST: 3-39-38-23.sslip.io # TMT-175. 실도메인 전환 시 Caddyfile과 함께 교체
         run: |
+          # 1) 앱 자체 (8080 직결) — 앱이 못 뜨면 여기서 끊는다
           for _ in $(seq 1 36); do
             if curl -sf "http://${PUBLIC_IP}:8080/api/health/db" >/dev/null; then
-              echo ">>> 헬스체크 통과"
+              echo ">>> 앱 헬스체크 통과"
+              break
+            fi
+            sleep 5
+          done
+          curl -sf "http://${PUBLIC_IP}:8080/api/health/db" >/dev/null || {
+            echo "::error::3분 내에 /api/health/db가 응답하지 않았습니다"
+            exit 1
+          }
+
+          # 2) HTTPS 경로 (caddy → app). 첫 배포는 인증서 발급 시간이 포함된다 (TMT-175)
+          for _ in $(seq 1 36); do
+            if curl -sf "https://${API_HOST}/api/health/db" >/dev/null; then
+              echo ">>> HTTPS 헬스체크 통과"
               exit 0
             fi
             sleep 5
           done
-          echo "::error::3분 내에 /api/health/db가 응답하지 않았습니다"
+          echo "::error::3분 내에 https://${API_HOST}/api/health/db가 응답하지 않았습니다 — FE가 쓰는 경로다"
           exit 1
