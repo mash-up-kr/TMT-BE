@@ -45,7 +45,7 @@ class ReviewCardAssembler(
                     ReviewCardResponse.Tag(it, ReviewFormRules.labelOf(it))
                 },
             place =
-                ReviewCardResponse.PlaceSummary(
+                ReviewCardResponse.PlaceRegionSummary(
                     placeId = save.placeId,
                     name = place?.name ?: "(삭제된 매장)",
                     regionName = place?.regionName ?: "",

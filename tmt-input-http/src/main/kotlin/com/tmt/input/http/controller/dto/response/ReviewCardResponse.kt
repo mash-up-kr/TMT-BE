@@ -12,7 +12,7 @@ data class ReviewCardResponse(
     val aiSummary: AiSummary?,
     val content: String,
     val tags: List<Tag>,
-    val place: PlaceSummary,
+    val place: PlaceRegionSummary,
     val createdAt: String,
 ) {
     data class Photo(
@@ -31,7 +31,7 @@ data class ReviewCardResponse(
         val label: String,
     )
 
-    data class PlaceSummary(
+    data class PlaceRegionSummary(
         val placeId: String,
         val name: String,
         val regionName: String,

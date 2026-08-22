@@ -275,7 +275,7 @@ class SaveMockController(
         SaveResultResponse(
             saveId = save.saveId,
             reviewId = save.reviewId,
-            ticket = SaveResultResponse.TicketSummary(grantedCount, mockTicketLedger.availableCount(userId)),
+            ticket = SaveResultResponse.TicketGrantSummary(grantedCount, mockTicketLedger.availableCount(userId)),
         )
 
     private fun toListItem(save: MockSave): SaveListItemResponse {
@@ -283,7 +283,7 @@ class SaveMockController(
         return SaveListItemResponse(
             saveId = save.saveId,
             place =
-                SaveListItemResponse.PlaceSummary(
+                SaveListItemResponse.PlaceAddressSummary(
                     placeId = save.placeId,
                     name = place?.name ?: "(삭제된 매장)",
                     roadAddress = place?.roadAddress ?: "",
@@ -305,9 +305,9 @@ class SaveMockController(
     data class SaveResultResponse(
         val saveId: String,
         val reviewId: String?,
-        val ticket: TicketSummary,
+        val ticket: TicketGrantSummary,
     ) {
-        data class TicketSummary(
+        data class TicketGrantSummary(
             val grantedCount: Int,
             val availableCount: Int,
         )
@@ -315,11 +315,11 @@ class SaveMockController(
 
     data class SaveListItemResponse(
         val saveId: String,
-        val place: PlaceSummary,
+        val place: PlaceAddressSummary,
         val thumbnailUrl: String?,
         val updatedAt: String,
     ) {
-        data class PlaceSummary(
+        data class PlaceAddressSummary(
             val placeId: String,
             val name: String,
             val roadAddress: String,

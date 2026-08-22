@@ -45,7 +45,7 @@ class PlaceDetailMockController(
                     .sortedByDescending { it.updatedAt }
                     .flatMap { save ->
                         save.photoAssetIds.map {
-                            PlaceDetailResponse.Photo(
+                            PlaceDetailResponse.PlacePhoto(
                                 url = mockMediaUrl(it),
                                 reviewId = save.reviewId!!,
                             )
@@ -120,14 +120,14 @@ class PlaceDetailMockController(
         val categoryName: String?,
         val averageRating: Double?,
         val reviewCount: Int,
-        val photos: List<Photo>,
+        val photos: List<PlacePhoto>,
         val roadAddress: String,
         val latitude: Double,
         val longitude: Double,
         val phoneNumber: String?,
         val isFavorite: Boolean,
     ) {
-        data class Photo(
+        data class PlacePhoto(
             val url: String,
             val reviewId: String,
         )
