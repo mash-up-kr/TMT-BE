@@ -31,10 +31,12 @@ class MediaAssetEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0
 
-    /** STAGED → ATTACHED 단방향. 되돌리지 않는다. */
+    /** STAGED → ATTACHED 단방향. 첨부는 조건부 UPDATE로 한다 — 읽고 쓰면 같은 파일이 두 번 붙는다. */
     @Enumerated(EnumType.STRING)
     @Column(length = 10, nullable = false)
     var status: MediaAssetStatus = MediaAssetStatus.STAGED
+        protected set
 
     var attachedAt: Instant? = null
+        protected set
 }
