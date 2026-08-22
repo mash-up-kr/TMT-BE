@@ -22,22 +22,26 @@ context-path는 `/api`다. Swagger UI `http://localhost:8080/api/api-docs`, Open
 **이 레포에서 코드와 문서는 같은 PR에서 함께 움직인다.** 아래 두 가지는 코드만 바꾸고 문서를 빼먹으면
 mock·FE 코드젠·실구현이 조용히 어긋나기 때문에, 작업 전에 확인하고 작업 후에 반영한다. (TMT-158)
 
-### 1. DB 스키마를 바꾸면 — `.sql`이 정본이다
+### 1. DB 스키마를 바꾸면 — 마이그레이션이 정본이다
 
-`docs/DB-SCHEMA.sql`이 스키마의 **정본**이고, `docs/DB-SCHEMA.md`가 ERD와 설계 결정(D1~D6)의 근거다.
-테이블·컬럼·인덱스·제약을 추가하거나 바꿨다면 **같은 PR에서** 둘 다 갱신한다.
+`tmt-output-persistence/postgres/src/main/resources/db/migration/`의 Flyway 마이그레이션이 스키마의 **정본**이고
+(TMT-96), `docs/DB-SCHEMA.md`가 ERD와 설계 결정(D1~D6)의 근거다. 테이블·컬럼·인덱스·제약을 추가하거나
+바꿨다면 **같은 PR에서** 둘 다 갱신한다.
 
-- `.sql` — DDL 반영. 새 컬럼에는 어떤 도메인 규칙에서 온 것인지 주석으로 규칙 번호를 남긴다 (예: `-- P4`)
-- `.md` — ERD(mermaid)와 영향받은 설계 결정 갱신. 기존 결정을 뒤집었다면 **왜 바뀌었는지**를 함께 적는다
-- 실행 검증 필수 — 컨테이너에 실제로 넣어보고 통과한 것만 올린다:
+- **이미 적용된 마이그레이션은 고치지 않는다.** 체크섬이 달라져 기동이 막힌다. 변경은 항상 새 `V{n}__*.sql`을
+  추가하고, 스키마 변경과 참조 데이터(시드)는 파일을 나눈다
+- 새 컬럼에는 어떤 도메인 규칙에서 온 것인지 주석으로 규칙 번호를 남긴다 (예: `-- P4`)
+- `docs/DB-SCHEMA.md` — ERD(mermaid)와 영향받은 설계 결정 갱신. 기존 결정을 뒤집었다면 **왜 바뀌었는지**를 함께 적는다
+- 실행 검증 필수 — 빈 볼륨에서 실제로 기동해보고 통과한 것만 올린다:
 
   ```bash
-  podman run --rm -d --name ddl -e POSTGRES_PASSWORD=t -e POSTGRES_DB=tmt imresamu/postgis:17-3.5
-  podman exec -i ddl psql -U postgres -d tmt -v ON_ERROR_STOP=1 < docs/DB-SCHEMA.sql
+  docker compose -f docker/docker-compose.local.yml down -v
+  docker compose -f docker/docker-compose.local.yml up -d
+  ./gradlew :tmt-bootstrap:bootRun
   ```
 
-엔티티(JPA) 코드만 고치고 `.sql`을 안 고치면 `prod`의 `ddl-auto: validate`가 배포 시점에 터진다.
-스키마 변경은 코드보다 `.sql`이 먼저다.
+엔티티(JPA) 코드만 고치고 마이그레이션을 안 만들면 로컬·운영 모두 `ddl-auto: validate`에서 기동이 막힌다.
+스키마 변경은 코드보다 마이그레이션이 먼저다.
 
 ### 2. API 계약을 바꾸면 — 변경 이력이 먼저다
 
@@ -68,7 +72,7 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
 |---|---|
 | 브랜치·커밋·PR·리뷰 등급(`[must]`/`[want]`/`[q]`)·머지 조건 | [docs/BRANCHING.md](docs/BRANCHING.md) |
 | 릴리즈 태그·배포 절차·롤백 | [docs/RELEASE.md](docs/RELEASE.md) |
-| 테이블 구조·ERD·설계 결정 | [docs/DB-SCHEMA.sql](docs/DB-SCHEMA.sql) (DDL 정본) · [docs/DB-SCHEMA.md](docs/DB-SCHEMA.md) (근거) |
+| 테이블 구조·ERD·설계 결정 | [`V1__init.sql`](tmt-output-persistence/postgres/src/main/resources/db/migration/V1__init.sql) (DDL 정본) · [docs/DB-SCHEMA.md](docs/DB-SCHEMA.md) (근거) |
 | 응답 래퍼·에러 형식·커서 페이징·인증·멱등성 | [공통 API 규약 v1](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/51249170) |
 | 도메인 규칙 번호(C4·G17·T6 …)의 출처 | [도메인 설계 v2](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/57049090) |
 | 화면별 엔드포인트 계약 | API 명세 v2 — [A.홈](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/57049129) · [B.탐색·가게](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/57016328) · [D_01.그룹 탐색](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/56983660) · [D_02.그룹 생성·상세](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/56983617) · [F·G·I.리뷰](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/56983556) · [H.가입·공유](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/56950805) |
@@ -80,7 +84,7 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
 ## Universal working agreement
 
 - 코드를 바꾸면 `./gradlew build`를 돌린다. 일부만 돌렸다면 범위와 생략 이유를 밝힌다. 안 돌렸으면 통과했다고 말하지 않는다
-- 정확한 값과 현재 동작은 코드·설정·`.sql`을 source of truth로 본다. 문서와 코드가 다르면 추측하지 말고 **차이를 명시한다**
+- 정확한 값과 현재 동작은 코드·설정·마이그레이션을 source of truth로 본다. 문서와 코드가 다르면 추측하지 말고 **차이를 명시한다**
 - 내 변경으로 문서의 서술이 코드와 달라지면 같은 변경에서 문서를 갱신한다 (위 §문서 동반 갱신 규칙)
 - production 의존성을 추가하기 전에 필요성과 대안을 확인하고 보고한다
 - 기존 모듈 경계(`input/output 어댑터 → application`)를 이유 없이 우회하지 않는다
