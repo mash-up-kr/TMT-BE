@@ -1,34 +1,15 @@
 package com.tmt.output.persistence.postgres.entity
 
 import jakarta.persistence.Column
-import jakarta.persistence.EntityListeners
 import jakarta.persistence.MappedSuperclass
-import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
-import org.springframework.data.jpa.domain.support.AuditingEntityListener
-import java.time.LocalDateTime
+import java.time.Instant
 
+/** `updated_at`이 있는 테이블만 상속한다 — users·place·save·groups 4종. */
 @MappedSuperclass
-@EntityListeners(AuditingEntityListener::class)
-abstract class BaseTimeEntity {
-    @CreatedDate
-    @Column(updatable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-        protected set
-
+abstract class BaseTimeEntity : BaseCreatedEntity() {
     @LastModifiedDate
-    var updatedAt: LocalDateTime = LocalDateTime.now()
-        protected set
-
     @Column(nullable = false)
-    var deleted: Boolean = false
+    var updatedAt: Instant = Instant.now()
         protected set
-
-    open fun softDelete() {
-        this.deleted = true
-    }
-
-    open fun restore() {
-        this.deleted = false
-    }
 }
