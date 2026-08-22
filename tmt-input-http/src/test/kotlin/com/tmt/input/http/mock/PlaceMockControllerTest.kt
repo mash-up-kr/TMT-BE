@@ -3,11 +3,8 @@ package com.tmt.input.http.mock
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Test
-import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -19,12 +16,11 @@ class PlaceMockControllerTest {
             create { id -> MockPlace(id, "서북면옥", "서울 중구 을지로3가 296-1", "중구 을지로3가", "한식", 37.5663, 126.9910) }
             create { id -> MockPlace(id, "역전할머니맥주", "서울 강남구 역삼동 815-3", "강남구 역삼동", "주점", 37.4993, 127.0275) }
         }
-    private val addressStore = InMemoryStore<MockAddress>(idPrefix = "addr")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(PlaceMockController(placeStore, addressStore, saveStore, MockFavoriteStore()))
+            .standaloneSetup(PlaceMockController(placeStore, saveStore, MockFavoriteStore()))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
@@ -81,78 +77,5 @@ class PlaceMockControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].name").value("역전할머니맥주"))
-    }
-
-    @Test
-    fun `매장을 직접 등록하면 201과 Location이 내려간다`() {
-        val address =
-            addressStore.create { id ->
-                MockAddress(id, "서울 양천구 오목로 32길 1", "서울 양천구 신정동 948-1", 37.5261, 126.8558)
-            }
-
-        mockMvc
-            .perform(
-                post("/v1/places")
-                    .header(UserIdArgumentResolver.HEADER, "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        """{ "name": "마피아 피자", "addressId": "${address.addressId}", "categoryId": "cat_western" }""",
-                    ),
-            ).andExpect(status().isCreated)
-            .andExpect(header().string("Location", "/v1/places/place_4"))
-            .andExpect(jsonPath("$.placeId").value("place_4"))
-            .andExpect(jsonPath("$.name").value("마피아 피자"))
-            .andExpect(jsonPath("$.regionName").value("양천구 신정동"))
-            .andExpect(jsonPath("$.categoryName").value("양식"))
-    }
-
-    @Test
-    fun `같은 좌표·같은 매장명이면 새로 만들지 않고 200으로 기존 매장을 돌려준다`() {
-        val address =
-            addressStore.create { id ->
-                MockAddress(id, "서울 양천구 오목로 32길 1", "서울 양천구 신정동 948-1", 37.5261, 126.8558)
-            }
-        val body = """{ "name": "마피아 피자", "addressId": "${address.addressId}" }"""
-        val create =
-            post(
-                "/v1/places",
-            ).header(UserIdArgumentResolver.HEADER, "1").contentType(MediaType.APPLICATION_JSON).content(body)
-
-        mockMvc.perform(create).andExpect(status().isCreated)
-        mockMvc
-            .perform(create)
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.placeId").value("place_4"))
-    }
-
-    @Test
-    fun `addressId가 없으면 ADDRESS_NOT_FOUND다`() {
-        mockMvc
-            .perform(
-                post("/v1/places")
-                    .header(UserIdArgumentResolver.HEADER, "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{ "name": "마피아 피자", "addressId": "addr_999" }"""),
-            ).andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.code").value("ADDRESS_NOT_FOUND"))
-    }
-
-    @Test
-    fun `카테고리가 목록에 없으면 PLACE_CATEGORY_NOT_FOUND다`() {
-        val address =
-            addressStore.create { id ->
-                MockAddress(id, "서울 양천구 오목로 32길 1", "서울 양천구 신정동 948-1", 37.5261, 126.8558)
-            }
-
-        mockMvc
-            .perform(
-                post("/v1/places")
-                    .header(UserIdArgumentResolver.HEADER, "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        """{ "name": "마피아 피자", "addressId": "${address.addressId}", "categoryId": "cat_unknown" }""",
-                    ),
-            ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("PLACE_CATEGORY_NOT_FOUND"))
     }
 }
