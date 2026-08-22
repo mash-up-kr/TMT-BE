@@ -41,4 +41,6 @@ class PlaceEntity(
         protected set
 
     // location geography(Point,4326)은 매핑하지 않는다. 공간 조회는 네이티브 SQL로 쓴다.
+    // location이 DDL에서 NOT NULL이라 이 엔티티는 JPA로 INSERT할 수 없다. 매장 적재는
+    // 적재 파이프라인의 네이티브 SQL 전용이다 (TMT-159).
 }

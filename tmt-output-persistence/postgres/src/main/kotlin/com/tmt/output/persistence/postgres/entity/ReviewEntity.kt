@@ -22,5 +22,7 @@ class ReviewEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0
 
+    /** 소프트 삭제는 조건부 UPDATE로 한다 — 읽고 쓰면 이미 삭제된 행의 시각을 덮어쓴다. */
     var deletedAt: Instant? = null
+        protected set
 }
