@@ -1,11 +1,14 @@
 package com.tmt.input.http.config
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.core.converter.AnnotatedType
 import io.swagger.v3.core.converter.ModelConverter
 import io.swagger.v3.core.converter.ModelConverterContext
 import io.swagger.v3.oas.models.media.Schema
 import org.springdoc.core.providers.ObjectMapperProvider
 import kotlin.reflect.full.primaryConstructor
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Kotlin non-null 프로퍼티를 OpenAPI `required`에 싣는다.
@@ -53,9 +56,15 @@ class KotlinRequiredPropertyConverter(
                     .constructType(type.type)
                     .rawClass
                     .kotlin
+            }.onFailure { e ->
+                logger.warn(e) { "Kotlin 타입 해석 실패 - required 없이 스펙에 나간다: ${type.type}" }
             }.getOrNull() ?: return emptyList()
 
-        val constructor = runCatching { kClass.primaryConstructor }.getOrNull() ?: return emptyList()
+        val constructor =
+            runCatching { kClass.primaryConstructor }
+                .onFailure { e ->
+                    logger.warn(e) { "주 생성자 조회 실패 - required 없이 스펙에 나간다: ${kClass.qualifiedName}" }
+                }.getOrNull() ?: return emptyList()
 
         return constructor.parameters
             .filterNot { it.isOptional }
