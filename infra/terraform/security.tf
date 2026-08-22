@@ -32,6 +32,26 @@ resource "aws_vpc_security_group_ingress_rule" "was_app" {
   ip_protocol       = "tcp"
 }
 
+# HTTPS 종단 (TMT-175). Caddy가 80(ACME 챌린지·HTTPS 리다이렉트)·443(TLS)을 받는다.
+# 공개 웹 트래픽이라 전체 개방이 맞다 — app_ingress_cidrs로 좁힐 대상이 아니다.
+resource "aws_vpc_security_group_ingress_rule" "was_http" {
+  security_group_id = aws_security_group.was.id
+  description       = "http (caddy: ACME challenge + https redirect)"
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "was_https" {
+  security_group_id = aws_security_group.was.id
+  description       = "https (caddy TLS)"
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "was_ssh" {
   for_each = toset(var.was_ssh_cidrs)
 

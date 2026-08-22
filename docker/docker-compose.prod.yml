@@ -3,7 +3,8 @@ services:
     image: ${ECR_REGISTRY}/${ECR_REPOSITORY:-tmt}:latest
     container_name: tmt-app
     restart: unless-stopped
-    # nginx 등 리버스 프록시 도입 전까지는 호스트로 직접 노출
+    # 8080 직결은 전환기 동안 유지한다 (TMT-175) — CI 헬스체크와 기존 FE 설정이
+    # 아직 이 경로를 쓴다. HTTPS 경로(caddy)로 완전히 넘어가면 닫는다.
     ports:
       - "8080:8080"
     mem_limit: 1280m
@@ -18,3 +19,23 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - /etc/localtime:/etc/localtime:ro
+
+  # HTTPS 종단 (TMT-175). 호스트명·근거는 Caddyfile 주석 참고.
+  caddy:
+    image: caddy:2-alpine
+    container_name: tmt-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 인증서 영속화 — 없으면 컨테이너 교체마다 재발급해 Let's Encrypt
+      # 레이트리밋(주 50건)을 소모한다
+      - caddy_data:/data
+      - caddy_config:/config
+      - /etc/localtime:/etc/localtime:ro
+
+volumes:
+  caddy_data:
+  caddy_config:
