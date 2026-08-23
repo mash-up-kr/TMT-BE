@@ -39,9 +39,9 @@ $PSQL -v ON_ERROR_STOP=1 < "$SQL_DIR/upsert.sql"
 
 echo ">>> 소분류 원문 보존 (place_semas_category — V3, TMT-162)"
 $PSQL -v ON_ERROR_STOP=1 -c "
-  INSERT INTO place_semas_category (external_id, category_source)
-  SELECT external_id, category_source FROM place_staging
-  ON CONFLICT (external_id) DO UPDATE SET category_source = EXCLUDED.category_source;"
+  INSERT INTO place_semas_category (external_source, external_id, category_source)
+  SELECT external_source, external_id, category_source FROM place_staging
+  ON CONFLICT (external_source, external_id) DO UPDATE SET category_source = EXCLUDED.category_source;"
 
 echo ">>> staging 정리"
 $PSQL -v ON_ERROR_STOP=1 -c "DROP TABLE place_staging;"
