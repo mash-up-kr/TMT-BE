@@ -49,8 +49,9 @@ LEFT JOIN (VALUES
     -- 주의: 소분류명은 실데이터 값 기준이다 — 실측 문서 §5-1 표기는 접미사(음식점/전문)를
     -- 생략하고 있어 그대로 옮기면 966건이 미매칭된다 (2026-08-23 로컬 전수 대조로 발견)
 ) AS m(category_source, category_id) ON m.category_source = r.category_source
-WHERE p.external_source = 'SEMAS'
+WHERE p.external_source = r.external_source
   AND p.external_id = r.external_id
+  AND r.external_source = 'SEMAS'
   AND p.category_id IS DISTINCT FROM m.category_id;
 
 -- 리포트 1 — 매핑률 (승인 기준: 측정 필수)
@@ -70,6 +71,6 @@ GROUP BY 1 ORDER BY 2 DESC;
 -- 리포트 3 — 매핑표에 없는 소분류 (민서 회신용. 의도적 NULL 2종 외에 나오면 매핑표 보완 대상)
 SELECT r.category_source, count(*) AS cnt
 FROM place_semas_category r
-JOIN place p ON p.external_source = 'SEMAS' AND p.external_id = r.external_id
+JOIN place p ON p.external_source = r.external_source AND p.external_id = r.external_id
 WHERE p.category_id IS NULL
 GROUP BY 1 ORDER BY 2 DESC;
