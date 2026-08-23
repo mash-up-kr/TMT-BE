@@ -3,9 +3,11 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.CursorPage
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 import java.time.Instant
@@ -39,7 +42,17 @@ class SaveMockController(
         summary = "작성 완료 (신규)",
         description = "placeId와 newPlace 중 정확히 하나를 보낸다. 완성도 판정(C4)을 충족하면 리뷰와 티켓까지 같은 트랜잭션에서 나간다.",
     )
+    @ApiErrorCodes(
+        ErrorCode.PLACE_CATEGORY_NOT_FOUND,
+        ErrorCode.REVIEW_TAG_NOT_FOUND,
+        ErrorCode.REVIEW_CONTENT_TOO_LONG,
+        ErrorCode.MEDIA_NOT_OWNED,
+        ErrorCode.PLACE_NOT_FOUND,
+        ErrorCode.ADDRESS_NOT_FOUND,
+        ErrorCode.MEDIA_ALREADY_ATTACHED,
+    )
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createSave(
         @UserId userId: Long,
         @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
@@ -83,6 +96,15 @@ class SaveMockController(
     @Operation(
         summary = "작성 완료 (이어쓰기)",
         description = "전체 교체다. 매장은 바꿀 수 없어 newPlace를 받지 않는다(S6). 서버는 같은 완성도 판정을 다시 돌린다 (C6).",
+    )
+    @ApiErrorCodes(
+        ErrorCode.REVIEW_TAG_NOT_FOUND,
+        ErrorCode.REVIEW_CONTENT_TOO_LONG,
+        ErrorCode.MEDIA_NOT_OWNED,
+        ErrorCode.SAVE_NOT_FOUND,
+        ErrorCode.SAVE_ALREADY_REVIEWED,
+        ErrorCode.MEDIA_ALREADY_ATTACHED,
+        ErrorCode.SAVE_PLACE_IMMUTABLE,
     )
     @PutMapping("/{saveId}")
     fun updateSave(
@@ -144,6 +166,7 @@ class SaveMockController(
     }
 
     @Operation(summary = "본인 상세", description = "이어쓰기 재진입과 상세 시트를 모두 이걸로 그린다. 소유자에게만 응답한다 (S8).")
+    @ApiErrorCodes(ErrorCode.SAVE_NOT_FOUND, ErrorCode.PLACE_NOT_FOUND)
     @GetMapping("/{saveId}")
     fun getSave(
         @UserId userId: Long,

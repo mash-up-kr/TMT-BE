@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.CursorPage
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
@@ -26,6 +27,7 @@ class PlaceDetailMockController(
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
     @Operation(summary = "가게 상세", description = "핀 클릭 시트와 가게 상세 상단이 같은 데이터를 쓴다. 사진은 이 매장 리뷰에서 최신순으로 파생한다 (P7).")
+    @ApiErrorCodes(ErrorCode.PLACE_NOT_FOUND)
     @GetMapping
     fun placeDetail(
         @UserId userId: Long?,
@@ -60,6 +62,7 @@ class PlaceDetailMockController(
     }
 
     @Operation(summary = "가게 상세 리뷰 목록", description = "정렬은 최신순 createdAt DESC, reviewId DESC다.")
+    @ApiErrorCodes(ErrorCode.PLACE_NOT_FOUND)
     @GetMapping("/reviews")
     fun placeReviews(
         @UserId userId: Long?,
@@ -84,6 +87,7 @@ class PlaceDetailMockController(
     }
 
     @Operation(summary = "찜", description = "멱등 토글 — 이미 찜한 매장에 다시 보내도 200이다 (F2).")
+    @ApiErrorCodes(ErrorCode.PLACE_NOT_FOUND)
     @PutMapping("/favorite")
     fun addFavorite(
         @UserId userId: Long,
@@ -95,6 +99,7 @@ class PlaceDetailMockController(
     }
 
     @Operation(summary = "찜 해제", description = "찜하지 않은 매장에 보내도 200이다 (F2).")
+    @ApiErrorCodes(ErrorCode.PLACE_NOT_FOUND)
     @DeleteMapping("/favorite")
     fun removeFavorite(
         @UserId userId: Long,
