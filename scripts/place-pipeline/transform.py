@@ -104,8 +104,10 @@ def main() -> int:
             seen_ids.add(ext_id)
 
             # 컬럼 순서 = load.sh staging 정의. 빈 필드 = SQL NULL (COPY NULL '').
+            # category_source(소분류명 원문)는 place_semas_category로 옮겨져
+            # 카테고리 매핑(TMT-162)의 조인 키가 된다.
             out.writerow(["SEMAS", ext_id, name, road, jibun, region,
-                          f"{lon:.7f}", f"{lat:.7f}"])
+                          f"{lon:.7f}", f"{lat:.7f}", row["상권업종소분류명"].strip()])
             stats["kept"] += 1
 
     for k, v in stats.items():

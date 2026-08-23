@@ -4,8 +4,8 @@
 -- 재실행 가능해야 한다 — (external_source, external_id) 충돌 시 갱신하므로
 -- 같은 입력으로 두 번 돌려도 행이 늘지 않는다 (승인 기준).
 --
--- category_id는 여기서 채우지 않는다 — 매핑은 TMT-162다. staging의 소분류명은
--- TMT-162가 쓸 수 있도록 적재 후에도 남겨두지 않는다(파이프라인 재실행 시 재생성).
+-- category_id는 여기서 채우지 않는다 — load.sh가 소분류 원문을 place_semas_category(V3)로
+-- 옮긴 뒤 apply-category-mapping.sql이 전량 재계산한다 (TMT-162).
 
 INSERT INTO place (
     external_source, external_id, name, road_address, jibun_address,

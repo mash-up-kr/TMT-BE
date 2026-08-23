@@ -25,7 +25,8 @@ $PSQL -v ON_ERROR_STOP=1 -c "
     jibun_address   varchar(200),
     region_name     varchar(50)  NOT NULL,
     lon             double precision NOT NULL,
-    lat             double precision NOT NULL
+    lat             double precision NOT NULL,
+    category_source varchar(50)  NOT NULL
   );"
 
 echo ">>> COPY (${TSV})"
@@ -36,5 +37,14 @@ $PSQL -v ON_ERROR_STOP=1 -c "COPY place_staging FROM STDIN WITH (FORMAT text, NU
 echo ">>> upsert"
 $PSQL -v ON_ERROR_STOP=1 < "$SQL_DIR/upsert.sql"
 
+echo ">>> 소분류 원문 보존 (place_semas_category — V3, TMT-162)"
+$PSQL -v ON_ERROR_STOP=1 -c "
+  INSERT INTO place_semas_category (external_id, category_source)
+  SELECT external_id, category_source FROM place_staging
+  ON CONFLICT (external_id) DO UPDATE SET category_source = EXCLUDED.category_source;"
+
 echo ">>> staging 정리"
 $PSQL -v ON_ERROR_STOP=1 -c "DROP TABLE place_staging;"
+
+echo ">>> 카테고리 매핑 적용 (43종 → 14종)"
+$PSQL -v ON_ERROR_STOP=1 < "$SQL_DIR/apply-category-mapping.sql"
