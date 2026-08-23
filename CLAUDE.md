@@ -4,7 +4,7 @@
 
 또맛또(TMT) 백엔드 — 그룹 안에서 맛집 평가를 공유하는 모바일 웹앱의 API 서버.
 
-Kotlin 2.3 / Spring Boot 4.1 / JDK 21 / Gradle 9.5(멀티모듈·헥사고날) / PostgreSQL 17 + PostGIS
+Kotlin 2.3 / Spring Boot 4.1 / JDK 21 / Gradle 9.5(멀티모듈·헥사고날) / PostgreSQL 16 + PostGIS 3.4
 
 모듈 구조와 의존성 방향, 실행 환경은 [README.md](README.md)에 있다. 여기서 다시 쓰지 않는다.
 
