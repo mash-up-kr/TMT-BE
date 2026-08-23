@@ -37,6 +37,24 @@ variable "db_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
+variable "ami_id" {
+  description = <<-EOT
+    WAS·DB 공용 AMI (Amazon Linux 2023, x86_64, kernel-6.1). 고정값이다 — TMT-182.
+
+    원래 data.aws_ami(most_recent=true)였는데, AWS가 새 AMI를 내면 plan이
+    두 인스턴스의 교체(destroy)를 강요해 무심코 apply하면 prod가 내려간다.
+    AMI 교체는 이 값을 올리는 명시적 결정으로만 한다 — 인스턴스가 재생성되므로
+    배포 중단·DB 데이터 볼륨 재부착(user_data)을 감안해 계획적으로 진행할 것.
+
+    최신 AMI 조회:
+      aws ec2 describe-images --owners amazon \
+        --filters "Name=name,Values=al2023-ami-2023.*-kernel-6.1-x86_64" \
+        --query 'sort_by(Images,&CreationDate)[-1].[ImageId,Name]' --output text
+  EOT
+  type        = string
+  default     = "ami-00f6db7984ad32b20" # 2026-08 현재 두 인스턴스가 실제 쓰는 AMI
+}
+
 variable "was_instance_type" {
   description = "WAS 인스턴스 타입. x86(t3) 고정 — TMT-61 아키텍처 결정"
   type        = string
