@@ -1,15 +1,5 @@
-data "aws_ami" "al2023" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-kernel-6.1-x86_64"]
-  }
-}
-
 resource "aws_instance" "was" {
-  ami                    = data.aws_ami.al2023.id
+  ami                    = var.ami_id
   instance_type          = var.was_instance_type
   subnet_id              = aws_subnet.was.id
   vpc_security_group_ids = [aws_security_group.was.id]
@@ -37,7 +27,7 @@ resource "aws_instance" "was" {
 }
 
 resource "aws_instance" "db" {
-  ami                    = data.aws_ami.al2023.id
+  ami                    = var.ami_id
   instance_type          = var.db_instance_type
   subnet_id              = aws_subnet.db.id
   vpc_security_group_ids = [aws_security_group.db.id]
