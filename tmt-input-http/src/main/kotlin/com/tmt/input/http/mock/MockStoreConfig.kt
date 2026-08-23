@@ -18,9 +18,6 @@ class MockStoreConfig {
         }
 
     @Bean
-    fun mockAddressStore(): InMemoryStore<MockAddress> = InMemoryStore(idPrefix = "addr")
-
-    @Bean
     fun mockAssetStore(): InMemoryStore<MockAsset> = InMemoryStore(idPrefix = "asset")
 
     /**

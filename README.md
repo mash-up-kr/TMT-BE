@@ -8,7 +8,7 @@
 | Language | Kotlin 2.3, JDK 21 |
 | Framework | Spring Boot 4.1 |
 | ORM / Query | JPA, QueryDSL |
-| Database | PostgreSQL 17 (PostGIS) |
+| Database | PostgreSQL 16 (PostGIS 3.4) |
 | Build | Gradle 9.5 (buildSrc convention plugin + version catalog), ktlint |
 | Infra | Docker, GitHub Actions (CI/CD) |
 

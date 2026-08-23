@@ -23,6 +23,7 @@ enum class ErrorCode(
     PLACE_NOT_FOUND(ErrorType.NOT_FOUND, "매장을 찾을 수 없습니다."),
     PLACE_CATEGORY_NOT_FOUND(ErrorType.VALIDATION, "음식 카테고리가 목록에 없습니다."),
     ADDRESS_NOT_FOUND(ErrorType.NOT_FOUND, "주소를 찾을 수 없습니다."),
+    ADDRESS_PROVIDER_UNAVAILABLE(ErrorType.EXTERNAL_UNAVAILABLE, "주소 서비스가 응답하지 않습니다."),
 
     // 미디어
     MEDIA_FILE_TOO_LARGE(ErrorType.VALIDATION, "파일이 허용 크기를 초과했습니다."),

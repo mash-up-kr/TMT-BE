@@ -7,20 +7,15 @@ import com.tmt.input.http.controller.dto.response.CursorPage
 import com.tmt.input.http.controller.dto.response.PlaceCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.net.URI
 import kotlin.math.roundToInt
 
 @Tag(name = "매장 (mock)", description = "명세 v2 — B §2-2 · F §2")
 @RestController
 class PlaceMockController(
     private val mockPlaceStore: InMemoryStore<MockPlace>,
-    private val mockAddressStore: InMemoryStore<MockAddress>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockFavoriteStore: MockFavoriteStore,
 ) {
@@ -68,49 +63,6 @@ class PlaceMockController(
         return MockCursor.paginate(results, cursor, limit) { toPlaceCard(it, userId, latitude, longitude) }
     }
 
-    @Operation(summary = "매장 직접 등록", description = "같은 좌표·같은 매장명의 기존 매장이 있으면 새로 만들지 않고 200으로 그 매장을 돌려준다.")
-    @PostMapping("/v1/places")
-    fun createPlace(
-        @UserId userId: Long,
-        @RequestBody request: CreatePlaceRequest,
-    ): ResponseEntity<PlaceCardResponse> {
-        if (request.name.isBlank() || request.name.length > 50) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 1~50자여야 합니다.")
-        }
-        val address =
-            mockAddressStore.findById(request.addressId)
-                ?: throw TmtException(ErrorCode.ADDRESS_NOT_FOUND)
-        val categoryName =
-            request.categoryId?.let {
-                ReviewFormRules.FOOD_CATEGORIES[it] ?: throw TmtException(ErrorCode.PLACE_CATEGORY_NOT_FOUND)
-            }
-
-        // 중복 매장이 쌓이면 리뷰가 흩어져 평균 별점과 지도 핀이 갈라진다 — 기존 매장을 돌려준다
-        val duplicate =
-            mockPlaceStore.findAll().find {
-                it.name == request.name && it.latitude == address.latitude && it.longitude == address.longitude
-            }
-        if (duplicate != null) {
-            return ResponseEntity.ok(toPlaceCard(duplicate, userId, latitude = null, longitude = null))
-        }
-
-        val created =
-            mockPlaceStore.create { id ->
-                MockPlace(
-                    placeId = id,
-                    name = request.name,
-                    roadAddress = address.roadAddress,
-                    regionName = regionNameOf(address.jibunAddress),
-                    categoryName = categoryName,
-                    latitude = address.latitude,
-                    longitude = address.longitude,
-                )
-            }
-        return ResponseEntity
-            .created(URI.create("/v1/places/${created.placeId}"))
-            .body(toPlaceCard(created, userId, latitude = null, longitude = null))
-    }
-
     private fun toPlaceCard(
         place: MockPlace,
         viewerId: Long?,
@@ -137,21 +89,5 @@ class PlaceMockController(
                 },
             isFavorite = mockFavoriteStore.isFavorite(viewerId, place.placeId),
         )
-    }
-
-    data class CreatePlaceRequest(
-        val name: String,
-        val addressId: String,
-        val categoryId: String? = null,
-    )
-
-    companion object {
-        /** 지번주소 "서울 양천구 신정동 948-1" → "양천구 신정동" */
-        private fun regionNameOf(jibunAddress: String): String =
-            jibunAddress
-                .split(" ")
-                .drop(1)
-                .take(2)
-                .joinToString(" ")
     }
 }

@@ -10,5 +10,8 @@ enum class ErrorType {
     GONE,
     UNPROCESSABLE,
     RATE_LIMITED,
+
+    /** 외부 의존(주소 API 등)이 응답하지 못함. 우리 서버 결함인 [INTERNAL]과 구분한다 */
+    EXTERNAL_UNAVAILABLE,
     INTERNAL,
 }
