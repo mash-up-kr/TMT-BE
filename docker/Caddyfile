@@ -1,0 +1,17 @@
+# API HTTPS 종단 (TMT-175)
+#
+# Vercel FE(https)가 평문 http://<EIP>:8080을 호출하면 mixed content로 차단된다.
+# ALB는 비용 방침으로 제외돼(TMT-61) 인스턴스 안에서 Caddy가 TLS를 끝낸다 —
+# Let's Encrypt 인증서를 자동 발급·갱신하므로 ACM이 필요 없다.
+#
+# 도메인은 sslip.io(무료 wildcard DNS, 3-39-38-23 → 3.39.38.23 EIP)다.
+# 실도메인을 사면 아래 호스트명과 DNS A레코드만 바꾸면 된다. EIP가 바뀌면
+# 이 파일의 호스트명도 함께 바뀌어야 한다 (compute.tf의 aws_eip.was).
+#
+# 80 포트의 HTTP → HTTPS 리다이렉트는 Caddy가 자동으로 건다.
+
+3-39-38-23.sslip.io {
+	# compose 네트워크의 서비스명으로 붙는다. 8080 직결(호스트 포트)은
+	# 전환기 동안 유지한다 — CI 헬스체크와 기존 FE 설정이 아직 그 경로를 쓴다.
+	reverse_proxy app:8080
+}
