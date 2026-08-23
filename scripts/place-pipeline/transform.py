@@ -6,7 +6,9 @@
 
 입력:  상가정보 서울 CSV (UTF-8, 분기 갱신). 컬럼은 이름으로 찾는다 —
        분기 갱신에서 컬럼 순서가 바뀌어도 동작하고, 이름이 바뀌면 시끄럽게 죽는다.
-출력:  탭 구분 TSV (stdout). 컬럼 순서는 sql/upsert.sql의 staging 테이블과 일치해야 한다.
+출력:  탭 구분 TSV (stdout). 컬럼 순서는 load.sh의 staging 테이블과 일치해야 한다.
+       NULL은 빈 필드다 — load.sh가 COPY ... NULL '' 로 읽는다. sentinel(\\N)을 쓰면
+       writer의 escapechar가 백슬래시를 이스케이프해 리터럴 문자열이 적재된다 (PR #30 리뷰).
 
 표준 에러로 처리 통계를 남긴다. 걸러진 행이 왜 걸러졌는지 세지 않으면
 "141,126건이어야 하는데 13만 건" 같은 이상을 조용히 지나치게 된다.
@@ -16,7 +18,7 @@ import csv
 import sys
 import argparse
 
-# 실측 문서 §3의 매핑표. DDL 길이 제약(docs/DB-SCHEMA.sql)을 넘으면 자르지 않고 버린다
+# 실측 문서 §3의 매핑표. DDL 길이 제약(db/migration/V1__init.sql)을 넘으면 자르지 않고 버린다
 # — 길이 초과는 데이터 이상 신호라서, 잘라 넣으면 이상이 숨는다.
 REQUIRED_COLUMNS = [
     "상가업소번호", "상호명", "지점명",
@@ -101,13 +103,20 @@ def main() -> int:
                 continue
             seen_ids.add(ext_id)
 
-            # 컬럼 순서 = sql/upsert.sql staging 정의. \N은 SQL NULL.
-            out.writerow(["SEMAS", ext_id, name, road, jibun or "\\N", region,
+            # 컬럼 순서 = load.sh staging 정의. 빈 필드 = SQL NULL (COPY NULL '').
+            out.writerow(["SEMAS", ext_id, name, road, jibun, region,
                           f"{lon:.7f}", f"{lat:.7f}"])
             stats["kept"] += 1
 
     for k, v in stats.items():
         print(f"{k}\t{v}", file=sys.stderr)
+
+    # 값 드리프트 방어 — 컬럼 이름 가드(위)는 값 변경을 못 잡는다. 공단이 대분류명을
+    # '음식' → '음식점'처럼 바꾸면 전량이 not_food로 빠지므로, 0건이면 시끄럽게 죽는다.
+    if stats["kept"] == 0:
+        print("kept=0 — 필터 값('음식'/'서울특별시')이 데이터와 어긋난 것 같다. "
+              "상권업종대분류명·시도명의 실제 값 분포를 확인할 것.", file=sys.stderr)
+        return 1
     return 0
 
 

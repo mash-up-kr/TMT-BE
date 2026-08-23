@@ -29,7 +29,9 @@ $PSQL -v ON_ERROR_STOP=1 -c "
   );"
 
 echo ">>> COPY (${TSV})"
-$PSQL -v ON_ERROR_STOP=1 -c "COPY place_staging FROM STDIN WITH (FORMAT text)" < "$TSV"
+# NULL '' — transform.py는 NULL을 빈 필드로 내보낸다. 기본 마커(\N)를 쓰면 writer의
+# escapechar와 얽혀 리터럴 \N 문자열이 적재된다 (PR #30 리뷰에서 실증).
+$PSQL -v ON_ERROR_STOP=1 -c "COPY place_staging FROM STDIN WITH (FORMAT text, NULL '')" < "$TSV"
 
 echo ">>> upsert"
 $PSQL -v ON_ERROR_STOP=1 < "$SQL_DIR/upsert.sql"

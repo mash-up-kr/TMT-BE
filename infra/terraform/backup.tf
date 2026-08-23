@@ -51,6 +51,21 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
       days_after_initiation = 7
     }
   }
+
+  # 적재 반입 파일(data/)도 같은 원칙으로 만료한다 — DB에 들어간 뒤에는 원본 CSV에서
+  # 언제든 재생성할 수 있는 전송용 사본이라, 백업(pg/)보다 짧게 둔다.
+  rule {
+    id     = "expire-ingest-files"
+    status = "Enabled"
+
+    filter {
+      prefix = "data/"
+    }
+
+    expiration {
+      days = 7
+    }
+  }
 }
 
 # DB 인스턴스가 덤프를 올릴 수 있게 한다. 쓰기만 주고 삭제 권한은 주지 않는다 —
