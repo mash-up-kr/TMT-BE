@@ -4,6 +4,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -42,10 +42,9 @@ class SaveMockController(
     @PostMapping
     fun createSave(
         @UserId userId: Long,
-        @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
+        @IdempotencyKey key: String,
         @RequestBody request: SaveRequest,
     ): ResponseEntity<SaveResultResponse> {
-        val key = requireIdempotencyKey(idempotencyKey)
         replayed(userId, ENDPOINT_CREATE, key, request)?.let { return created(it) }
 
         // 검증을 다 끝낸 뒤에 매장을 만든다 — 먼저 만들면 뒤에서 실패했을 때 리뷰 없는 매장이 남는다
@@ -88,10 +87,9 @@ class SaveMockController(
     fun updateSave(
         @UserId userId: Long,
         @PathVariable saveId: String,
-        @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
+        @IdempotencyKey key: String,
         @RequestBody request: SaveRequest,
     ): SaveResultResponse {
-        val key = requireIdempotencyKey(idempotencyKey)
         // 재현 검사가 아래 reviewId 가드보다 앞에 있어야 한다 — 뒤로 가면 성공한 요청의
         // 재시도가 200 대신 409 SAVE_ALREADY_REVIEWED를 받는다 (규약 §9)
         replayed(userId, endpointUpdate(saveId), key, request)?.let { return it }
@@ -183,10 +181,6 @@ class SaveMockController(
             createdAt = save.createdAt.toString(),
         )
     }
-
-    private fun requireIdempotencyKey(key: String?): String =
-        key?.takeIf { it.isNotBlank() }
-            ?: throw TmtException(ErrorCode.VALIDATION_FAILED, "$IDEMPOTENCY_KEY_HEADER 헤더는 필수입니다.")
 
     /**
      * 같은 사용자·엔드포인트·키의 재요청이면 최초 응답을 그대로 돌려준다 (규약 §9).
@@ -438,8 +432,6 @@ class SaveMockController(
     )
 
     companion object {
-        const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
-
         // place.name VARCHAR(100)
         private const val PLACE_NAME_MAX_LENGTH = 100
 

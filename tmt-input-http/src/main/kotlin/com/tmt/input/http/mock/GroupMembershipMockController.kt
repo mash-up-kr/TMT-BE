@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -66,16 +66,10 @@ class GroupMembershipMockController(
     fun join(
         @UserId userId: Long,
         @PathVariable groupId: String,
-        @RequestHeader(name = SaveMockController.IDEMPOTENCY_KEY_HEADER, required = false) idempotencyKey: String?,
+        @IdempotencyKey key: String,
         @RequestBody(required = false) requestBody: JoinRequest?,
     ): ResponseEntity<JoinResponse> {
         val request = requestBody ?: JoinRequest()
-        val key =
-            idempotencyKey?.takeIf { it.isNotBlank() }
-                ?: throw TmtException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "${SaveMockController.IDEMPOTENCY_KEY_HEADER} 헤더는 필수입니다.",
-                )
 
         // 재현 검사가 isMember 가드보다 앞에 있어야 한다 — 뒤로 가면 성공한 가입의 재시도가
         // 409 ALREADY_GROUP_MEMBER를 받고, FE는 sourceReviewId가 공유됐는지 알 수 없다 (규약 §9)
