@@ -41,6 +41,9 @@ class OpenApiConfiguration {
     fun errorResponses(): OperationCustomizer = ErrorResponseCustomizer()
 
     @Bean
+    fun userIdHeader(): OperationCustomizer = UserIdHeaderCustomizer()
+
+    @Bean
     fun errorResponseSchema(): OpenApiCustomizer =
         OpenApiCustomizer { openApi ->
             val components = openApi.components ?: Components().also { openApi.components = it }
