@@ -53,6 +53,15 @@ class CursorCodecTest {
     }
 
     @Test
+    fun `null 조건과 빈 문자열 조건은 다른 커서다`() {
+        val withNull = CursorCondition.of("a", null)
+        val withEmpty = CursorCondition.of("a", "")
+        val cursor = CursorCodec.encode(SaveCursorSpec, SaveKey(Instant.EPOCH, 1), withNull)
+
+        assertFailsWith<TmtException> { CursorCodec.decode(SaveCursorSpec, cursor, withEmpty) }
+    }
+
+    @Test
     fun `해석할 수 없는 커서는 거절한다`() {
         listOf("not-base64!!", "", "eyJrIjpbXX0", base64Url("{\"k\":[\"only-one\"],\"h\":\"x\"}")).forEach { cursor ->
             val error = assertFailsWith<TmtException>(cursor) { CursorCodec.decode(SaveCursorSpec, cursor, condition) }
