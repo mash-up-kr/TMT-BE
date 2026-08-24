@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
 import io.swagger.v3.oas.models.servers.Server
 import org.springdoc.core.customizers.OpenApiCustomizer
+import org.springdoc.core.customizers.OperationCustomizer
 import org.springdoc.core.providers.ObjectMapperProvider
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -35,6 +36,9 @@ class OpenApiConfiguration {
     @Bean
     fun kotlinPropertyConverter(objectMapperProvider: ObjectMapperProvider): ModelConverter =
         KotlinPropertyConverter(objectMapperProvider)
+
+    @Bean
+    fun idempotencyKeyHeader(): OperationCustomizer = IdempotencyKeyHeaderCustomizer()
 
     @Bean
     fun errorResponseSchema(): OpenApiCustomizer =
