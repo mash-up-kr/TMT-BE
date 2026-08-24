@@ -24,10 +24,16 @@ load.sh       staging COPY + upsert. 재실행 가능 (ON CONFLICT DO UPDATE)
 sql/upsert.sql
 ```
 
-`category_id`는 **NULL로 적재한다** — 매핑(소분류 43종 → 14종)은 TMT-162다.
-`phone_number`도 NULL이다 — 상가정보에 컬럼 자체가 없다 (도메인 P10과의 괴리는 실측 §8 참고).
-재적재 시 `review_count`·`rating_sum`·`category_id`는 덮지 않는다 — 서비스 데이터와 TMT-162
-결과를 원본 갱신이 지우면 안 된다.
+`phone_number`는 NULL이다 — 상가정보에 컬럼 자체가 없다 (도메인 P10과의 괴리는 실측 §8 참고).
+재적재 시 `review_count`·`rating_sum`은 덮지 않는다 — 서비스 데이터를 원본 갱신이 지우면 안 된다.
+
+### 카테고리 매핑 (TMT-162)
+
+`sql/apply-category-mapping.sql`이 **소분류 43종 → 카테고리 14종**(E11·D4, 매핑표 정본: TMT-162
+민서 코멘트 2026-08-23)을 적용한다. `load.sh`가 적재 말미에 자동 실행하고, 매핑표만 고쳤을 때는
+이 파일만 다시 실행하면 **재적재 없이** 반영된다 — 소분류 원문이 `place_semas_category`(V3)에
+보존돼 있기 때문이다. 매핑 실패는 NULL로 남긴다(기타로 몰지 않는다, E11). 파일 말미의 리포트
+3종(매핑률·분포·미매칭 목록)이 승인 기준의 측정을 대신한다.
 
 ## 사용법
 
