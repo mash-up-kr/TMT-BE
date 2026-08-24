@@ -42,6 +42,9 @@ class IdempotencyService(
                 )
             IdempotentResult(response, request.successStatus, replayed = false)
         } catch (e: IdempotencyRaceLostException) {
+            // 밀린 쪽은 승자의 커밋을 기다렸다 rowcount 0을 받으므로 여기서는 승자 레코드가 보인다.
+            // null은 그 사이 TTL purge가 지운 경우뿐이라 실질적으로 도달하지 않는다 — 지우면 NPE로
+            // 500이 나가므로, 재시도할 수 있게 409로 돌려준다.
             val recorded =
                 idempotencyPort.find(request.userId, request.endpoint, request.idemKey)
                     ?: throw TmtException(ErrorCode.IDEMPOTENCY_CONFLICT, "같은 키의 요청이 처리 중입니다. 잠시 후 다시 시도해 주세요.")
