@@ -11,6 +11,7 @@ import java.security.MessageDigest
  *
  * 애플리케이션 공용 ObjectMapper를 주입받지 않고 전용 매퍼를 쓴다 — 전역 직렬화 설정을
  * 손대면 이미 기록된 지문이 전부 어긋나 같은 요청이 IDEMPOTENCY_CONFLICT가 된다.
+ * 요청 DTO의 필드 추가·선언 순서 변경도 같은 효과가 나므로 TTL 창 안의 재시도 영향을 보고 배포한다.
  */
 @Component
 class IdempotencyPayloadCodec {
