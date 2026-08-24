@@ -38,6 +38,12 @@ class OpenApiConfiguration {
         KotlinPropertyConverter(objectMapperProvider)
 
     @Bean
+    fun errorResponses(): OperationCustomizer = ErrorResponseCustomizer()
+
+    @Bean
+    fun userIdHeader(): OperationCustomizer = UserIdHeaderCustomizer()
+
+    @Bean
     fun idempotencyKeyHeader(): OperationCustomizer = IdempotencyKeyHeaderCustomizer()
 
     @Bean

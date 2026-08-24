@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
@@ -25,6 +26,7 @@ class AddressMockController {
                 "mock 재현용 검색어 — `장애`: 502 ADDRESS_PROVIDER_UNAVAILABLE, " +
                 "`좌표없음`: 저장 시 404 ADDRESS_NOT_FOUND, `많음`: truncated=true",
     )
+    @ApiErrorCodes(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)
     @GetMapping
     fun searchAddresses(
         @UserId userId: Long,

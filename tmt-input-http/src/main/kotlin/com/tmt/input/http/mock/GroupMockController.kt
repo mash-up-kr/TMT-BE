@@ -3,11 +3,13 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.CursorPage
 import com.tmt.input.http.controller.dto.response.GroupCardResponse
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 import java.time.Instant
@@ -31,6 +34,7 @@ class GroupMockController(
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
     @Operation(summary = "그룹 탐색", description = "검색·필터·정렬이 모두 한 목록에 걸린다. 파라미터 없이 부르면 추천순 전체 목록.")
+    @ApiErrorCodes(ErrorCode.GROUP_TAG_NOT_FOUND)
     @GetMapping
     fun listGroups(
         @UserId userId: Long?,
@@ -108,7 +112,14 @@ class GroupMockController(
     }
 
     @Operation(summary = "그룹 만들기", description = "4단계 입력을 한 번에 보낸다. 요청자가 자동으로 그룹장이 되고 소유권은 이전되지 않는다 (G13).")
+    @ApiErrorCodes(
+        ErrorCode.GROUP_TAG_NOT_FOUND,
+        ErrorCode.MEDIA_NOT_OWNED,
+        ErrorCode.GROUP_NAME_DUPLICATED,
+        ErrorCode.MEDIA_ALREADY_ATTACHED,
+    )
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     fun createGroup(
         @UserId userId: Long,
         @RequestBody request: GroupRequest,
@@ -142,6 +153,7 @@ class GroupMockController(
     }
 
     @Operation(summary = "그룹 상세")
+    @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/{groupId}")
     fun groupDetail(
         @UserId userId: Long?,
@@ -149,6 +161,7 @@ class GroupMockController(
     ): GroupAssembler.GroupDetailResponse = groupAssembler.detail(findGroup(groupId), userId)
 
     @Operation(summary = "그룹 상세 리뷰 목록", description = "게이트가 걸리는 곳 — 미가입·비회원은 최신 3건, 가입자는 전체 (G1). 판정은 가입 여부 하나다.")
+    @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/{groupId}/reviews")
     fun groupReviews(
         @UserId userId: Long?,
@@ -195,6 +208,14 @@ class GroupMockController(
     }
 
     @Operation(summary = "그룹 편집", description = "생성자만 호출할 수 있다 (G13). 전체 교체라 바꾸지 않는 필드도 현재 값을 실어 보내야 한다.")
+    @ApiErrorCodes(
+        ErrorCode.GROUP_TAG_NOT_FOUND,
+        ErrorCode.MEDIA_NOT_OWNED,
+        ErrorCode.GROUP_OWNER_REQUIRED,
+        ErrorCode.GROUP_NOT_FOUND,
+        ErrorCode.GROUP_NAME_DUPLICATED,
+        ErrorCode.MEDIA_ALREADY_ATTACHED,
+    )
     @PutMapping("/{groupId}")
     fun updateGroup(
         @UserId userId: Long,

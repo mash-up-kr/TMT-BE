@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
@@ -22,6 +23,7 @@ class MediaMockController(
     private val mockAssetStore: InMemoryStore<MockAsset>,
 ) {
     @Operation(summary = "사진 업로드 presigned URL 발급", description = "발급받은 assetId는 발급받은 사용자만 Save에 붙일 수 있다 (M2).")
+    @ApiErrorCodes(ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED, ErrorCode.MEDIA_FILE_TOO_LARGE)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createUploadIntent(

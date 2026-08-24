@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -34,6 +35,7 @@ class GroupMembershipMockController(
     private val mockIdempotencyRegistry: MockIdempotencyRegistry,
 ) {
     @Operation(summary = "가입 팝업 정보", description = "티켓 보유·부족 분기. preview는 참고값이고 가입이 조건을 다시 검증한다 (TX-3).")
+    @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/join-preview")
     fun joinPreview(
         @UserId userId: Long,
@@ -62,7 +64,14 @@ class GroupMembershipMockController(
     }
 
     @Operation(summary = "가입", description = "티켓 1장을 소비해 가입한다. 티켓 소비·멤버십 생성·자동 공유가 한 트랜잭션이다 (TX-3).")
+    @ApiErrorCodes(
+        ErrorCode.GROUP_NOT_FOUND,
+        ErrorCode.REVIEW_NOT_FOUND,
+        ErrorCode.ALREADY_GROUP_MEMBER,
+        ErrorCode.GROUP_JOIN_TICKET_REQUIRED,
+    )
     @PostMapping("/memberships")
+    @ResponseStatus(HttpStatus.CREATED)
     fun join(
         @UserId userId: Long,
         @PathVariable groupId: String,
@@ -123,6 +132,11 @@ class GroupMembershipMockController(
     }
 
     @Operation(summary = "탈퇴", description = "그 그룹에 공유했던 내 리뷰가 전부 내려간다 (G10). 티켓은 돌아오지 않는다 (T9).")
+    @ApiErrorCodes(
+        ErrorCode.GROUP_MEMBERSHIP_REQUIRED,
+        ErrorCode.GROUP_NOT_FOUND,
+        ErrorCode.GROUP_OWNER_CANNOT_LEAVE,
+    )
     @DeleteMapping("/memberships/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun leave(
@@ -141,6 +155,7 @@ class GroupMembershipMockController(
     }
 
     @Operation(summary = "리뷰 공유 목록", description = "내 리뷰 전체를 공유 여부와 함께 내린다 — PUT이 전체 교체라 현재 상태를 전부 알아야 한다.")
+    @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/review-shares")
     fun listReviewShares(
         @UserId userId: Long,
@@ -178,6 +193,11 @@ class GroupMembershipMockController(
     @Operation(
         summary = "리뷰 공유 (전체 교체)",
         description = "보낸 reviewIds가 이 그룹에 공유된 내 리뷰의 최종 집합이 된다. 멱등이라 Idempotency-Key가 필요 없다.",
+    )
+    @ApiErrorCodes(
+        ErrorCode.GROUP_MEMBERSHIP_REQUIRED,
+        ErrorCode.GROUP_NOT_FOUND,
+        ErrorCode.REVIEW_NOT_FOUND,
     )
     @PutMapping("/review-shares")
     fun replaceReviewShares(

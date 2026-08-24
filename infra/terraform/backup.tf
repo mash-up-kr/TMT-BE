@@ -51,6 +51,21 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
       days_after_initiation = 7
     }
   }
+
+  # 적재 반입 파일(data/)도 같은 원칙으로 만료한다 — DB에 들어간 뒤에는 원본 CSV에서
+  # 언제든 재생성할 수 있는 전송용 사본이라, 백업(pg/)보다 짧게 둔다.
+  rule {
+    id     = "expire-ingest-files"
+    status = "Enabled"
+
+    filter {
+      prefix = "data/"
+    }
+
+    expiration {
+      days = 7
+    }
+  }
 }
 
 # DB 인스턴스가 덤프를 올릴 수 있게 한다. 쓰기만 주고 삭제 권한은 주지 않는다 —
@@ -75,4 +90,22 @@ resource "aws_iam_role_policy" "backup_write" {
   name   = "${local.name}-backup-write"
   role   = aws_iam_role.instance.id
   policy = data.aws_iam_policy_document.backup_write.json
+}
+
+# 데이터 적재 반입 경로 (TMT-163). SSM Run Command 페이로드 한도(8KB) 때문에
+# 적재 파일(수십 MB TSV)을 명령에 실을 수 없어 S3를 경유한다 — 로컬에서
+# data/ 프리픽스에 올리면 DB 인스턴스가 내려받는다 (scripts/place-pipeline/README.md).
+# 읽기만 준다: pg/(백업)는 읽을 수 없어 덤프 유출 경로가 되지 않고,
+# data/에 쓰기 권한이 없어 인스턴스가 반입 파일을 위조할 수도 없다.
+data "aws_iam_policy_document" "data_read" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.backup.arn}/data/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "data_read" {
+  name   = "${local.name}-data-read"
+  role   = aws_iam_role.instance.id
+  policy = data.aws_iam_policy_document.data_read.json
 }
