@@ -3,6 +3,7 @@ package com.tmt.input.http.mock
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
+import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.Author
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -25,6 +26,7 @@ class ReviewMockController(
     private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
     @Operation(summary = "공개 리뷰 상세", description = "완성된 리뷰만 대상이고 미완성 저장은 조회되지 않는다 (R8). 개인 리뷰 열람에는 게이트가 없다 (G2).")
+    @ApiErrorCodes(ErrorCode.REVIEW_NOT_FOUND)
     @GetMapping
     fun reviewDetail(
         @UserId userId: Long?,
@@ -66,6 +68,7 @@ class ReviewMockController(
         summary = "리뷰 삭제",
         description = "사진까지 완전 삭제되고 저장으로 되돌아가지 않으며 티켓 1장을 회수한다 (R6·R7). 회수할 티켓이 없으면 409로 거부한다.",
     )
+    @ApiErrorCodes(ErrorCode.REVIEW_NOT_FOUND, ErrorCode.REVIEW_DELETE_TICKET_REQUIRED)
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteReview(

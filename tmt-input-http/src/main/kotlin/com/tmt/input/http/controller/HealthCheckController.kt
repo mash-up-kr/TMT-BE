@@ -3,6 +3,10 @@ package com.tmt.input.http.controller
 import com.tmt.application.port.input.HealthCheckUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
+import com.tmt.input.http.config.ApiErrorCodes
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,6 +23,12 @@ class HealthCheckController(
     fun apiHealth(): ResponseEntity<HealthResponse> =
         ResponseEntity.ok(HealthResponse(status = "UP", service = "tmt-api"))
 
+    @ApiResponse(responseCode = "200", description = "DB 연결 정상")
+    @ApiResponse(
+        responseCode = "503",
+        description = "DB 연결 실패",
+        content = [Content(schema = Schema(implementation = HealthResponse::class))],
+    )
     @GetMapping("/db")
     fun dbHealth(): ResponseEntity<HealthResponse> {
         val isHealthy = healthCheckUseCase.checkDatabaseHealth()
@@ -30,6 +40,7 @@ class HealthCheckController(
     @PostMapping("/error-test-global")
     fun errorTestGlobal(): Nothing = throw RuntimeException()
 
+    @ApiErrorCodes(ErrorCode.INTERNAL_ERROR_TEST)
     @PostMapping("/error-test-tmt")
     fun errorTestTmt(): Nothing =
         throw TmtException(
