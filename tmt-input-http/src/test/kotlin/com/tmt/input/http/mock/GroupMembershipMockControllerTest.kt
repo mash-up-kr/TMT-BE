@@ -2,6 +2,7 @@ package com.tmt.input.http.mock
 
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
+import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -53,7 +54,7 @@ class GroupMembershipMockControllerTest {
                     ticketLedger,
                     idempotencyRegistry,
                 ),
-            ).setCustomArgumentResolvers(UserIdArgumentResolver())
+            ).setCustomArgumentResolvers(UserIdArgumentResolver(), IdempotencyKeyArgumentResolver())
             .setControllerAdvice(ExceptionAdvice(), MockTicketExceptionAdvice())
             .build()
 
@@ -64,7 +65,7 @@ class GroupMembershipMockControllerTest {
     ) = mockMvc.perform(
         post("/v1/groups/${group.groupId}/memberships")
             .header(UserIdArgumentResolver.HEADER, userId.toString())
-            .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, key)
+            .header(IdempotencyKeyArgumentResolver.HEADER, key)
             .contentType(MediaType.APPLICATION_JSON)
             .apply { body?.let { content(it) } },
     )

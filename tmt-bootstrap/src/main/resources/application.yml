@@ -23,6 +23,12 @@ spring:
         order_inserts: true
         order_updates: true
 
+tmt:
+  idempotency:
+    # 이 기간이 지난 재시도는 멱등 기록이 없어 비즈니스 로직을 다시 탄다.
+    ttl: P1D
+    purge-cron: "0 20 4 * * *"
+
 server:
   port: 8080
   shutdown: graceful

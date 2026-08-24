@@ -44,6 +44,9 @@ class OpenApiConfiguration {
     fun userIdHeader(): OperationCustomizer = UserIdHeaderCustomizer()
 
     @Bean
+    fun idempotencyKeyHeader(): OperationCustomizer = IdempotencyKeyHeaderCustomizer()
+
+    @Bean
     fun errorResponseSchema(): OpenApiCustomizer =
         OpenApiCustomizer { openApi ->
             val components = openApi.components ?: Components().also { openApi.components = it }

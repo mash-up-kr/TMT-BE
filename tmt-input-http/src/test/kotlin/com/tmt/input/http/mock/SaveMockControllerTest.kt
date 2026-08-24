@@ -2,6 +2,7 @@ package com.tmt.input.http.mock
 
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
+import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -35,7 +36,7 @@ class SaveMockControllerTest {
                     MockIdempotencyRegistry(),
                     aiSummaryStore,
                 ),
-            ).setCustomArgumentResolvers(UserIdArgumentResolver())
+            ).setCustomArgumentResolvers(UserIdArgumentResolver(), IdempotencyKeyArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
 
@@ -58,7 +59,7 @@ class SaveMockControllerTest {
     ) = mockMvc.perform(
         post("/v1/saves")
             .header(UserIdArgumentResolver.HEADER, userId.toString())
-            .apply { idempotencyKey?.let { header(SaveMockController.IDEMPOTENCY_KEY_HEADER, it) } }
+            .apply { idempotencyKey?.let { header(IdempotencyKeyArgumentResolver.HEADER, it) } }
             .contentType(MediaType.APPLICATION_JSON)
             .content(body),
     )
@@ -135,7 +136,7 @@ class SaveMockControllerTest {
         val put =
             put("/v1/saves/save_1")
                 .header(UserIdArgumentResolver.HEADER, "1")
-                .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "put-1")
+                .header(IdempotencyKeyArgumentResolver.HEADER, "put-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(completeBody)
 
@@ -163,7 +164,7 @@ class SaveMockControllerTest {
             .perform(
                 put("/v1/saves/save_1")
                     .header(UserIdArgumentResolver.HEADER, "1")
-                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "shared-key")
+                    .header(IdempotencyKeyArgumentResolver.HEADER, "shared-key")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{ "placeId": "place_1", "rating": 4 }"""),
             ).andExpect(status().isOk)
@@ -295,7 +296,7 @@ class SaveMockControllerTest {
             .perform(
                 put("/v1/saves/save_1")
                     .header(UserIdArgumentResolver.HEADER, "1")
-                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "key-2")
+                    .header(IdempotencyKeyArgumentResolver.HEADER, "key-2")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(completeBody),
             ).andExpect(status().isOk)
@@ -313,7 +314,7 @@ class SaveMockControllerTest {
             .perform(
                 put("/v1/saves/save_1")
                     .header(UserIdArgumentResolver.HEADER, "1")
-                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "key-2")
+                    .header(IdempotencyKeyArgumentResolver.HEADER, "key-2")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(completeBody),
             ).andExpect(status().isConflict)
@@ -329,7 +330,7 @@ class SaveMockControllerTest {
             .perform(
                 put("/v1/saves/save_1")
                     .header(UserIdArgumentResolver.HEADER, "1")
-                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "key-2")
+                    .header(IdempotencyKeyArgumentResolver.HEADER, "key-2")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{ "placeId": "place_2" }"""),
             ).andExpect(status().isUnprocessableEntity)
@@ -440,7 +441,7 @@ class SaveMockControllerTest {
             .perform(
                 put("/v1/saves/save_1")
                     .header(UserIdArgumentResolver.HEADER, "1")
-                    .header(SaveMockController.IDEMPOTENCY_KEY_HEADER, "key-put")
+                    .header(IdempotencyKeyArgumentResolver.HEADER, "key-put")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{ "newPlace": { "name": "한판승부", "addressId": "${addressToken()}" } }"""),
             ).andExpect(status().isUnprocessableEntity)
