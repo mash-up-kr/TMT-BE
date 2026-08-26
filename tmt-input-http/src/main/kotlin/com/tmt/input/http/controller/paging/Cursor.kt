@@ -1,0 +1,84 @@
+package com.tmt.input.http.controller.paging
+
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
+import tools.jackson.module.kotlin.readValue
+import java.security.MessageDigest
+import java.util.Base64
+
+private val BASE64: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
+
+private val MAPPER: JsonMapper = JsonMapper.builder().addModule(kotlinModule()).build()
+
+/**
+ * 커서에 담을 정렬 키. **마지막 키는 유일해야 한다** — tie-breaker가 없으면 같은 정렬 키를 가진 행이
+ * 페이지 경계에서 중복·누락된다 (규약 §5-3).
+ */
+interface CursorSpec<T : Any> {
+    fun toKeys(key: T): List<String>
+
+    /** 형식이 맞지 않으면 예외를 던진다 — 코덱이 INVALID_CURSOR로 바꾼다. */
+    fun fromKeys(keys: List<String>): T
+}
+
+/**
+ * 커서를 발급한 조회 조건. 정렬·필터가 바뀌면 해시가 달라져 이전 커서가 무효가 된다.
+ * 조건에 쓰는 값을 순서대로 넘긴다.
+ */
+class CursorCondition private constructor(
+    internal val hash: String,
+) {
+    companion object {
+        /**
+         * 조건이 바뀐 커서를 걸러내는 용도다. **서명이 아니다** — 커서에는 정렬 키만 들어 있어
+         * 위조해도 클라이언트가 쿼리 파라미터로 보낼 수 있는 것과 등가다.
+         */
+        private const val HASH_BYTES = 6
+
+        fun of(vararg parts: Any?): CursorCondition {
+            val source = parts.joinToString(SEPARATOR) { if (it == null) NULL_MARKER else "$VALUE_MARKER$it" }
+            val digest = MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
+            return CursorCondition(BASE64.encodeToString(digest.copyOf(HASH_BYTES)))
+        }
+
+        /** 값 경계를 고정한다 — 구분자가 없으면 ("ab", "c")와 ("a", "bc")가 같은 해시가 된다. */
+        private const val SEPARATOR = "\u0000"
+
+        /** null과 빈 문자열을 가른다 — 표지가 없으면 of("a", null)과 of("a", "")가 같은 해시가 된다. */
+        private const val NULL_MARKER = "~"
+        private const val VALUE_MARKER = "="
+    }
+}
+
+/**
+ * 커서 문자열을 만들고 읽는다. 커서는 클라이언트에게 불투명하다 — 받은 값을 그대로 되돌려주기만 한다.
+ */
+object CursorCodec {
+    fun <T : Any> encode(
+        spec: CursorSpec<T>,
+        key: T,
+        condition: CursorCondition,
+    ): String = BASE64.encodeToString(MAPPER.writeValueAsBytes(CursorPayload(k = spec.toKeys(key), h = condition.hash)))
+
+    /** 첫 페이지(커서 없음)면 null. 해석 실패·조건 불일치면 INVALID_CURSOR. */
+    fun <T : Any> decode(
+        spec: CursorSpec<T>,
+        cursor: String?,
+        condition: CursorCondition,
+    ): T? {
+        if (cursor == null) return null
+        val payload =
+            runCatching { MAPPER.readValue<CursorPayload>(Base64.getUrlDecoder().decode(cursor)) }
+                .getOrElse { throw TmtException(ErrorCode.INVALID_CURSOR) }
+        if (payload.h != condition.hash) throw TmtException(ErrorCode.INVALID_CURSOR)
+        return runCatching { spec.fromKeys(payload.k) }
+            .getOrElse { throw TmtException(ErrorCode.INVALID_CURSOR) }
+    }
+
+    private data class CursorPayload(
+        val k: List<String>,
+        val h: String,
+    )
+}
