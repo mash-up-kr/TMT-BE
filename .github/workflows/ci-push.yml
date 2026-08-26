@@ -11,6 +11,7 @@ env:
   ECR_REPOSITORY: tmt
   WAS_NAME_TAG: tmt-prod-was
   SSM_DB_PREFIX: /tmt-prod/db
+  SSM_MEDIA_PREFIX: /tmt-prod/media
 
 jobs:
   build:
@@ -149,6 +150,9 @@ jobs:
           DB_NAME=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/name --query Parameter.Value --output text)
           DB_USER=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/user --query Parameter.Value --output text)
           DB_PASSWORD=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/password --with-decryption --query Parameter.Value --output text)
+          # 미디어 버킷·조회 base URL (TMT-201) — 정본은 SSM 파라미터, DB 접속 정보와 같은 방식
+          MEDIA_BUCKET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_MEDIA_PREFIX}/bucket --query Parameter.Value --output text)
+          MEDIA_BASE_URL=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_MEDIA_PREFIX}/base-url --query Parameter.Value --output text)
 
           # ECR pull — 인스턴스 역할 권한 (infra/terraform/ecr.tf)
           aws ecr get-login-password --region ${AWS_REGION} \
@@ -165,6 +169,8 @@ jobs:
           DB_NAME=\$DB_NAME
           DB_USER=\$DB_USER
           DB_PASSWORD=\$DB_PASSWORD
+          MEDIA_BUCKET=\$MEDIA_BUCKET
+          MEDIA_BASE_URL=\$MEDIA_BASE_URL
           ENV
 
           cd "\$DEPLOY_DIR"
