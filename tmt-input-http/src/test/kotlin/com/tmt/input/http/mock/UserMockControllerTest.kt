@@ -161,6 +161,23 @@ class UserMockControllerTest {
     }
 
     @Test
+    fun `티켓 소비는 동시에 들어와도 잔액을 넘지 않는다 (T5)`() {
+        val ledger = MockTicketLedger()
+        // 가입 보상 1장뿐인 사용자에게 8개 스레드가 동시에 소비를 시도한다
+        val pool =
+            java.util.concurrent.Executors
+                .newFixedThreadPool(8)
+        val results =
+            (1..8)
+                .map { pool.submit<Boolean> { ledger.tryConsume(42, TicketEntryType.GROUP_JOIN) } }
+                .map { it.get() }
+        pool.shutdown()
+
+        assert(results.count { it } == 1) { "1장으로 ${results.count { it }}번 소비됐다" }
+        assert(ledger.availableCount(42) == 0) { "잔액이 ${ledger.availableCount(42)}이다" }
+    }
+
+    @Test
     fun `응답의 userId 표기를 그대로 경로에 써도 열린다`() {
         // 카드·프로필이 user_7로 내려주므로 FE가 그 값을 그대로 경로에 넣는다
         mockMvc

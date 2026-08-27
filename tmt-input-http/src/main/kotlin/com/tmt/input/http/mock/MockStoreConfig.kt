@@ -248,16 +248,15 @@ class MockStoreConfig {
  * 잔액은 이력의 합이 정본이다 (T5) — 내 티켓 배너와 이력이 어긋나지 않게 한 곳에서 나온다.
  */
 class MockTicketLedger {
-    private val entries = ConcurrentHashMap<Long, MutableList<MockTicketEntry>>()
+    // 값이 불변 리스트다 — 갱신은 전부 compute 안에서 통째로 갈아끼우므로
+    // 잔액 확인과 기록이 한 번에 일어나고(원자적), 읽는 쪽은 스냅샷을 본다
+    private val entries = ConcurrentHashMap<Long, List<MockTicketEntry>>()
     private val sequence = AtomicLong()
 
     fun availableCount(userId: Long): Int = historyOf(userId).sumOf { it.amount }
 
     /** 발급·소비 이력. 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 (T10). */
-    fun historyOf(userId: Long): List<MockTicketEntry> {
-        ensureSignupReward(userId)
-        return entries[userId].orEmpty().toList()
-    }
+    fun historyOf(userId: Long): List<MockTicketEntry> = entries.computeIfAbsent(userId) { listOf(signupReward(it)) }
 
     /** 티켓 1장 회수를 시도한다. 잔고가 0이면 false — 리뷰 삭제가 거부되는 조건이다 (R7). */
     fun tryConsume(
@@ -266,11 +265,7 @@ class MockTicketLedger {
         saveId: String? = null,
         placeId: String? = null,
         groupId: String? = null,
-    ): Boolean {
-        if (availableCount(userId) <= 0) return false
-        record(userId, type, amount = -1, saveId = saveId, placeId = placeId, groupId = groupId)
-        return true
-    }
+    ): Boolean = append(userId, type, amount = -1, saveId = saveId, placeId = placeId, groupId = groupId) { it > 0 }
 
     /** 티켓 1장 발급을 시도하고 실제 발급 수(0 또는 1)를 돌려준다. 상한 도달 시 0 (T6). */
     fun tryGrant(
@@ -278,53 +273,65 @@ class MockTicketLedger {
         saveId: String? = null,
         placeId: String? = null,
     ): Int {
-        if (availableCount(userId) >= MAX_TICKETS) return 0
-        record(userId, TicketEntryType.REVIEW_REWARD, amount = 1, saveId = saveId, placeId = placeId, groupId = null)
-        return 1
+        val granted =
+            append(
+                userId,
+                TicketEntryType.REVIEW_REWARD,
+                amount = 1,
+                saveId = saveId,
+                placeId = placeId,
+                groupId = null,
+            ) {
+                it < MAX_TICKETS
+            }
+        return if (granted) 1 else 0
     }
 
-    // 잔액이 이력의 합이라, 가입 보상 행이 없으면 아무 이력도 없는 사용자의 잔액이 0이 된다 (T2)
-    private fun ensureSignupReward(userId: Long) {
-        entries.computeIfAbsent(userId) {
-            java.util.Collections.synchronizedList(
-                mutableListOf(
-                    MockTicketEntry(
-                        entryId = nextEntryId(),
-                        userId = userId,
-                        type = TicketEntryType.SIGNUP_REWARD,
-                        amount = SIGNUP_BONUS,
-                        saveId = null,
-                        placeId = null,
-                        groupId = null,
-                        occurredAt = SIGNUP_AT,
-                    ),
-                ),
-            )
-        }
-    }
-
-    private fun record(
+    /** 잔액 판정과 기록을 한 compute 안에서 끝낸다 — 같은 사용자의 동시 요청이 잔액을 두 번 쓰지 못한다. */
+    private fun append(
         userId: Long,
         type: TicketEntryType,
         amount: Int,
         saveId: String?,
         placeId: String?,
         groupId: String?,
-    ) {
-        ensureSignupReward(userId)
-        entries.getValue(userId).add(
-            MockTicketEntry(
-                entryId = nextEntryId(),
-                userId = userId,
-                type = type,
-                amount = amount,
-                saveId = saveId,
-                placeId = placeId,
-                groupId = groupId,
-                occurredAt = java.time.Instant.now(),
-            ),
-        )
+        allows: (Int) -> Boolean,
+    ): Boolean {
+        var applied = false
+        entries.compute(userId) { id, current ->
+            val history = current ?: listOf(signupReward(id))
+            if (!allows(history.sumOf { it.amount })) {
+                history
+            } else {
+                applied = true
+                history +
+                    MockTicketEntry(
+                        entryId = nextEntryId(),
+                        userId = id,
+                        type = type,
+                        amount = amount,
+                        saveId = saveId,
+                        placeId = placeId,
+                        groupId = groupId,
+                        occurredAt = java.time.Instant.now(),
+                    )
+            }
+        }
+        return applied
     }
+
+    // 잔액이 이력의 합이라, 가입 보상 행이 없으면 아무 이력도 없는 사용자의 잔액이 0이 된다 (T2)
+    private fun signupReward(userId: Long) =
+        MockTicketEntry(
+            entryId = nextEntryId(),
+            userId = userId,
+            type = TicketEntryType.SIGNUP_REWARD,
+            amount = SIGNUP_BONUS,
+            saveId = null,
+            placeId = null,
+            groupId = null,
+            occurredAt = SIGNUP_AT,
+        )
 
     private fun nextEntryId(): String = "tkh_${sequence.incrementAndGet()}"
 
