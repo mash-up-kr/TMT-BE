@@ -13,6 +13,7 @@ class NearbyMockControllerTest {
     private val placeStore = InMemoryStore<MockPlace>(idPrefix = "place")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
     private val favoriteStore = MockFavoriteStore()
+    private val userStore = MockUserStore(listOf(MockUser(1, "조용한 미식가", "tester1@example.com")))
     private val aiSummaryStore = MockAiSummaryStore()
 
     // 기준점(37.5399, 126.9515) / 800m쯤 북쪽 / 5km 밖 세 곳
@@ -26,7 +27,7 @@ class NearbyMockControllerTest {
                 NearbyMockController(
                     saveStore,
                     placeStore,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore),
+                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())

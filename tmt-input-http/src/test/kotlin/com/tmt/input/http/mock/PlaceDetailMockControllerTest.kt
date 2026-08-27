@@ -15,6 +15,7 @@ class PlaceDetailMockControllerTest {
     private val placeStore = InMemoryStore<MockPlace>(idPrefix = "place")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
     private val favoriteStore = MockFavoriteStore()
+    private val userStore = MockUserStore(listOf(MockUser(1, "조용한 미식가", "tester1@example.com")))
     private val aiSummaryStore = MockAiSummaryStore()
 
     private val place = MockFixtures.place(placeStore, "오즈 커피", categoryName = "카페·디저트", phoneNumber = "010 5244 6041")
@@ -26,7 +27,7 @@ class PlaceDetailMockControllerTest {
                     placeStore,
                     saveStore,
                     favoriteStore,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore),
+                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())

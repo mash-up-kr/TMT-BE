@@ -18,13 +18,15 @@ class ReviewMockControllerTest {
     private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
     private val ticketLedger = MockTicketLedger()
     private val aiSummaryStore = MockAiSummaryStore()
+    private val userStore = MockUserStore(listOf(MockUser(1, "조용한 미식가", "tester1@example.com")))
 
     private val place = MockFixtures.place(placeStore, "델리스피자")
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(ReviewMockController(saveStore, placeStore, assetStore, ticketLedger, aiSummaryStore))
-            .setCustomArgumentResolvers(UserIdArgumentResolver())
+            .standaloneSetup(
+                ReviewMockController(saveStore, placeStore, assetStore, ticketLedger, userStore, aiSummaryStore),
+            ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice(), MockTicketExceptionAdvice())
             .build()
 
@@ -77,7 +79,7 @@ class ReviewMockControllerTest {
     @Test
     fun `회수할 티켓이 없으면 409와 티켓 상태를 함께 내린다`() {
         MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_1")
-        ticketLedger.tryConsume(1) // 잔고 0으로
+        ticketLedger.tryConsume(1, TicketEntryType.GROUP_JOIN) // 잔고 0으로
 
         mockMvc
             .perform(delete("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "1"))

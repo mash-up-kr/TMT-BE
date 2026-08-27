@@ -20,7 +20,7 @@ class PlaceMockControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(PlaceMockController(placeStore, saveStore, MockFavoriteStore()))
+            .standaloneSetup(PlaceMockController(placeStore, PlaceCardAssembler(saveStore, MockFavoriteStore())))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()

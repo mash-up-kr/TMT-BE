@@ -84,7 +84,7 @@ class GroupMembershipMockControllerTest {
 
     @Test
     fun `가입 팝업 — 티켓이 없으면 TICKET_REQUIRED, 이미 가입이면 ALREADY_MEMBER`() {
-        ticketLedger.tryConsume(1)
+        ticketLedger.tryConsume(1, TicketEntryType.GROUP_JOIN)
         mockMvc
             .perform(get("/v1/groups/${group.groupId}/join-preview").header(UserIdArgumentResolver.HEADER, "1"))
             .andExpect(jsonPath("$.joinable").value(false))
@@ -149,7 +149,7 @@ class GroupMembershipMockControllerTest {
 
     @Test
     fun `이미 가입 판정이 티켓 부족보다 먼저다 (G8)`() {
-        ticketLedger.tryConsume(999) // 그룹장 티켓 소진
+        ticketLedger.tryConsume(999, TicketEntryType.GROUP_JOIN) // 그룹장 티켓 소진
         join(userId = 999)
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("ALREADY_GROUP_MEMBER"))
@@ -157,7 +157,7 @@ class GroupMembershipMockControllerTest {
 
     @Test
     fun `티켓이 없으면 409와 티켓 상태를 함께 내린다`() {
-        ticketLedger.tryConsume(1)
+        ticketLedger.tryConsume(1, TicketEntryType.GROUP_JOIN)
 
         join()
             .andExpect(status().isConflict)
