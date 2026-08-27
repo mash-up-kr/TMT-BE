@@ -10,6 +10,13 @@
 
 resource "aws_s3_bucket" "media" {
   bucket = var.media_bucket_name
+
+  # 리뷰 사진은 원본이 이 버킷에만 있다 — 백업 버킷보다 destroy 보호가 더 필요하다.
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = { Name = "${local.name}-media" }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
@@ -53,9 +60,9 @@ data "aws_iam_policy_document" "media_public_read" {
   }
 }
 
-# 클라이언트가 브라우저에서 presigned URL로 직접 PUT 한다 — 오리진은 앱 CORS
-# (WebConfig.ALLOWED_ORIGIN_PATTERNS)와 같은 축이다. S3 CORS는 오리진당 와일드카드
-# 1개만 허용하므로 프리뷰 도메인은 ttomatto-*.vercel.app 한 장으로 커버한다.
+# 클라이언트가 브라우저에서 presigned URL로 직접 PUT 한다 — 오리진 목록은 앱 CORS
+# (WebConfig.ALLOWED_ORIGIN_PATTERNS)와 같은 문자열로 맞춘다. Vercel 프리뷰 URL이
+# <project>-<hash>-<scope>.vercel.app 형태라 와일드카드 1개로 스코프까지 고정된다.
 resource "aws_s3_bucket_cors_configuration" "media" {
   bucket = aws_s3_bucket.media.id
 
@@ -63,7 +70,7 @@ resource "aws_s3_bucket_cors_configuration" "media" {
     allowed_origins = [
       "http://localhost:3000",
       "https://ttomatto-web.vercel.app",
-      "https://ttomatto-*.vercel.app",
+      "https://ttomatto-*-ttalkkakfe.vercel.app",
     ]
     allowed_methods = ["PUT", "GET", "HEAD"]
     allowed_headers = ["*"]
@@ -91,12 +98,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "media" {
 
 # presigned PUT 발급 권한. presigned URL은 발급자 자격증명의 권한을 그대로 쓰므로
 # 역할에 PutObject가 있어야 클라이언트의 PUT이 통과한다. 조회는 공개 읽기라 GetObject를
-# 주지 않고, 삭제 권한도 주지 않는다 — 잘못 발급된 URL로도 지울 수 없다.
+# 주지 않는다. DeleteObject는 M4 TTL 정리와 리뷰 삭제가 S3 객체를 실제로 걷어내야 해서
+# 준다 — presigned로 나가는 것은 서명된 PUT뿐이라 이 권한이 클라이언트에 노출되지 않는다.
 # instance 역할은 WAS·DB가 공유한다(기존 구조) — 분리는 인스턴스 프로필 교체가 따라와
 # 별도 티켓 감이고, DB 인스턴스에 PutObject가 더 열리는 것을 알고 감수한다.
 data "aws_iam_policy_document" "media_write" {
   statement {
-    actions   = ["s3:PutObject"]
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.media.arn}/*"]
   }
 }
