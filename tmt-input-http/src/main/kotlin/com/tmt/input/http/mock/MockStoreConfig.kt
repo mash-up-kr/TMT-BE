@@ -112,18 +112,21 @@ class MockStoreConfig {
 
     @Bean
     fun groupAssembler(
+        mockMediaUrls: MockMediaUrls,
         mockSaveStore: InMemoryStore<MockSave>,
         mockMembershipStore: MockMembershipStore,
         mockReviewShareStore: MockReviewShareStore,
-    ): GroupAssembler = GroupAssembler(mockSaveStore, mockMembershipStore, mockReviewShareStore)
+    ): GroupAssembler = GroupAssembler(mockMediaUrls, mockSaveStore, mockMembershipStore, mockReviewShareStore)
 
     @Bean
     fun reviewCardAssembler(
+        mockMediaUrls: MockMediaUrls,
         mockPlaceStore: InMemoryStore<MockPlace>,
         mockFavoriteStore: MockFavoriteStore,
         mockAiSummaryStore: MockAiSummaryStore,
         mockUserStore: MockUserStore,
-    ): ReviewCardAssembler = ReviewCardAssembler(mockPlaceStore, mockFavoriteStore, mockAiSummaryStore, mockUserStore)
+    ): ReviewCardAssembler =
+        ReviewCardAssembler(mockMediaUrls, mockPlaceStore, mockFavoriteStore, mockAiSummaryStore, mockUserStore)
 
     companion object {
         // 시드 데이터의 작성자 — 실제 사용자와 겹치지 않는 가상 ID (그룹 시드의 ownerId와 같다)

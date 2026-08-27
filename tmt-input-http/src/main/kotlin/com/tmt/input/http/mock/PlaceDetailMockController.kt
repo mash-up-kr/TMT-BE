@@ -21,6 +21,7 @@ import kotlin.math.roundToInt
 @RestController
 @RequestMapping("/v1/places/{placeId}")
 class PlaceDetailMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockFavoriteStore: MockFavoriteStore,
@@ -48,7 +49,7 @@ class PlaceDetailMockController(
                     .flatMap { save ->
                         save.photoAssetIds.map {
                             PlaceDetailResponse.PlacePhoto(
-                                url = mockMediaUrl(it),
+                                url = mockMediaUrls.urlOf(it),
                                 reviewId = save.reviewId!!,
                             )
                         }

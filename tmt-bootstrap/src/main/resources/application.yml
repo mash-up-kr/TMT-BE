@@ -24,6 +24,15 @@ spring:
         order_updates: true
 
 tmt:
+  media:
+    # TMT-201 버킷. 정본은 SSM /tmt-prod/media/* — 배포 시 .env로 내려온다 (로컬은 빈 값이면 발급 시점에 실패)
+    bucket: ${MEDIA_BUCKET:}
+    base-url: ${MEDIA_BASE_URL:}
+    region: ap-northeast-2
+    upload-url-ttl: PT15M
+    # 작성 중 이탈로 남은 STAGED 사진의 수명 (M4). 넘기면 S3 객체와 행을 함께 걷어낸다
+    staged-ttl: P1D
+    purge-cron: "0 40 4 * * *"
   idempotency:
     # 이 기간이 지난 재시도는 멱등 기록이 없어 비즈니스 로직을 다시 탄다.
     ttl: P1D

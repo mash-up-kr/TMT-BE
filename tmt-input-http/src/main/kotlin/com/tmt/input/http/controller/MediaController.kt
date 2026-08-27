@@ -1,7 +1,7 @@
-package com.tmt.input.http.mock
+package com.tmt.input.http.controller
 
+import com.tmt.application.port.input.CreateUploadIntentUseCase
 import com.tmt.common.exception.ErrorCode
-import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import io.swagger.v3.oas.annotations.Operation
@@ -12,15 +12,19 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
-/** 업로드 대상 URL을 발급한다 (M1). mock에서는 실제 S3 대신 가짜 presigned URL을 내린다. */
+/**
+ * 사진 업로드 presigned URL 발급 (M1) — mock을 대체하는 실구현 (TMT-202).
+ * 응답 형태(assetId·uploadUrl·expiresAt)는 mock과 같아 FE 재생성이 필요 없다.
+ *
+ * 태그 문자열은 mock 시절 것을 그대로 둔다 — FE의 orval 생성 경로가 태그에 묶여 있어
+ * (FE TMT-171) "(mock)"을 떼는 것만으로 생성 코드 경로가 바뀐다. TMT-171과 함께 정리한다.
+ */
 @Tag(name = "미디어 (mock)", description = "명세 v2 — F §3-2")
 @RestController
 @RequestMapping("/v1/media/upload-intents")
-class MediaMockController(
-    private val mockAssetStore: InMemoryStore<MockAsset>,
+class MediaController(
+    private val createUploadIntentUseCase: CreateUploadIntentUseCase,
 ) {
     @Operation(summary = "사진 업로드 presigned URL 발급", description = "발급받은 assetId는 발급받은 사용자만 Save에 붙일 수 있다 (M2).")
     @ApiErrorCodes(ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED, ErrorCode.MEDIA_FILE_TOO_LARGE)
@@ -30,25 +34,11 @@ class MediaMockController(
         @UserId userId: Long,
         @RequestBody request: UploadIntentRequest,
     ): UploadIntentResponse {
-        if (request.contentType !in ReviewFormRules.ALLOWED_CONTENT_TYPES) {
-            throw TmtException(ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED, "허용: ${ReviewFormRules.ALLOWED_CONTENT_TYPES}")
-        }
-        if (request.contentLength > ReviewFormRules.PHOTO_MAX_BYTES) {
-            throw TmtException(ErrorCode.MEDIA_FILE_TOO_LARGE, "최대 ${ReviewFormRules.PHOTO_MAX_BYTES} bytes")
-        }
-
-        val asset =
-            mockAssetStore.create { id ->
-                MockAsset(
-                    assetId = id,
-                    ownerId = userId,
-                    contentType = request.contentType,
-                )
-            }
+        val intent = createUploadIntentUseCase.create(userId, request.contentType, request.contentLength)
         return UploadIntentResponse(
-            assetId = asset.assetId,
-            uploadUrl = "https://mock-upload.tmt.example/${asset.assetId}?signature=mock",
-            expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES).toString(),
+            assetId = intent.assetId.toString(),
+            uploadUrl = intent.uploadUrl,
+            expiresAt = intent.expiresAt.toString(),
         )
     }
 
@@ -63,6 +53,3 @@ class MediaMockController(
         val expiresAt: String,
     )
 }
-
-/** Save 상세·카드의 사진 노출 URL — mock에서는 assetId로 결정되는 가짜 CDN 주소다. */
-fun mockMediaUrl(assetId: String): String = "https://mock-cdn.tmt.example/$assetId.jpg"

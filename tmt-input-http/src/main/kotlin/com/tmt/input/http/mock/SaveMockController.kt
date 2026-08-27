@@ -1,5 +1,6 @@
 package com.tmt.input.http.mock
 
+import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
@@ -32,7 +33,8 @@ import java.time.Instant
 class SaveMockController(
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
-    private val mockAssetStore: InMemoryStore<MockAsset>,
+    private val attachMediaUseCase: AttachMediaUseCase,
+    private val mockMediaUrls: MockMediaUrls,
     private val mockTicketLedger: MockTicketLedger,
     private val mockReviewIdGenerator: MockReviewIdGenerator,
     private val mockIdempotencyRegistry: MockIdempotencyRegistry,
@@ -140,7 +142,7 @@ class SaveMockController(
                 )
             } ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
         detachAssets(save.photoAssetIds - request.photoAssetIds.toSet())
-        attachAssets(request.photoAssetIds)
+        attachAssets(request.photoAssetIds, reattachableIds = save.photoAssetIds.intersect(request.photoAssetIds.toSet()))
 
         val granted = if (completed) mockTicketLedger.tryGrant(userId, updated.saveId, updated.placeId) else 0
         val result = toResult(updated, granted, userId)
@@ -186,7 +188,7 @@ class SaveMockController(
                 save.photoAssetIds.mapIndexed { index, assetId ->
                     SaveDetailResponse.Photo(
                         photoId = "sp_${assetId.removePrefix("asset_")}",
-                        url = mockMediaUrl(assetId),
+                        url = mockMediaUrls.urlOf(assetId),
                         order = index,
                     )
                 },
@@ -242,16 +244,13 @@ class SaveMockController(
         if (request.photoAssetIds.distinct().size != request.photoAssetIds.size) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "photoAssetIds에 같은 사진이 두 번 들어 있습니다.")
         }
-        request.photoAssetIds.forEach { assetId ->
-            val asset = mockAssetStore.findById(assetId)
-            if (asset == null || asset.ownerId != ownerId) {
-                throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
-            }
-            val alreadyMine = existingSave?.photoAssetIds?.contains(assetId) == true
-            if (asset.attached && !alreadyMine) {
-                throw TmtException(ErrorCode.MEDIA_ALREADY_ATTACHED)
-            }
-        }
+        // 실 media_asset 기준 검증 (TMT-202) — 발급도 실구현이라 mock 저장에도 실사진이 붙는다.
+        // 시드 사진(asset_*)은 검증을 타지 않는다 — 시드 리뷰는 완성이라 PUT이 거부된다.
+        attachMediaUseCase.verifyAttachable(
+            ownerId = ownerId,
+            assetIds = parseAssetIds(request.photoAssetIds),
+            reattachableIds = parseAssetIds(existingSave?.photoAssetIds.orEmpty()).toSet(),
+        )
 
         (request.companionTagIds - ReviewFormRules.COMPANION_TAG_IDS).firstOrNull()?.let {
             throw TmtException(ErrorCode.REVIEW_TAG_NOT_FOUND, it)
@@ -340,13 +339,16 @@ class SaveMockController(
             request.rating != null &&
             !request.content.isNullOrBlank()
 
-    private fun attachAssets(assetIds: List<String>) =
-        assetIds.forEach {
-            mockAssetStore.update(it) { asset -> asset.copy(attached = true) }
-        }
+    private fun attachAssets(
+        assetIds: List<String>,
+        reattachableIds: Collection<String> = emptyList(),
+    ) = attachMediaUseCase.attach(parseAssetIds(assetIds), parseAssetIds(reattachableIds).toSet())
 
-    private fun detachAssets(assetIds: Collection<String>) =
-        assetIds.forEach { mockAssetStore.update(it) { asset -> asset.copy(attached = false) } }
+    private fun detachAssets(assetIds: Collection<String>) = attachMediaUseCase.detach(parseAssetIds(assetIds))
+
+    /** 실구현 발급 assetId는 숫자 문자열이다. 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
+    private fun parseAssetIds(assetIds: Collection<String>): List<Long> =
+        assetIds.map { it.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED) }
 
     private fun created(body: SaveResultResponse): ResponseEntity<SaveResultResponse> =
         ResponseEntity.created(URI.create("/v1/saves/${body.saveId}")).body(body)
