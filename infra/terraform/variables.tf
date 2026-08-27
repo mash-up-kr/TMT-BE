@@ -156,6 +156,15 @@ variable "postgres_user" {
   default     = "tmt"
 }
 
+variable "media_bucket_name" {
+  description = <<-EOT
+    미디어(리뷰 사진) 버킷 (TMT-201). 백업 버킷과 분리한다 — 수명주기·공개 정책이 다르다.
+    이름 충돌 시 tfvars에서 덮어쓴다 (backup_bucket_name과 같은 이유).
+  EOT
+  type        = string
+  default     = "ttalkkak-tmt-media"
+}
+
 variable "backup_bucket_name" {
   description = <<-EOT
     pg_dump 보관 S3 버킷. 이름은 전 계정 공용이라 흔한 이름은 이미 선점되어 있다.

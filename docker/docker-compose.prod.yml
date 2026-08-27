@@ -17,6 +17,10 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
+      # 미디어 버킷·조회 base URL (TMT-201). 정본은 SSM /tmt-prod/media/* — 배포 시 .env로 내려온다.
+      # 앱 소비는 TMT-202(사진 업로드 실구현)에서 붙는다.
+      - MEDIA_BUCKET=${MEDIA_BUCKET}
+      - MEDIA_BASE_URL=${MEDIA_BASE_URL}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
