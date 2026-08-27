@@ -5,12 +5,13 @@ import com.tmt.application.port.input.GetNearbyReviewsUseCase
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyReviewKey
 import com.tmt.application.port.input.NearbyReviewsRequest
-import com.tmt.application.port.input.ReviewCardView
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
+import com.tmt.input.http.controller.dto.response.PublicIds
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
+import com.tmt.input.http.controller.dto.response.toResponse
 import com.tmt.input.http.controller.paging.CursorCodec
 import com.tmt.input.http.controller.paging.CursorCondition
 import com.tmt.input.http.controller.paging.CursorSpec
@@ -110,7 +111,7 @@ class NearbyController(
             items =
                 result.pins.map {
                     NearbyPlacesResponse.Pin(
-                        placeId = "place_${it.placeId}",
+                        placeId = PublicIds.place(it.placeId),
                         name = it.name,
                         latitude = it.latitude,
                         longitude = it.longitude,
@@ -142,37 +143,5 @@ class NearbyController(
             require(keys.size == 2) { "정렬 키 2개가 필요하다" }
             return NearbyReviewKey(keys[0].toInt(), keys[1].toLong())
         }
-    }
-
-    companion object {
-        /** mock·명세 예시와 같은 ID 표기 — 실구현 전환에서 FE가 들고 있는 표기가 흔들리지 않게 유지한다 */
-        internal fun ReviewCardView.toResponse(): ReviewCardResponse =
-            ReviewCardResponse(
-                reviewId = "rv_$reviewId",
-                author =
-                    com.tmt.input.http.controller.dto.response.Author(
-                        userId = "user_$authorId",
-                        nickname = authorNickname,
-                        profileImageUrl = authorProfileImageUrl,
-                    ),
-                rating = rating,
-                distanceMeters = distanceMeters,
-                photos =
-                    photos.map {
-                        ReviewCardResponse.Photo(photoId = "sp_${it.photoId}", url = it.url, order = it.order)
-                    },
-                aiSummary = aiSummary?.let { ReviewCardResponse.AiSummary(it.pros, it.cons) },
-                content = content,
-                contentLength = content.codePointCount(0, content.length),
-                tags = tags.map { ReviewCardResponse.Tag(it.tagId, it.label) },
-                place =
-                    ReviewCardResponse.PlaceRegionSummary(
-                        placeId = "place_$placeId",
-                        name = placeName,
-                        regionName = placeRegionName,
-                        isFavorite = placeFavorite,
-                    ),
-                createdAt = createdAt.toString(),
-            )
     }
 }

@@ -85,7 +85,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
 
         fun getPlaceRegionName(): String
 
-        fun getDistanceMeters(): Int
+        fun getDistanceMeters(): Int?
 
         fun getFavorite(): Boolean
     }
