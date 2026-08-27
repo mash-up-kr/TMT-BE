@@ -23,6 +23,7 @@ class ReviewMockController(
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockAssetStore: InMemoryStore<MockAsset>,
     private val mockTicketLedger: MockTicketLedger,
+    private val mockUserStore: MockUserStore,
     private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
     @Operation(summary = "공개 리뷰 상세", description = "완성된 리뷰만 대상이고 미완성 저장은 조회되지 않는다 (R8). 개인 리뷰 열람에는 게이트가 없다 (G2).")
@@ -36,7 +37,7 @@ class ReviewMockController(
         val place = mockPlaceStore.findById(save.placeId)
         return ReviewDetailResponse(
             reviewId = reviewId,
-            author = MockUsers.authorOf(save.ownerId),
+            author = mockUserStore.authorOf(save.ownerId).toAuthor(),
             place =
                 ReviewDetailResponse.PlaceSummary(
                     placeId = save.placeId,
@@ -79,7 +80,13 @@ class ReviewMockController(
             findReview(reviewId)?.takeIf { it.ownerId == userId }
                 ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
 
-        if (!mockTicketLedger.tryConsume(userId)) {
+        if (!mockTicketLedger.tryConsume(
+                userId,
+                TicketEntryType.REVIEW_DELETE_REVOKE,
+                saveId = save.saveId,
+                placeId = save.placeId,
+            )
+        ) {
             throw ReviewDeleteTicketRequiredException(availableCount = mockTicketLedger.availableCount(userId))
         }
         save.photoAssetIds.forEach { mockAssetStore.delete(it) }

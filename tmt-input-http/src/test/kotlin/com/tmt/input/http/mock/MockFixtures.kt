@@ -42,4 +42,22 @@ object MockFixtures {
                 updatedAt = createdAt,
             )
         }
+
+    /** InMemoryStore.create가 넘겨준 id로 그룹을 만든다. */
+    fun group(
+        groupId: String,
+        name: String = "성수 커피 탐험대",
+        ownerId: Long = 999,
+    ): MockGroup =
+        MockGroup(
+            groupId = groupId,
+            name = name,
+            oneLineDescription = "조용히 커피 맛에 집중하는 사람들",
+            description = null,
+            imageAssetId = null,
+            foodCategoryId = "cat_cafe",
+            regionTagIds = listOf("region_seongdong"),
+            ownerId = ownerId,
+            createdAt = Instant.parse("2026-08-10T00:00:00Z"),
+        )
 }

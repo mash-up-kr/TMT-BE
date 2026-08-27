@@ -11,6 +11,7 @@ class ReviewCardAssembler(
     private val placeStore: InMemoryStore<MockPlace>,
     private val favoriteStore: MockFavoriteStore,
     private val aiSummaryStore: MockAiSummaryStore,
+    private val userStore: MockUserStore,
 ) {
     fun assemble(
         save: MockSave,
@@ -24,7 +25,7 @@ class ReviewCardAssembler(
         val content = requireNotNull(save.content) { "리뷰는 본문이 필수다 (C4)" }
         return ReviewCardResponse(
             reviewId = reviewId,
-            author = MockUsers.authorOf(save.ownerId),
+            author = userStore.authorOf(save.ownerId).toAuthor(),
             rating = requireNotNull(save.rating) { "리뷰는 별점이 필수다 (C4)" },
             distanceMeters =
                 if (latitude != null && longitude != null && place != null) {
@@ -63,8 +64,6 @@ class ReviewCardAssembler(
     }
 }
 
-/** mock 사용자 — 인증 스텁(X-User-Id)의 숫자 ID를 명세 표기(user_1)와 닉네임으로 바꾼다. */
-object MockUsers {
-    fun authorOf(userId: Long): Author =
-        Author(userId = "user_$userId", nickname = "미식가$userId", profileImageUrl = null)
-}
+/** 인증 스텁(X-User-Id)의 숫자 ID를 명세 표기(user_1)로 바꾼다. */
+fun MockUser.toAuthor(): Author =
+    Author(userId = "user_$userId", nickname = nickname, profileImageUrl = profileImageUrl)

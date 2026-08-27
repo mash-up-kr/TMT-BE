@@ -57,3 +57,32 @@ data class MockGroup(
     val ownerId: Long,
     val createdAt: Instant,
 )
+
+/** mock 사용자. 타인 프로필이 404를 낼 수 있으려면 존재하는 사용자 집합이 있어야 한다 (J-01 §6-2). */
+data class MockUser(
+    val userId: Long,
+    val nickname: String,
+    /** 카카오 동의 항목을 못 받으면 null (J §2). 타인 프로필 응답에는 실리지 않는다 (U7). */
+    val email: String?,
+    val profileImageUrl: String? = null,
+)
+
+/** 티켓 이력 한 행 (T10). 발급·소비·회수가 한 목록이고 amount 부호로 구분한다. */
+data class MockTicketEntry(
+    val entryId: String,
+    val userId: Long,
+    val type: TicketEntryType,
+    val amount: Int,
+    val saveId: String?,
+    val placeId: String?,
+    val groupId: String?,
+    val occurredAt: Instant,
+)
+
+/** 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 — amount가 null인 행이다. */
+enum class TicketEntryType {
+    SIGNUP_REWARD,
+    REVIEW_REWARD,
+    REVIEW_DELETE_REVOKE,
+    GROUP_JOIN,
+}

@@ -86,7 +86,7 @@ class SaveMockController(
             }
         attachAssets(request.photoAssetIds)
 
-        val granted = if (completed) mockTicketLedger.tryGrant(userId) else 0
+        val granted = if (completed) mockTicketLedger.tryGrant(userId, save.saveId, save.placeId) else 0
         val result = toResult(save, granted, userId)
         mockIdempotencyRegistry.register(userId, ENDPOINT_CREATE, key, request.toString(), result)
         return created(result)
@@ -142,7 +142,7 @@ class SaveMockController(
         detachAssets(save.photoAssetIds - request.photoAssetIds.toSet())
         attachAssets(request.photoAssetIds)
 
-        val granted = if (completed) mockTicketLedger.tryGrant(userId) else 0
+        val granted = if (completed) mockTicketLedger.tryGrant(userId, updated.saveId, updated.placeId) else 0
         val result = toResult(updated, granted, userId)
         mockIdempotencyRegistry.register(userId, endpointUpdate(saveId), key, request.toString(), result)
         return result

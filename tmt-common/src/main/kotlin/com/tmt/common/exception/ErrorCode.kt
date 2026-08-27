@@ -49,4 +49,9 @@ enum class ErrorCode(
     GROUP_MEMBERSHIP_REQUIRED(ErrorType.FORBIDDEN, "가입하지 않은 그룹입니다."),
     ALREADY_GROUP_MEMBER(ErrorType.CONFLICT, "이미 가입한 그룹입니다."),
     GROUP_JOIN_TICKET_REQUIRED(ErrorType.CONFLICT, "그룹 가입에 필요한 티켓이 부족합니다."),
+
+    // 사용자·추천
+    USER_NOT_FOUND(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    RECOMMENDATION_UNAVAILABLE(ErrorType.UNPROCESSABLE, "추천의 근거가 될 리뷰가 없습니다."),
+    RECOMMENDATION_FAILED(ErrorType.SERVICE_UNAVAILABLE, "매장 추천에 실패했습니다."),
 }

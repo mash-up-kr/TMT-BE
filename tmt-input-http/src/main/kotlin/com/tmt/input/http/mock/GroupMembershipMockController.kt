@@ -105,7 +105,7 @@ class GroupMembershipMockController(
                     ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
             }
 
-        if (!mockTicketLedger.tryConsume(userId)) {
+        if (!mockTicketLedger.tryConsume(userId, TicketEntryType.GROUP_JOIN, groupId = groupId)) {
             throw GroupJoinTicketRequiredException(availableCount = mockTicketLedger.availableCount(userId))
         }
 

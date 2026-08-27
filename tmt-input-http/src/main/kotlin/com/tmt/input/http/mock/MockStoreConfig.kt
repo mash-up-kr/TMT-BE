@@ -58,6 +58,43 @@ class MockStoreConfig {
     fun mockFavoriteStore(): MockFavoriteStore = MockFavoriteStore()
 
     @Bean
+    fun mockUserStore(): MockUserStore = MockUserStore(SEED_USERS)
+
+    /**
+     * UT 대상자 계정에 리뷰·가입·찜을 붙인다. 다른 시드 빈이 모두 만들어진 뒤에 실행돼야 해서
+     * 스토어를 전부 주입받는 빈으로 둔다 — 반환값은 쓰이지 않고 부팅 시 한 번 도는 것이 전부다.
+     */
+    @Bean
+    fun mockUserSeedApplier(
+        mockSaveStore: InMemoryStore<MockSave>,
+        mockAssetStore: InMemoryStore<MockAsset>,
+        mockGroupStore: InMemoryStore<MockGroup>,
+        mockMembershipStore: MockMembershipStore,
+        mockReviewShareStore: MockReviewShareStore,
+        mockFavoriteStore: MockFavoriteStore,
+        mockAiSummaryStore: MockAiSummaryStore,
+        mockReviewIdGenerator: MockReviewIdGenerator,
+    ): MockUserSeedApplier {
+        MockUserSeeds.apply(
+            mockSaveStore,
+            mockAssetStore,
+            mockGroupStore,
+            mockMembershipStore,
+            mockReviewShareStore,
+            mockFavoriteStore,
+            mockAiSummaryStore,
+            mockReviewIdGenerator,
+        )
+        return MockUserSeedApplier
+    }
+
+    @Bean
+    fun placeCardAssembler(
+        mockSaveStore: InMemoryStore<MockSave>,
+        mockFavoriteStore: MockFavoriteStore,
+    ): PlaceCardAssembler = PlaceCardAssembler(mockSaveStore, mockFavoriteStore)
+
+    @Bean
     fun mockGroupStore(mockMembershipStore: MockMembershipStore): InMemoryStore<MockGroup> =
         InMemoryStore<MockGroup>(idPrefix = "group").apply {
             SEED_GROUPS.forEach { seed ->
@@ -85,11 +122,26 @@ class MockStoreConfig {
         mockPlaceStore: InMemoryStore<MockPlace>,
         mockFavoriteStore: MockFavoriteStore,
         mockAiSummaryStore: MockAiSummaryStore,
-    ): ReviewCardAssembler = ReviewCardAssembler(mockPlaceStore, mockFavoriteStore, mockAiSummaryStore)
+        mockUserStore: MockUserStore,
+    ): ReviewCardAssembler = ReviewCardAssembler(mockPlaceStore, mockFavoriteStore, mockAiSummaryStore, mockUserStore)
 
     companion object {
         // 시드 데이터의 작성자 — 실제 사용자와 겹치지 않는 가상 ID (그룹 시드의 ownerId와 같다)
         const val SEED_USER_ID = 999L
+
+        /**
+         * UT 대상자 계정 4개 — `X-User-Id: 1~4`가 그대로 이 사람들이다.
+         * 각자에게 맞는 그룹·리뷰는 [MockUserSeeds]에서 붙인다. 여기 없는 ID로도 호출은 되지만
+         * 타인 프로필(`GET /v1/users/{userId}`)은 USER_NOT_FOUND다.
+         */
+        private val SEED_USERS: List<MockUser> =
+            listOf(
+                MockUser(1, "조용한 미식가", "tester1@example.com"),
+                MockUser(2, "매콤한 하루", "tester2@example.com"),
+                MockUser(3, "면요리 연구가", "tester3@example.com"),
+                MockUser(4, "커피 마시는 곰", null),
+                MockUser(SEED_USER_ID, "딸깍 운영자", null),
+            )
 
         // 부팅 시드 리뷰 (saveId, reviewId, assetId) → 남이 예전에 써둔 완성 리뷰
         private val SEED_REVIEWS: List<(String, String, String) -> MockSave> =
@@ -191,47 +243,97 @@ class MockStoreConfig {
     }
 }
 
-/** 사용자별 보유 티켓. 회원가입 기본 1장(T2), 상한 999장(T6). */
+/**
+ * 사용자별 보유 티켓과 그 이력. 회원가입 기본 1장(T2), 상한 999장(T6).
+ * 잔액은 이력의 합이 정본이다 (T5) — 내 티켓 배너와 이력이 어긋나지 않게 한 곳에서 나온다.
+ */
 class MockTicketLedger {
-    private val counts = ConcurrentHashMap<Long, Int>()
+    private val entries = ConcurrentHashMap<Long, MutableList<MockTicketEntry>>()
+    private val sequence = AtomicLong()
 
-    fun availableCount(userId: Long): Int = counts.getOrDefault(userId, SIGNUP_BONUS)
+    fun availableCount(userId: Long): Int = historyOf(userId).sumOf { it.amount }
+
+    /** 발급·소비 이력. 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 (T10). */
+    fun historyOf(userId: Long): List<MockTicketEntry> {
+        ensureSignupReward(userId)
+        return entries[userId].orEmpty().toList()
+    }
 
     /** 티켓 1장 회수를 시도한다. 잔고가 0이면 false — 리뷰 삭제가 거부되는 조건이다 (R7). */
-    fun tryConsume(userId: Long): Boolean {
-        var consumed = false
-        counts.compute(userId) { _, current ->
-            val base = current ?: SIGNUP_BONUS
-            if (base > 0) {
-                consumed = true
-                base - 1
-            } else {
-                consumed = false
-                base
-            }
-        }
-        return consumed
+    fun tryConsume(
+        userId: Long,
+        type: TicketEntryType,
+        saveId: String? = null,
+        placeId: String? = null,
+        groupId: String? = null,
+    ): Boolean {
+        if (availableCount(userId) <= 0) return false
+        record(userId, type, amount = -1, saveId = saveId, placeId = placeId, groupId = groupId)
+        return true
     }
 
     /** 티켓 1장 발급을 시도하고 실제 발급 수(0 또는 1)를 돌려준다. 상한 도달 시 0 (T6). */
-    fun tryGrant(userId: Long): Int {
-        var granted = 0
-        counts.compute(userId) { _, current ->
-            val base = current ?: SIGNUP_BONUS
-            if (base < MAX_TICKETS) {
-                granted = 1
-                base + 1
-            } else {
-                granted = 0
-                base
-            }
-        }
-        return granted
+    fun tryGrant(
+        userId: Long,
+        saveId: String? = null,
+        placeId: String? = null,
+    ): Int {
+        if (availableCount(userId) >= MAX_TICKETS) return 0
+        record(userId, TicketEntryType.REVIEW_REWARD, amount = 1, saveId = saveId, placeId = placeId, groupId = null)
+        return 1
     }
+
+    // 잔액이 이력의 합이라, 가입 보상 행이 없으면 아무 이력도 없는 사용자의 잔액이 0이 된다 (T2)
+    private fun ensureSignupReward(userId: Long) {
+        entries.computeIfAbsent(userId) {
+            java.util.Collections.synchronizedList(
+                mutableListOf(
+                    MockTicketEntry(
+                        entryId = nextEntryId(),
+                        userId = userId,
+                        type = TicketEntryType.SIGNUP_REWARD,
+                        amount = SIGNUP_BONUS,
+                        saveId = null,
+                        placeId = null,
+                        groupId = null,
+                        occurredAt = SIGNUP_AT,
+                    ),
+                ),
+            )
+        }
+    }
+
+    private fun record(
+        userId: Long,
+        type: TicketEntryType,
+        amount: Int,
+        saveId: String?,
+        placeId: String?,
+        groupId: String?,
+    ) {
+        ensureSignupReward(userId)
+        entries.getValue(userId).add(
+            MockTicketEntry(
+                entryId = nextEntryId(),
+                userId = userId,
+                type = type,
+                amount = amount,
+                saveId = saveId,
+                placeId = placeId,
+                groupId = groupId,
+                occurredAt = java.time.Instant.now(),
+            ),
+        )
+    }
+
+    private fun nextEntryId(): String = "tkh_${sequence.incrementAndGet()}"
 
     companion object {
         const val SIGNUP_BONUS = 1
         const val MAX_TICKETS = 999
+
+        // 가입 보상은 이력의 맨 아래에 오도록 과거 시각으로 고정한다
+        private val SIGNUP_AT: java.time.Instant = java.time.Instant.parse("2026-08-01T00:00:00Z")
     }
 }
 

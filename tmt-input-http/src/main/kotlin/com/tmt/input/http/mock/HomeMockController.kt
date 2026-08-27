@@ -26,6 +26,7 @@ class HomeMockController(
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockMembershipStore: MockMembershipStore,
     private val mockReviewShareStore: MockReviewShareStore,
+    private val mockUserStore: MockUserStore,
     private val groupAssembler: GroupAssembler,
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
@@ -60,7 +61,7 @@ class HomeMockController(
             }
 
         return HomeResponse(
-            nickname = MockUsers.authorOf(userId).nickname,
+            nickname = mockUserStore.authorOf(userId).nickname,
             myGroups = myGroups,
             recommendedGroups = recommended,
         )
