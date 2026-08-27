@@ -98,14 +98,19 @@ class UserMockController(
     ): TicketHistoryResponse {
         val recorded =
             mockTicketLedger.historyOf(userId).map { entry ->
-                TicketHistoryItem(
-                    entryId = entry.entryId,
-                    type = TicketHistoryType.of(entry.type),
-                    amount = entry.amount,
-                    saveId = entry.saveId,
-                    place = entry.placeId?.let { placeRefOf(it) },
-                    group = entry.groupId?.let { groupRefOf(it) },
-                    occurredAt = entry.occurredAt.toString(),
+                SortableEntry(
+                    occurredAt = entry.occurredAt,
+                    seq = entrySeq(entry.entryId),
+                    item =
+                        TicketHistoryItem(
+                            entryId = entry.entryId,
+                            type = TicketHistoryType.of(entry.type),
+                            amount = entry.amount,
+                            saveId = entry.saveId,
+                            place = entry.placeId?.let { placeRefOf(it) },
+                            group = entry.groupId?.let { groupRefOf(it) },
+                            occurredAt = entry.occurredAt.toString(),
+                        ),
                 )
             }
         // 아직 티켓이 나가지 않은 저장도 같은 목록에 섞인다 — 목록을 나누면 클라이언트가 두 커서를 병합해야 한다
@@ -114,20 +119,28 @@ class UserMockController(
                 .findAll()
                 .filter { it.ownerId == userId && it.reviewId == null }
                 .map { save ->
-                    TicketHistoryItem(
-                        entryId = "tkh_save_${save.saveId}",
-                        type = TicketHistoryType.SAVE_IN_PROGRESS,
-                        amount = null,
-                        saveId = save.saveId,
-                        place = placeRefOf(save.placeId),
-                        group = null,
-                        occurredAt = save.updatedAt.toString(),
+                    SortableEntry(
+                        occurredAt = save.updatedAt,
+                        seq = entrySeq(save.saveId),
+                        item =
+                            TicketHistoryItem(
+                                entryId = "tkh_save_${save.saveId}",
+                                type = TicketHistoryType.SAVE_IN_PROGRESS,
+                                amount = null,
+                                saveId = save.saveId,
+                                place = placeRefOf(save.placeId),
+                                group = null,
+                                occurredAt = save.updatedAt.toString(),
+                            ),
                     )
                 }
 
+        // 시각은 Instant로, tie-breaker는 id의 숫자로 비교한다 —
+        // 문자열로 비교하면 소수 자리가 있는 시각과 tkh_9 · tkh_10의 순서가 뒤집힌다
         val items =
             (recorded + inProgress)
-                .sortedWith(compareByDescending<TicketHistoryItem> { it.occurredAt }.thenByDescending { it.entryId })
+                .sortedWith(compareByDescending<SortableEntry> { it.occurredAt }.thenByDescending { it.seq })
+                .map { it.item }
         val page = MockCursor.paginate(items, cursor, limit) { it }
         return TicketHistoryResponse(
             availableCount = mockTicketLedger.availableCount(userId),
@@ -200,6 +213,9 @@ class UserMockController(
         val owner = findUser(userId).userId
         return favoritesPage(owner, viewerId, latitude, longitude, cursor, limit)
     }
+
+    /** `tkh_12`·`save_7`의 끝 숫자. 정렬 tie-breaker라 해석되지 않으면 맨 뒤로 보낸다. */
+    private fun entrySeq(id: String): Long = id.substringAfterLast('_').toLongOrNull() ?: 0
 
     /**
      * 경로의 userId는 응답 표기(`user_7`)와 숫자(`7`) 둘 다 받는다 —
@@ -305,6 +321,12 @@ class UserMockController(
         val name: String,
         /** 매장 추천 진입 격자가 아이콘을 고르는 데 쓴다 (J §5-1). 매핑 실패 시 null */
         val categoryName: String?,
+    )
+
+    private data class SortableEntry(
+        val occurredAt: java.time.Instant,
+        val seq: Long,
+        val item: TicketHistoryItem,
     )
 
     data class TicketHistoryResponse(
