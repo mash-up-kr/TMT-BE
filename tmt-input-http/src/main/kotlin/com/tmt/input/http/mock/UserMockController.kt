@@ -100,7 +100,7 @@ class UserMockController(
             mockTicketLedger.historyOf(userId).map { entry ->
                 TicketHistoryItem(
                     entryId = entry.entryId,
-                    type = entry.type.name,
+                    type = TicketHistoryType.of(entry.type),
                     amount = entry.amount,
                     saveId = entry.saveId,
                     place = entry.placeId?.let { placeRefOf(it) },
@@ -116,7 +116,7 @@ class UserMockController(
                 .map { save ->
                     TicketHistoryItem(
                         entryId = "tkh_save_${save.saveId}",
-                        type = TICKET_TYPE_SAVE_IN_PROGRESS,
+                        type = TicketHistoryType.SAVE_IN_PROGRESS,
                         amount = null,
                         saveId = save.saveId,
                         place = placeRefOf(save.placeId),
@@ -314,9 +314,23 @@ class UserMockController(
         val hasNext: Boolean,
     )
 
+    /** 이력 행의 종류 (J §4-1). 저장에서 파생하는 SAVE_IN_PROGRESS가 [TicketEntryType]보다 하나 많다. */
+    enum class TicketHistoryType {
+        SAVE_IN_PROGRESS,
+        SIGNUP_REWARD,
+        REVIEW_REWARD,
+        REVIEW_DELETE_REVOKE,
+        GROUP_JOIN,
+        ;
+
+        companion object {
+            fun of(type: TicketEntryType): TicketHistoryType = valueOf(type.name)
+        }
+    }
+
     data class TicketHistoryItem(
         val entryId: String,
-        val type: String,
+        val type: TicketHistoryType,
         /** null이면 티켓이 오간 적 없는 행이다 — 화면이 `작성 중` 배지를 그린다 (T10). */
         val amount: Int?,
         val saveId: String?,
@@ -338,8 +352,6 @@ class UserMockController(
     }
 
     companion object {
-        // 저장에서 파생하는 행이라 TicketEntryType에는 없다 (T10)
-        private const val TICKET_TYPE_SAVE_IN_PROGRESS = "SAVE_IN_PROGRESS"
         private const val USER_ID_PREFIX = "user_"
     }
 }
