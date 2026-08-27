@@ -21,7 +21,10 @@ class MediaUploadService(
     ): UploadIntent {
         val extension =
             MediaRules.EXTENSION_BY_CONTENT_TYPE[contentType]
-                ?: throw TmtException(ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED, "허용: ${MediaRules.ALLOWED_CONTENT_TYPES}")
+                ?: throw TmtException(
+                    ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED,
+                    "허용: ${MediaRules.ALLOWED_CONTENT_TYPES}",
+                )
         if (contentLength <= 0 || contentLength > MediaRules.MAX_CONTENT_LENGTH) {
             throw TmtException(ErrorCode.MEDIA_FILE_TOO_LARGE, "1~${MediaRules.MAX_CONTENT_LENGTH} bytes")
         }

@@ -24,10 +24,18 @@ class PlaceDetailMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(
                 PlaceDetailMockController(
-                    placeStore,
-                    saveStore,
-                    favoriteStore,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
+                    mockMediaUrls = fakeMockMediaUrls(),
+                    mockPlaceStore = placeStore,
+                    mockSaveStore = saveStore,
+                    mockFavoriteStore = favoriteStore,
+                    reviewCardAssembler =
+                        ReviewCardAssembler(
+                            mockMediaUrls = fakeMockMediaUrls(),
+                            placeStore = placeStore,
+                            favoriteStore = favoriteStore,
+                            aiSummaryStore = aiSummaryStore,
+                            userStore = userStore,
+                        ),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())

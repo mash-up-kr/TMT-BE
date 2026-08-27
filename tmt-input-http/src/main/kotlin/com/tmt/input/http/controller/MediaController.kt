@@ -15,12 +15,9 @@ import org.springframework.web.bind.annotation.RestController
 
 /**
  * 사진 업로드 presigned URL 발급 (M1) — mock을 대체하는 실구현 (TMT-202).
- * 응답 형태(assetId·uploadUrl·expiresAt)는 mock과 같아 FE 재생성이 필요 없다.
- *
- * 태그 문자열은 mock 시절 것을 그대로 둔다 — FE의 orval 생성 경로가 태그에 묶여 있어
- * (FE TMT-171) "(mock)"을 떼는 것만으로 생성 코드 경로가 바뀐다. TMT-171과 함께 정리한다.
+ * 응답 형태(assetId·uploadUrl·expiresAt)는 mock과 같다.
  */
-@Tag(name = "미디어 (mock)", description = "명세 v2 — F §3-2")
+@Tag(name = "미디어", description = "명세 v2 — F §3-2")
 @RestController
 @RequestMapping("/v1/media/upload-intents")
 class MediaController(

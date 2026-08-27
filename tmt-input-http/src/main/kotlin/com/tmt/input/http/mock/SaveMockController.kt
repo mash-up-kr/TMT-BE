@@ -142,7 +142,10 @@ class SaveMockController(
                 )
             } ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
         detachAssets(save.photoAssetIds - request.photoAssetIds.toSet())
-        attachAssets(request.photoAssetIds, reattachableIds = save.photoAssetIds.intersect(request.photoAssetIds.toSet()))
+        attachAssets(
+            request.photoAssetIds,
+            reattachableIds = save.photoAssetIds.intersect(request.photoAssetIds.toSet()),
+        )
 
         val granted = if (completed) mockTicketLedger.tryGrant(userId, updated.saveId, updated.placeId) else 0
         val result = toResult(updated, granted, userId)

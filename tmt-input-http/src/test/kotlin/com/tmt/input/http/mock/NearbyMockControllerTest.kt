@@ -25,9 +25,16 @@ class NearbyMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(
                 NearbyMockController(
-                    saveStore,
-                    placeStore,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
+                    mockSaveStore = saveStore,
+                    mockPlaceStore = placeStore,
+                    reviewCardAssembler =
+                        ReviewCardAssembler(
+                            mockMediaUrls = fakeMockMediaUrls(),
+                            placeStore = placeStore,
+                            favoriteStore = favoriteStore,
+                            aiSummaryStore = aiSummaryStore,
+                            userStore = userStore,
+                        ),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())

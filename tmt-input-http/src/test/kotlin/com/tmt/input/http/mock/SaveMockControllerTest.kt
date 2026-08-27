@@ -20,7 +20,7 @@ class SaveMockControllerTest {
         InMemoryStore<MockPlace>(idPrefix = "place").apply {
             create { id -> MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515) }
         }
-    private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
+    private val attachMedia = FakeAttachMediaUseCase()
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
     private val aiSummaryStore = MockAiSummaryStore()
 
@@ -28,13 +28,14 @@ class SaveMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(
                 SaveMockController(
-                    saveStore,
-                    placeStore,
-                    assetStore,
-                    MockTicketLedger(),
-                    MockReviewIdGenerator(),
-                    MockIdempotencyRegistry(),
-                    aiSummaryStore,
+                    mockSaveStore = saveStore,
+                    mockPlaceStore = placeStore,
+                    attachMediaUseCase = attachMedia,
+                    mockMediaUrls = fakeMockMediaUrls(),
+                    mockTicketLedger = MockTicketLedger(),
+                    mockReviewIdGenerator = MockReviewIdGenerator(),
+                    mockIdempotencyRegistry = MockIdempotencyRegistry(),
+                    mockAiSummaryStore = aiSummaryStore,
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver(), IdempotencyKeyArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -44,7 +45,7 @@ class SaveMockControllerTest {
         """
         {
           "placeId": "place_1",
-          "photoAssetIds": ["asset_1"],
+          "photoAssetIds": ["1"],
           "companionTagIds": ["tag_couple"],
           "positivePointTagIds": ["tag_kind"],
           "rating": 5,
@@ -64,8 +65,8 @@ class SaveMockControllerTest {
             .content(body),
     )
 
-    private fun ownedAsset(ownerId: Long = 1): MockAsset =
-        assetStore.create { id -> MockAsset(assetId = id, ownerId = ownerId, contentType = "image/jpeg") }
+    // 실구현 발급 assetId는 숫자다 (TMT-202). 시드의 `asset_*`는 발급분이 아니라 여기 쓰지 않는다.
+    private fun ownedAsset(ownerId: Long = 1): String = attachMedia.issue(assetId = 1, ownerId = ownerId)
 
     @Test
     fun `가게 선택만으로 작성 완료하면 저장만 생긴다 (C1·C5)`() {
@@ -175,7 +176,7 @@ class SaveMockControllerTest {
     fun `같은 사진을 두 번 실어 보내면 VALIDATION_FAILED다`() {
         ownedAsset()
 
-        postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1", "asset_1"] }""")
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["1", "1"] }""")
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
@@ -213,7 +214,7 @@ class SaveMockControllerTest {
     fun `남의 asset을 붙이면 MEDIA_NOT_OWNED다`() {
         ownedAsset(ownerId = 99)
 
-        postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1"] }""")
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["1"] }""")
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("MEDIA_NOT_OWNED"))
     }
@@ -221,9 +222,9 @@ class SaveMockControllerTest {
     @Test
     fun `이미 다른 저장에 붙은 asset은 MEDIA_ALREADY_ATTACHED다`() {
         ownedAsset()
-        postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1"] }""").andExpect(status().isCreated)
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["1"] }""").andExpect(status().isCreated)
 
-        postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1"] }""", idempotencyKey = "key-2")
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["1"] }""", idempotencyKey = "key-2")
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("MEDIA_ALREADY_ATTACHED"))
     }

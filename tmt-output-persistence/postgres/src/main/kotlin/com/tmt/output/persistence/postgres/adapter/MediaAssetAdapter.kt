@@ -35,7 +35,8 @@ class MediaAssetAdapter(
         mediaAssetRepository.findAllById(assetIds).map { it.toSnapshot() }
 
     @Transactional
-    override fun markAttached(assetIds: Collection<Long>): Int = mediaAssetRepository.markAttached(assetIds, Instant.now())
+    override fun markAttached(assetIds: Collection<Long>): Int =
+        mediaAssetRepository.markAttached(assetIds, Instant.now())
 
     @Transactional
     override fun markStaged(assetIds: Collection<Long>): Int = mediaAssetRepository.markStaged(assetIds)

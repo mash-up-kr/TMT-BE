@@ -25,7 +25,15 @@ class ReviewMockControllerTest {
     private val mockMvc: MockMvc =
         MockMvcBuilders
             .standaloneSetup(
-                ReviewMockController(saveStore, placeStore, assetStore, ticketLedger, userStore, aiSummaryStore),
+                ReviewMockController(
+                    mockMediaUrls = fakeMockMediaUrls(),
+                    mockSaveStore = saveStore,
+                    mockPlaceStore = placeStore,
+                    mockAssetStore = assetStore,
+                    mockTicketLedger = ticketLedger,
+                    mockUserStore = userStore,
+                    mockAiSummaryStore = aiSummaryStore,
+                ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice(), MockTicketExceptionAdvice())
             .build()
