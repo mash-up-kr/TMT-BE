@@ -45,7 +45,8 @@ class ReviewCardAssembler(
                     ReviewCardResponse.AiSummary(it.pros, if (masked) null else it.cons)
                 },
             content = if (masked) null else content,
-            contentLength = content.length,
+            // 코드 포인트 기준 — 이모지가 든 본문에서 UTF-16 길이를 쓰면 FE가 세는 값과 어긋난다
+            contentLength = content.codePointCount(0, content.length),
             tags =
                 (save.companionTagIds + save.positivePointTagIds).map {
                     ReviewCardResponse.Tag(it, ReviewFormRules.labelOf(it))

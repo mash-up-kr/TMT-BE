@@ -12,7 +12,7 @@ data class ReviewCardResponse(
     val aiSummary: AiSummary?,
     /** 미가입 그룹 리뷰 목록에서는 마스킹돼 null (D_02 §3-2). */
     val content: String?,
-    /** 마스킹돼도 원본 본문의 문자 수를 내린다 — 화면이 블러 자리를 잡는다. */
+    /** 마스킹돼도 원본 본문의 문자 수(코드 포인트)를 내린다 — 화면이 블러 자리를 잡는다. */
     val contentLength: Int,
     val tags: List<Tag>,
     val place: PlaceRegionSummary,

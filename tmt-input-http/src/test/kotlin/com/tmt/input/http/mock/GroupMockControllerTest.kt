@@ -2,6 +2,7 @@ package com.tmt.input.http.mock
 
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
+import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -232,7 +233,7 @@ class GroupMockControllerTest {
             .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "999"))
             .andExpect(jsonPath("$.items.length()").value(5))
             .andExpect(jsonPath("$.gate.gated").value(false))
-            .andExpect(jsonPath("$.gate.reason").doesNotExist())
+            .andExpect(jsonPath("$.gate.reason").value(nullValue()))
     }
 
     @Test
@@ -247,9 +248,9 @@ class GroupMockControllerTest {
         mockMvc
             .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "1"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.items[0].content").doesNotExist())
-            .andExpect(jsonPath("$.items[0].contentLength").value("맛있어요".length))
-            .andExpect(jsonPath("$.items[0].aiSummary.cons").doesNotExist())
+            .andExpect(jsonPath("$.items[0].content").value(nullValue()))
+            .andExpect(jsonPath("$.items[0].contentLength").value(4))
+            .andExpect(jsonPath("$.items[0].aiSummary.cons").value(nullValue()))
             .andExpect(jsonPath("$.items[0].aiSummary.pros").value("분위기가 좋아요"))
             .andExpect(jsonPath("$.items[0].rating").value(5))
             .andExpect(jsonPath("$.items[0].photos.length()").value(1))
@@ -258,8 +259,37 @@ class GroupMockControllerTest {
         mockMvc
             .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "999"))
             .andExpect(jsonPath("$.items[0].content").value("맛있어요"))
-            .andExpect(jsonPath("$.items[0].contentLength").value("맛있어요".length))
+            .andExpect(jsonPath("$.items[0].contentLength").value(4))
             .andExpect(jsonPath("$.items[0].aiSummary.cons").value("웨이팅이 길어요"))
+    }
+
+    @Test
+    fun `contentLength는 코드 포인트로 센다 — 이모지가 있어도 FE가 세는 값과 같다`() {
+        val group = seedGroup()
+        val place = MockFixtures.place(placeStore, "델리스피자")
+        val review =
+            saveStore.create { id ->
+                MockSave(
+                    saveId = id,
+                    ownerId = 999,
+                    placeId = place.placeId,
+                    photoAssetIds = listOf("asset_1"),
+                    companionTagIds = emptyList(),
+                    positivePointTagIds = emptyList(),
+                    rating = 5,
+                    // 이모지는 하나가 UTF-16으로 2 — 코드 포인트로 세면 7, UTF-16으로 세면 9다
+                    content = "맛있어요 🍕🍕",
+                    reviewId = "review_1",
+                    createdAt = Instant.now(),
+                    updatedAt = Instant.now(),
+                )
+            }
+        shareStore.add(group.groupId, 999, review.reviewId!!)
+
+        mockMvc
+            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].contentLength").value(7))
     }
 
     @Test
