@@ -160,7 +160,10 @@ class GroupMockController(
         @PathVariable groupId: String,
     ): GroupAssembler.GroupDetailResponse = groupAssembler.detail(findGroup(groupId), userId)
 
-    @Operation(summary = "그룹 상세 리뷰 목록", description = "게이트가 걸리는 곳 — 미가입·비회원은 최신 3건, 가입자는 전체 (G1). 판정은 가입 여부 하나다.")
+    @Operation(
+        summary = "그룹 상세 리뷰 목록",
+        description = "미가입·비회원도 전체를 커서 페이징으로 본다. 대신 본문과 단점 요약을 서버가 마스킹한다 (G1).",
+    )
     @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/{groupId}/reviews")
     fun groupReviews(
@@ -173,35 +176,22 @@ class GroupMockController(
     ): GatedReviewsResponse {
         val group = findGroup(groupId)
         val reviews = groupAssembler.sharedReviews(group.groupId)
-
-        if (!mockMembershipStore.isMember(groupId, userId)) {
-            // 미가입일 때 hasNext는 항상 false — 더 있다고 알리면 화면이 잘못된 무한 스크롤을 만든다
-            return GatedReviewsResponse(
-                items =
-                    reviews
-                        .take(
-                            GATE_VISIBLE_COUNT,
-                        ).map { reviewCardAssembler.assemble(it, userId, latitude, longitude) },
-                gate =
-                    GatedReviewsResponse.Gate(
-                        gated = true,
-                        reason = "MEMBERSHIP_REQUIRED",
-                        visibleCount = GATE_VISIBLE_COUNT,
-                    ),
-                nextCursor = null,
-                hasNext = false,
-            )
-        }
+        // 블러는 화면 표현이지만 값은 서버가 지운다 — 페이로드에 남으면 devtools로 그대로 보인다
+        val masked = !mockMembershipStore.isMember(groupId, userId)
 
         val page =
             MockCursor.paginate(
                 reviews,
                 cursor,
                 limit,
-            ) { reviewCardAssembler.assemble(it, userId, latitude, longitude) }
+            ) { reviewCardAssembler.assemble(it, userId, latitude, longitude, masked) }
         return GatedReviewsResponse(
             items = page.items,
-            gate = GatedReviewsResponse.Gate(gated = false, reason = null, visibleCount = null),
+            gate =
+                GatedReviewsResponse.Gate(
+                    gated = masked,
+                    reason = if (masked) "MEMBERSHIP_REQUIRED" else null,
+                ),
             nextCursor = page.nextCursor,
             hasNext = page.hasNext,
         )
@@ -321,7 +311,6 @@ class GroupMockController(
         data class Gate(
             val gated: Boolean,
             val reason: String?,
-            val visibleCount: Int?,
         )
     }
 
@@ -330,8 +319,6 @@ class GroupMockController(
         const val SORT_MEMBER_COUNT = "MEMBER_COUNT"
         const val SORT_REVIEW_COUNT = "REVIEW_COUNT"
 
-        // 미가입 게이트 — 최신 3건까지 (G1, 확정표 "그룹 리뷰 열람 게이트")
-        private const val GATE_VISIBLE_COUNT = 3
         private const val DESCRIPTION_MAX_LENGTH = 200
 
         private fun groupSeq(groupId: String): Long = groupId.substringAfterLast('_').toLongOrNull() ?: 0

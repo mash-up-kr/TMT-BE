@@ -17,9 +17,11 @@ class ReviewCardAssembler(
         viewerId: Long?,
         latitude: Double?,
         longitude: Double?,
+        masked: Boolean = false,
     ): ReviewCardResponse {
         val reviewId = requireNotNull(save.reviewId) { "완성된 리뷰만 카드가 된다 (R8)" }
         val place = placeStore.findById(save.placeId)
+        val content = requireNotNull(save.content) { "리뷰는 본문이 필수다 (C4)" }
         return ReviewCardResponse(
             reviewId = reviewId,
             author = MockUsers.authorOf(save.ownerId),
@@ -38,8 +40,13 @@ class ReviewCardAssembler(
                         order = index,
                     )
                 },
-            aiSummary = aiSummaryStore.find(reviewId)?.let { ReviewCardResponse.AiSummary(it.pros, it.cons) },
-            content = requireNotNull(save.content) { "리뷰는 본문이 필수다 (C4)" },
+            aiSummary =
+                aiSummaryStore.find(reviewId)?.let {
+                    ReviewCardResponse.AiSummary(it.pros, if (masked) null else it.cons)
+                },
+            content = if (masked) null else content,
+            // 코드 포인트 기준 — 이모지가 든 본문에서 UTF-16 길이를 쓰면 FE가 세는 값과 어긋난다
+            contentLength = content.codePointCount(0, content.length),
             tags =
                 (save.companionTagIds + save.positivePointTagIds).map {
                     ReviewCardResponse.Tag(it, ReviewFormRules.labelOf(it))
