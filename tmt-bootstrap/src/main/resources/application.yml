@@ -34,6 +34,9 @@ tmt:
       model: gemini-2.5-flash
     batch-size: 100
     backfill-cron: "0 */10 * * * *"
+  media:
+    # 사진 조회 base URL (TMT-201 공개 읽기 버킷). 정본은 SSM /tmt-prod/media/base-url -> 배포 .env
+    base-url: ${MEDIA_BASE_URL:}
   idempotency:
     # 이 기간이 지난 재시도는 멱등 기록이 없어 비즈니스 로직을 다시 탄다.
     ttl: P1D
