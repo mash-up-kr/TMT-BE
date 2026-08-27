@@ -161,8 +161,20 @@ class UserMockControllerTest {
     }
 
     @Test
+    fun `응답의 userId 표기를 그대로 경로에 써도 열린다`() {
+        // 카드·프로필이 user_7로 내려주므로 FE가 그 값을 그대로 경로에 넣는다
+        mockMvc
+            .perform(get("/v1/users/user_7"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.userId").value("user_7"))
+            .andExpect(jsonPath("$.nickname").value("면요리 연구가"))
+    }
+
+    @Test
     fun `없는 사용자는 404다 (J-01 6-2)`() {
         mockMvc.perform(get("/v1/users/404")).andExpect(status().isNotFound)
+        // 숫자로 해석되지 않는 값도 500이 아니라 404다
+        mockMvc.perform(get("/v1/users/ghost")).andExpect(status().isNotFound)
         mockMvc.perform(get("/v1/users/404/reviews")).andExpect(status().isNotFound)
         mockMvc.perform(get("/v1/users/404/groups")).andExpect(status().isNotFound)
         mockMvc.perform(get("/v1/users/404/favorites")).andExpect(status().isNotFound)

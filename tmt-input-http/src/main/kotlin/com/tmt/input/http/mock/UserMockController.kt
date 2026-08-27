@@ -45,9 +45,9 @@ class UserMockController(
             email = user.email,
             profileImageUrl = user.profileImageUrl,
             availableTicketCount = mockTicketLedger.availableCount(userId),
-            reviewCount = reviewsOf(userId).size,
-            joinedGroupCount = mockMembershipStore.joinedGroups(userId).size,
-            favoritePlaceCount = mockFavoriteStore.count(userId),
+            reviewCount = reviewsOf(user.userId).size,
+            joinedGroupCount = mockMembershipStore.joinedGroups(user.userId).size,
+            favoritePlaceCount = mockFavoriteStore.count(user.userId),
         )
     }
 
@@ -141,16 +141,16 @@ class UserMockController(
     @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
     @GetMapping("/{userId}")
     fun userProfile(
-        @PathVariable userId: Long,
+        @PathVariable userId: String,
     ): UserProfileResponse {
         val user = findUser(userId)
         return UserProfileResponse(
-            userId = "user_$userId",
+            userId = "user_${user.userId}",
             nickname = user.nickname,
             profileImageUrl = user.profileImageUrl,
-            reviewCount = reviewsOf(userId).size,
-            joinedGroupCount = mockMembershipStore.joinedGroups(userId).size,
-            favoritePlaceCount = mockFavoriteStore.count(userId),
+            reviewCount = reviewsOf(user.userId).size,
+            joinedGroupCount = mockMembershipStore.joinedGroups(user.userId).size,
+            favoritePlaceCount = mockFavoriteStore.count(user.userId),
         )
     }
 
@@ -158,12 +158,12 @@ class UserMockController(
     @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
     @GetMapping("/{userId}/reviews")
     fun userReviews(
-        @PathVariable userId: Long,
+        @PathVariable userId: String,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): CursorPage<UserReviewGridItem> {
-        findUser(userId)
-        return MockCursor.paginate(reviewsOf(userId), cursor, limit) { save ->
+        val owner = findUser(userId).userId
+        return MockCursor.paginate(reviewsOf(owner), cursor, limit) { save ->
             UserReviewGridItem(
                 reviewId = save.reviewId!!,
                 thumbnailUrl = mockMediaUrl(save.photoAssetIds.first()),
@@ -178,12 +178,12 @@ class UserMockController(
     @GetMapping("/{userId}/groups")
     fun userGroups(
         @UserId viewerId: Long?,
-        @PathVariable userId: Long,
+        @PathVariable userId: String,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): CursorPage<GroupCardResponse> {
-        findUser(userId)
-        return groupsPage(ownerId = userId, viewerId = viewerId, cursor = cursor, limit = limit)
+        val owner = findUser(userId).userId
+        return groupsPage(ownerId = owner, viewerId = viewerId, cursor = cursor, limit = limit)
     }
 
     @Operation(summary = "타인 좋아요 탭", description = "isFavorite은 조회자 기준이라 여기서는 true가 아닐 수 있다 (F3).")
@@ -191,18 +191,24 @@ class UserMockController(
     @GetMapping("/{userId}/favorites")
     fun userFavorites(
         @UserId viewerId: Long?,
-        @PathVariable userId: Long,
+        @PathVariable userId: String,
         @RequestParam(required = false) latitude: Double?,
         @RequestParam(required = false) longitude: Double?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): CursorPage<PlaceCardResponse> {
-        findUser(userId)
-        return favoritesPage(userId, viewerId, latitude, longitude, cursor, limit)
+        val owner = findUser(userId).userId
+        return favoritesPage(owner, viewerId, latitude, longitude, cursor, limit)
     }
 
-    private fun findUser(userId: Long): MockUser =
-        mockUserStore.find(userId) ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
+    /**
+     * 경로의 userId는 응답 표기(`user_7`)와 숫자(`7`) 둘 다 받는다 —
+     * FE가 카드에서 받은 `author.userId`를 그대로 경로에 넣기 때문이다.
+     */
+    private fun findUser(userId: String): MockUser {
+        val id = userId.removePrefix(USER_ID_PREFIX).toLongOrNull() ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
+        return mockUserStore.find(id) ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
+    }
 
     /** 완성된 리뷰만, 최신순 (R8). 칩 카운트와 리뷰 탭이 같은 집합을 본다. */
     private fun reviewsOf(userId: Long): List<MockSave> =
@@ -334,5 +340,6 @@ class UserMockController(
     companion object {
         // 저장에서 파생하는 행이라 TicketEntryType에는 없다 (T10)
         private const val TICKET_TYPE_SAVE_IN_PROGRESS = "SAVE_IN_PROGRESS"
+        private const val USER_ID_PREFIX = "user_"
     }
 }
