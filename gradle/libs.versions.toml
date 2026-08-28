@@ -43,6 +43,7 @@ postgresql = { group = "org.postgresql", name = "postgresql" }
 # Boot 4에서 FlywayAutoConfiguration이 별도 모듈로 빠져, flyway-core만 넣으면 자동설정이 붙지 않는다.
 spring-boot-starter-flyway = { group = "org.springframework.boot", name = "spring-boot-starter-flyway" }
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awsSdk" }
+spring-web = { group = "org.springframework", name = "spring-web" }
 flyway-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql" }
 
 # Test
