@@ -32,6 +32,7 @@ class ReviewCardComposerTest {
         placeId = 10,
         placeName = "가게",
         placeRegionName = "마포구 서교동",
+        placeCategoryId = "cat_korean",
         distanceMeters = distance,
         favorite = true,
     )
