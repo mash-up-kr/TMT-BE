@@ -74,9 +74,10 @@ class MockStoreConfig {
 
     @Bean
     fun placeCardAssembler(
+        mockMediaUrls: MockMediaUrls,
         mockSaveStore: InMemoryStore<MockSave>,
         mockFavoriteStore: MockFavoriteStore,
-    ): PlaceCardAssembler = PlaceCardAssembler(mockSaveStore, mockFavoriteStore)
+    ): PlaceCardAssembler = PlaceCardAssembler(mockMediaUrls, mockSaveStore, mockFavoriteStore)
 
     /** 그룹은 전부 UT2 시드가 만든다 (TMT-213) — [MockUt2Seeds]. */
     @Bean

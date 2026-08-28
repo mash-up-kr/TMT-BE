@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @Tag(name = "매장 추천 (mock)", description = "명세 v2 — J §5-2")
 @RestController
 class RecommendationMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockAiSummaryStore: MockAiSummaryStore,
@@ -76,7 +77,7 @@ class RecommendationMockController(
                     name = place.name,
                     roadAddress = place.roadAddress,
                     categoryName = place.categoryName,
-                    thumbnailUrl = latestReview?.photoAssetIds?.firstOrNull()?.let(::mockMediaUrl),
+                    thumbnailUrl = latestReview?.photoAssetIds?.firstOrNull()?.let(mockMediaUrls::urlOf),
                 ),
             summary = summary,
         )

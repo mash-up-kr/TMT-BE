@@ -27,6 +27,7 @@ import java.time.Instant
 @RestController
 @RequestMapping("/v1/groups/{groupId}")
 class GroupMembershipMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockGroupStore: InMemoryStore<MockGroup>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
@@ -55,7 +56,7 @@ class GroupMembershipMockController(
                 JoinPreviewResponse.GroupSummary(
                     groupId = group.groupId,
                     name = group.name,
-                    imageUrl = group.imageAssetId?.let(::mockMediaUrl),
+                    imageUrl = group.imageAssetId?.let(mockMediaUrls::urlOf),
                 ),
             availableTicketCount = available,
             requiredTicketCount = REQUIRED_TICKETS,
@@ -182,7 +183,7 @@ class GroupMembershipMockController(
                 ReviewSharesResponse.Item(
                     reviewId = save.reviewId!!,
                     placeName = placeNameOf(save.placeId),
-                    thumbnailUrl = save.photoAssetIds.first().let(::mockMediaUrl),
+                    thumbnailUrl = save.photoAssetIds.first().let(mockMediaUrls::urlOf),
                     contentPreview = save.content.orEmpty(),
                     isShared = save.reviewId in shared,
                     createdAt = save.createdAt.toString(),

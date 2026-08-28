@@ -27,6 +27,7 @@ class HomeMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(
                 HomeMockController(
+                    fakeMockMediaUrls(),
                     groupStore,
                     saveStore,
                     placeStore,
