@@ -41,11 +41,9 @@ data "aws_iam_policy_document" "db_secret_read" {
     resources = [
       # /db/*      DB 접속 정보 (ci-push.yml · cicd-release.yml)
       # /media/*   미디어 버킷·조회 base URL (TMT-201)
-      # /ai/*      리뷰 요약 LLM 키 (TMT-232)
       # /address/* juso 승인키·addressId 서명키 (TMT-187)
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/db/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/media/*",
-      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/ai/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/address/*",
     ]
   }
