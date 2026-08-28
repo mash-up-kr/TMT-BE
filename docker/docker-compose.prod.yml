@@ -24,6 +24,10 @@ services:
       # 리뷰 요약 LLM 키 (TMT-232). 정본은 SSM /tmt-prod/ai/* — 빈 값이면 해당 프로바이더 비활성
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # 주소 API 키 (TMT-187)·addressId 서명 키 (TMT-191). 정본은 SSM /tmt-prod/address/*
+      - JUSO_SEARCH_KEY=${JUSO_SEARCH_KEY}
+      - JUSO_COORD_KEY=${JUSO_COORD_KEY}
+      - ADDRESS_TOKEN_SECRET=${ADDRESS_TOKEN_SECRET}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 

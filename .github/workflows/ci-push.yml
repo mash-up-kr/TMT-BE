@@ -13,6 +13,7 @@ env:
   SSM_DB_PREFIX: /tmt-prod/db
   SSM_MEDIA_PREFIX: /tmt-prod/media
   SSM_AI_PREFIX: /tmt-prod/ai
+  SSM_ADDRESS_PREFIX: /tmt-prod/address
 
 jobs:
   build:
@@ -157,6 +158,12 @@ jobs:
           # LLM 키 (TMT-232) — 아직 등록 전이면 빈 값으로 두고 해당 프로바이더는 앱이 건너뛴다
           GROQ_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
           GEMINI_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/gemini-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
+          # 주소 API 키 (TMT-187) — 검색용·좌표용이 서로 다른 키다. 없으면 주소 검색이
+          # ADDRESS_PROVIDER_UNAVAILABLE로 죽으므로 LLM 키와 달리 빈 값 폴백을 두지 않는다
+          JUSO_SEARCH_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-search-key --with-decryption --query Parameter.Value --output text)
+          JUSO_COORD_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-coord-key --with-decryption --query Parameter.Value --output text)
+          # addressId 서명 키 (TMT-191). 외부 발급이 아니라 우리가 만든 HMAC 시크릿이다
+          ADDRESS_TOKEN_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/token-secret --with-decryption --query Parameter.Value --output text)
 
           # ECR pull — 인스턴스 역할 권한 (infra/terraform/ecr.tf)
           aws ecr get-login-password --region ${AWS_REGION} \
@@ -177,6 +184,9 @@ jobs:
           MEDIA_BASE_URL=\$MEDIA_BASE_URL
           GROQ_API_KEY=\$GROQ_API_KEY
           GEMINI_API_KEY=\$GEMINI_API_KEY
+          JUSO_SEARCH_KEY=\$JUSO_SEARCH_KEY
+          JUSO_COORD_KEY=\$JUSO_COORD_KEY
+          ADDRESS_TOKEN_SECRET=\$ADDRESS_TOKEN_SECRET
           ENV
 
           cd "\$DEPLOY_DIR"
