@@ -124,7 +124,7 @@ class UserMockController(
                         seq = entrySeq(save.saveId),
                         item =
                             TicketHistoryItem(
-                                entryId = "tkh_save_${save.saveId}",
+                                entryId = "tkh_${save.saveId}",
                                 type = TicketHistoryType.SAVE_IN_PROGRESS,
                                 amount = null,
                                 saveId = save.saveId,
