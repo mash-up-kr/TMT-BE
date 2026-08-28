@@ -9,3 +9,9 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: true
+
+tmt:
+  address:
+    token:
+      # 로컬 전용 서명 키. 운영 값은 SSM에서 주입된다 (application-prod.yml)
+      secret: ${ADDRESS_TOKEN_SECRET:local-dev-address-token-secret}

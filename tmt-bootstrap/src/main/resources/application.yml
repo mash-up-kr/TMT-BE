@@ -49,7 +49,7 @@ tmt:
         open-seconds: 60
     token:
       # addressId 서명 키(HMAC-SHA256). 시크릿이라 커밋하지 않는다 (TMT-191)
-      secret: ${ADDRESS_TOKEN_SECRET:}
+      secret: ${ADDRESS_TOKEN_SECRET:}  # local은 application-local.yml, prod는 필수 (application-prod.yml)
   media:
     # TMT-201 버킷. 정본은 SSM /tmt-prod/media/* — 배포 시 .env로 내려온다 (로컬은 빈 값이면 발급 시점에 실패)
     bucket: ${MEDIA_BUCKET:}

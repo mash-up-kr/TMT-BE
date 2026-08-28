@@ -3,7 +3,6 @@ package com.tmt.input.http.controller.address
 import com.tmt.application.port.output.address.AddressCandidate
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
@@ -13,8 +12,6 @@ import java.security.MessageDigest
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-
-private val logger = KotlinLogging.logger {}
 
 /**
  * addressId — 주소를 통째로 담는 **서명된 불투명 토큰** (F §2-2, TMT-191).
@@ -30,15 +27,12 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class AddressIdTokenCodec(
-    @param:Value("\${tmt.address.token.secret:}") secret: String,
+    @param:Value("\${tmt.address.token.secret}") secret: String,
 ) {
+    // 키가 비면 기동을 막는다 — 코드에 박힌 기본값으로 서명하면 위조 방지가 무의미해진다
     private val key: SecretKeySpec =
         SecretKeySpec(
-            secret
-                .ifBlank {
-                    logger.warn { "addressId 서명 키가 비어 있어 개발용 기본값을 쓴다 - tmt.address.token.secret 설정 확인" }
-                    LOCAL_FALLBACK_SECRET
-                }.toByteArray(),
+            secret.ifBlank { throw IllegalStateException("tmt.address.token.secret이 비어 있다") }.toByteArray(),
             HMAC_ALGORITHM,
         )
 
@@ -107,8 +101,5 @@ class AddressIdTokenCodec(
     companion object {
         private const val HMAC_ALGORITHM = "HmacSHA256"
         private val BASE64: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
-
-        /** 로컬에서 키 없이도 기동은 돼야 한다. 운영은 설정 주입이 정본이다 */
-        private const val LOCAL_FALLBACK_SECRET = "tmt-local-address-token-secret"
     }
 }
