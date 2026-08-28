@@ -15,6 +15,8 @@ object PublicIds {
 
     fun user(id: Long) = "user_$id"
 
+    fun save(id: Long) = "save_$id"
+
     fun savePhoto(id: Long) = "sp_$id"
 
     /** 접두·형식이 어긋나면 없는 자원과 같다 — 존재 여부를 새지 않게 NOT_FOUND 계열로 던진다. */
