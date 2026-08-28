@@ -36,7 +36,7 @@ class GroupAssembler(
             name = group.name,
             oneLineDescription = group.oneLineDescription,
             description = group.description,
-            imageUrl = group.imageAssetId?.let(::mockMediaUrl),
+            imageUrl = group.imageAssetId?.let(mockMediaUrls::urlOf),
             coverImages = stats.coverPhotos.take(MAX_COVER_IMAGES),
             memberCount = membershipStore.memberCount(group.groupId),
             reviewCount = stats.reviewCount,

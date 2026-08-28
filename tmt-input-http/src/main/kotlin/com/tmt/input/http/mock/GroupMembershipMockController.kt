@@ -56,7 +56,7 @@ class GroupMembershipMockController(
                 JoinPreviewResponse.GroupSummary(
                     groupId = group.groupId,
                     name = group.name,
-                    imageUrl = group.imageAssetId?.let(::mockMediaUrl),
+                    imageUrl = group.imageAssetId?.let(mockMediaUrls::urlOf),
                 ),
             availableTicketCount = available,
             requiredTicketCount = REQUIRED_TICKETS,
