@@ -394,6 +394,27 @@ class GroupMockControllerTest {
     }
 
     @Test
+    fun `이미지를 지우면 이전 asset이 STAGED로 돌아간다 (M4)`() {
+        attachMediaUseCase.issue(48, ownerId = 999)
+        attachMediaUseCase.attach(listOf(48))
+        val group = seedGroup()
+        groupStore.update(group.groupId) { it.copy(imageAssetId = "48") }
+
+        // imageAssetId를 빼고 보낸다 — 대표 이미지를 없애는 편집이다
+        mockMvc
+            .perform(
+                put("/v1/groups/${group.groupId}")
+                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.imageUrl").doesNotExist())
+
+        // ATTACHED로 남으면 TTL 정리 대상에서 빠져 버킷에 영구히 남는다
+        assertEquals(false, attachMediaUseCase.isAttached(48))
+    }
+
+    @Test
     fun `이미지를 그대로 둔 편집은 재부착으로 막히지 않는다`() {
         attachMediaUseCase.issue(47, ownerId = 999)
         attachMediaUseCase.attach(listOf(47))
