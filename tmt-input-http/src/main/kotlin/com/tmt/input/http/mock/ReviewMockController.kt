@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/v1/reviews/{reviewId}")
 class ReviewMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockAssetStore: InMemoryStore<MockAsset>,
@@ -49,7 +50,7 @@ class ReviewMockController(
                 save.photoAssetIds.mapIndexed { index, assetId ->
                     ReviewDetailResponse.Photo(
                         photoId = "sp_${assetId.removePrefix("asset_")}",
-                        url = mockMediaUrl(assetId),
+                        url = mockMediaUrls.urlOf(assetId),
                         order = index,
                     )
                 },

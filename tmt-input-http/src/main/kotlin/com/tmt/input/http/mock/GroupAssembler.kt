@@ -4,6 +4,7 @@ import com.tmt.input.http.controller.dto.response.GroupCardResponse
 
 /** GroupCard(D_01 §2)·그룹 상세(D_02 §3-1) 조립 — 집계와 커버는 공유 리뷰에서 파생한다. */
 class GroupAssembler(
+    private val mockMediaUrls: MockMediaUrls,
     private val saveStore: InMemoryStore<MockSave>,
     private val membershipStore: MockMembershipStore,
     private val shareStore: MockReviewShareStore,
@@ -70,7 +71,7 @@ class GroupAssembler(
                 reviews.flatMap { save ->
                     save.photoAssetIds.map {
                         GroupDetailResponse.CoverImage(
-                            url = mockMediaUrl(it),
+                            url = mockMediaUrls.urlOf(it),
                             reviewId = save.reviewId!!,
                         )
                     }

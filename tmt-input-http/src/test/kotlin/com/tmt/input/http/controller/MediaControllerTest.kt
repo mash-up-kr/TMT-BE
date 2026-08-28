@@ -1,5 +1,10 @@
-package com.tmt.input.http.mock
+package com.tmt.input.http.controller
 
+import com.tmt.application.domain.media.MediaRules
+import com.tmt.application.port.input.CreateUploadIntentUseCase
+import com.tmt.application.port.input.UploadIntent
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -10,13 +15,41 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
 
-class MediaMockControllerTest {
-    private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
+/**
+ * 발급 계약(assetId·uploadUrl·expiresAt)이 mock과 같은지 지킨다 — 형태가 같아야
+ * FE orval 재생성이 필요 없다 (TMT-202 승인 기준).
+ */
+class MediaControllerTest {
+    private var lastOwnerId: Long? = null
+
+    private val useCase =
+        object : CreateUploadIntentUseCase {
+            override fun create(
+                ownerId: Long,
+                contentType: String,
+                contentLength: Long,
+            ): UploadIntent {
+                // 서비스(MediaUploadService)와 같은 순서로 거른다 — 형식 먼저, 크기 다음
+                if (contentType !in MediaRules.ALLOWED_CONTENT_TYPES) {
+                    throw TmtException(ErrorCode.MEDIA_CONTENT_TYPE_NOT_ALLOWED)
+                }
+                if (contentLength <= 0 || contentLength > MediaRules.MAX_CONTENT_LENGTH) {
+                    throw TmtException(ErrorCode.MEDIA_FILE_TOO_LARGE)
+                }
+                lastOwnerId = ownerId
+                return UploadIntent(
+                    assetId = 1,
+                    uploadUrl = "https://media.test.tmt/review/uuid.jpg?X-Amz-Signature=x",
+                    expiresAt = Instant.parse("2026-08-28T00:10:00Z"),
+                )
+            }
+        }
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(MediaMockController(assetStore))
+            .standaloneSetup(MediaController(useCase))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
@@ -28,15 +61,15 @@ class MediaMockControllerTest {
             .content(body)
 
     @Test
-    fun `presigned URL을 발급하고 asset을 요청자 소유로 기록한다`() {
+    fun `presigned URL을 발급하고 요청자를 소유자로 넘긴다 (M2)`() {
         mockMvc
             .perform(request("""{ "contentType": "image/jpeg", "contentLength": 1048576 }"""))
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.assetId").value("asset_1"))
+            .andExpect(jsonPath("$.assetId").value("1"))
             .andExpect(jsonPath("$.uploadUrl").isNotEmpty)
             .andExpect(jsonPath("$.expiresAt").isNotEmpty)
 
-        assertEquals(1L, assetStore.findById("asset_1")?.ownerId)
+        assertEquals(1L, lastOwnerId)
     }
 
     @Test
