@@ -8,6 +8,7 @@ import com.tmt.input.http.controller.dto.response.ReviewCardResponse
  * 여기서 한 번 조립하고 각 컨트롤러가 재사용한다.
  */
 class ReviewCardAssembler(
+    private val mockMediaUrls: MockMediaUrls,
     private val placeStore: InMemoryStore<MockPlace>,
     private val favoriteStore: MockFavoriteStore,
     private val aiSummaryStore: MockAiSummaryStore,
@@ -37,7 +38,7 @@ class ReviewCardAssembler(
                 save.photoAssetIds.mapIndexed { index, assetId ->
                     ReviewCardResponse.Photo(
                         photoId = "sp_${assetId.removePrefix("asset_")}",
-                        url = mockMediaUrl(assetId),
+                        url = mockMediaUrls.urlOf(assetId),
                         order = index,
                     )
                 },
@@ -57,6 +58,7 @@ class ReviewCardAssembler(
                     placeId = save.placeId,
                     name = place?.name ?: "(삭제된 매장)",
                     regionName = place?.regionName ?: "",
+                    categoryName = place?.categoryName,
                     isFavorite = favoriteStore.isFavorite(viewerId, save.placeId),
                 ),
             createdAt = save.createdAt.toString(),

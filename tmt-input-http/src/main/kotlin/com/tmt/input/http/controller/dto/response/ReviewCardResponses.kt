@@ -24,6 +24,7 @@ fun ReviewCardView.toResponse(): ReviewCardResponse =
                 placeId = PublicIds.place(placeId),
                 name = placeName,
                 regionName = placeRegionName,
+                categoryName = placeCategoryName,
                 isFavorite = placeFavorite,
             ),
         createdAt = createdAt.toString(),

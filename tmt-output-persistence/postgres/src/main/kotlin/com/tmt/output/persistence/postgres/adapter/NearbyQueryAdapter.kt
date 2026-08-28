@@ -47,6 +47,7 @@ class NearbyQueryAdapter(
                         placeId = it.getPlaceId(),
                         placeName = it.getPlaceName(),
                         placeRegionName = it.getPlaceRegionName(),
+                        placeCategoryId = it.getPlaceCategoryId(),
                         distanceMeters = requireNotNull(it.getDistanceMeters()) { "근처 쿼리는 항상 거리를 계산한다" },
                         favorite = it.getFavorite(),
                     )

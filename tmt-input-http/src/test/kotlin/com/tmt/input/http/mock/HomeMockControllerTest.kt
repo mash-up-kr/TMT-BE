@@ -21,7 +21,7 @@ class HomeMockControllerTest {
     // 등록되지 않은 X-User-Id로도 홈이 열려야 한다 — 닉네임은 만들어 준다
     private val userStore = MockUserStore(emptyList())
     private val aiSummaryStore = MockAiSummaryStore()
-    private val groupAssembler = GroupAssembler(saveStore, membershipStore, shareStore)
+    private val groupAssembler = GroupAssembler(fakeMockMediaUrls(), saveStore, membershipStore, shareStore)
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
@@ -34,7 +34,7 @@ class HomeMockControllerTest {
                     shareStore,
                     userStore,
                     groupAssembler,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
+                    ReviewCardAssembler(fakeMockMediaUrls(), placeStore, favoriteStore, aiSummaryStore, userStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -70,9 +70,10 @@ class HomeMockControllerTest {
     }
 
     @Test
-    fun `가입 그룹이 있으면 가입 오래된 순으로 내리고 추천은 비운다`() {
+    fun `가입 그룹이 있으면 가입 오래된 순으로 내리고 추천에서는 뺀다`() {
         val first = seedGroup("성수 커피 탐험대")
         val second = seedGroup("나는야 초밥왕")
+        val notJoined = seedGroup("면요리 연구회")
         membershipStore.join(second.groupId, 1, Instant.parse("2026-08-11T00:00:00Z"))
         membershipStore.join(first.groupId, 1, Instant.parse("2026-08-12T00:00:00Z"))
 
@@ -82,6 +83,19 @@ class HomeMockControllerTest {
             .andExpect(jsonPath("$.myGroups.length()").value(2))
             .andExpect(jsonPath("$.myGroups[0].groupId").value(second.groupId))
             .andExpect(jsonPath("$.myGroups[1].groupId").value(first.groupId))
+            // 가입자에게도 캐러셀이 뜨고, 이미 가입한 둘은 후보에서 빠진다 (A §2)
+            .andExpect(jsonPath("$.recommendedGroups.length()").value(1))
+            .andExpect(jsonPath("$.recommendedGroups[0].groupId").value(notJoined.groupId))
+    }
+
+    @Test
+    fun `가입하지 않은 그룹이 없으면 추천은 비어 있다`() {
+        val only = seedGroup("성수 커피 탐험대")
+        membershipStore.join(only.groupId, 1, Instant.parse("2026-08-11T00:00:00Z"))
+
+        mockMvc
+            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
             .andExpect(jsonPath("$.recommendedGroups").isEmpty)
     }
 

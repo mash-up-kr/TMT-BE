@@ -26,7 +26,7 @@ class GroupMockControllerTest {
     private val favoriteStore = MockFavoriteStore()
     private val userStore = MockUserStore(listOf(MockUser(1, "조용한 미식가", "tester1@example.com")))
     private val aiSummaryStore = MockAiSummaryStore()
-    private val groupAssembler = GroupAssembler(saveStore, membershipStore, shareStore)
+    private val groupAssembler = GroupAssembler(fakeMockMediaUrls(), saveStore, membershipStore, shareStore)
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
@@ -36,7 +36,7 @@ class GroupMockControllerTest {
                     assetStore,
                     membershipStore,
                     groupAssembler,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
+                    ReviewCardAssembler(fakeMockMediaUrls(), placeStore, favoriteStore, aiSummaryStore, userStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
