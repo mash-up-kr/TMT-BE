@@ -1,7 +1,5 @@
 package com.tmt.application.port.output.persistence
 
-import java.time.Instant
-
 /**
  * 근처 탐색 읽기 (TMT-228). 공간 술어(ST_DWithin·bbox)와 키셋은 SQL이 제일 잘하는
  * 일이라 어댑터가 native로 처리하고, 카드 조립(사진·태그·요약 붙이기)은 서비스가 한다.
@@ -20,12 +18,6 @@ interface NearbyQueryPort {
         limit: Int,
         viewerId: Long?,
     ): NearbyReviewRows
-
-    fun findPhotoRows(saveIds: Collection<Long>): List<PhotoRow>
-
-    fun findTagRows(saveIds: Collection<Long>): List<TagRow>
-
-    fun findSummaryRows(reviewIds: Collection<Long>): List<SummaryRow>
 
     /**
      * bbox 안 리뷰 보유 매장(E6). [limit]+1개를 중심 가까운 순(중심 없으면 id 순)으로
@@ -48,43 +40,8 @@ interface NearbyQueryPort {
 }
 
 data class NearbyReviewRows(
-    val rows: List<ReviewRow>,
+    val rows: List<ReviewCardRow>,
     val hasNext: Boolean,
-) {
-    data class ReviewRow(
-        val reviewId: Long,
-        val saveId: Long,
-        val createdAt: Instant,
-        val rating: Int,
-        val content: String,
-        val authorId: Long,
-        val authorNickname: String,
-        val authorProfileImageUrl: String?,
-        val placeId: Long,
-        val placeName: String,
-        val placeRegionName: String,
-        val distanceMeters: Int,
-        val favorite: Boolean,
-    )
-}
-
-data class PhotoRow(
-    val saveId: Long,
-    val savePhotoId: Long,
-    val s3Key: String,
-    val photoOrder: Int,
-)
-
-data class TagRow(
-    val saveId: Long,
-    val tagId: String,
-    val label: String,
-)
-
-data class SummaryRow(
-    val reviewId: Long,
-    val pros: String?,
-    val cons: String?,
 )
 
 data class PinRow(

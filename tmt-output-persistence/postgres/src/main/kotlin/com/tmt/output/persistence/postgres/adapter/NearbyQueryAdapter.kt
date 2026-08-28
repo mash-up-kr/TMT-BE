@@ -2,10 +2,8 @@ package com.tmt.output.persistence.postgres.adapter
 
 import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.application.port.output.persistence.NearbyReviewRows
-import com.tmt.application.port.output.persistence.PhotoRow
 import com.tmt.application.port.output.persistence.PinRow
-import com.tmt.application.port.output.persistence.SummaryRow
-import com.tmt.application.port.output.persistence.TagRow
+import com.tmt.application.port.output.persistence.ReviewCardRow
 import com.tmt.output.persistence.postgres.repository.NearbyQueryRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -37,7 +35,7 @@ class NearbyQueryAdapter(
         return NearbyReviewRows(
             rows =
                 rows.take(limit).map {
-                    NearbyReviewRows.ReviewRow(
+                    ReviewCardRow(
                         reviewId = it.getReviewId(),
                         saveId = it.getSaveId(),
                         createdAt = it.getCreatedAt(),
@@ -49,28 +47,13 @@ class NearbyQueryAdapter(
                         placeId = it.getPlaceId(),
                         placeName = it.getPlaceName(),
                         placeRegionName = it.getPlaceRegionName(),
-                        distanceMeters = it.getDistanceMeters(),
+                        distanceMeters = requireNotNull(it.getDistanceMeters()) { "근처 쿼리는 항상 거리를 계산한다" },
                         favorite = it.getFavorite(),
                     )
                 },
             hasNext = rows.size > limit,
         )
     }
-
-    override fun findPhotoRows(saveIds: Collection<Long>): List<PhotoRow> =
-        nearbyQueryRepository.findPhotoRows(saveIds).map {
-            PhotoRow(it.getSaveId(), it.getSavePhotoId(), it.getS3Key(), it.getPhotoOrder())
-        }
-
-    override fun findTagRows(saveIds: Collection<Long>): List<TagRow> =
-        nearbyQueryRepository.findTagRows(saveIds).map {
-            TagRow(it.getSaveId(), it.getTagId(), it.getLabel())
-        }
-
-    override fun findSummaryRows(reviewIds: Collection<Long>): List<SummaryRow> =
-        nearbyQueryRepository.findSummaryRows(reviewIds).map {
-            SummaryRow(it.getReviewId(), it.getPros(), it.getCons())
-        }
 
     override fun findPins(
         north: Double,

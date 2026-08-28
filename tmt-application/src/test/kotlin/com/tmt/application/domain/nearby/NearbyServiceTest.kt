@@ -1,13 +1,13 @@
 package com.tmt.application.domain.nearby
 
+import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyReviewsRequest
 import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.application.port.output.persistence.NearbyReviewRows
-import com.tmt.application.port.output.persistence.PhotoRow
 import com.tmt.application.port.output.persistence.PinRow
-import com.tmt.application.port.output.persistence.SummaryRow
-import com.tmt.application.port.output.persistence.TagRow
+import com.tmt.application.port.output.persistence.ReviewCardLookupPort
+import com.tmt.application.port.output.persistence.ReviewCardRow
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import io.mockk.every
@@ -22,13 +22,19 @@ import kotlin.test.assertTrue
 
 class NearbyServiceTest {
     private val port = mockk<NearbyQueryPort>()
-    private val service = NearbyService(port, mediaBaseUrl = "https://media.example/")
+    private val lookup =
+        mockk<ReviewCardLookupPort> {
+            every { findPhotoRows(any()) } returns emptyList()
+            every { findTagRows(any()) } returns emptyList()
+            every { findSummaryRows(any()) } returns emptyList()
+        }
+    private val service = NearbyService(port, ReviewCardComposer(lookup, mediaBaseUrl = "https://media.example/"))
 
     private fun row(
         reviewId: Long,
         saveId: Long = reviewId,
         distance: Int = 100,
-    ) = NearbyReviewRows.ReviewRow(
+    ) = ReviewCardRow(
         reviewId = reviewId,
         saveId = saveId,
         createdAt = Instant.EPOCH,
@@ -45,27 +51,6 @@ class NearbyServiceTest {
     )
 
     private fun pin(id: Long) = PinRow(id, "p$id", 37.5, 126.9, 1)
-
-    @Test
-    fun `카드를 조립한다 - 사진 URL은 base-url과 s3_key로, 태그·요약·찜까지`() {
-        every { port.findReviewRowsWithin(any(), any(), any(), any(), any(), any(), any()) } returns
-            NearbyReviewRows(listOf(row(1)), hasNext = false)
-        every { port.findPhotoRows(listOf(1L)) } returns
-            listOf(PhotoRow(saveId = 1, savePhotoId = 7, s3Key = "review/a.jpg", photoOrder = 0))
-        every { port.findTagRows(listOf(1L)) } returns listOf(TagRow(1, "tag_alone", "혼자"))
-        every { port.findSummaryRows(listOf(1L)) } returns listOf(SummaryRow(1, "좋아요", null))
-
-        val item =
-            service
-                .get(NearbyReviewsRequest(viewerId = 2, latitude = 37.55, longitude = 126.92, limit = 20))
-                .items
-                .single()
-
-        assertEquals("https://media.example/review/a.jpg", item.photos.single().url)
-        assertEquals("혼자", item.tags.single().label)
-        assertEquals("좋아요", item.aiSummary?.pros)
-        assertTrue(item.placeFavorite)
-    }
 
     @Test
     fun `위경도 범위 밖이면 VALIDATION_FAILED다`() {
@@ -132,9 +117,6 @@ class NearbyServiceTest {
     fun `마지막 페이지면 lastKey 기반 커서 재료가 그대로 남고 hasNext만 false다`() {
         every { port.findReviewRowsWithin(any(), any(), any(), any(), any(), any(), any()) } returns
             NearbyReviewRows(listOf(row(1, distance = 5)), hasNext = false)
-        every { port.findPhotoRows(any()) } returns emptyList()
-        every { port.findTagRows(any()) } returns emptyList()
-        every { port.findSummaryRows(any()) } returns emptyList()
 
         val result =
             service.get(

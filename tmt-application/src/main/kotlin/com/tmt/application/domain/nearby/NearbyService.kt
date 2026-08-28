@@ -2,23 +2,22 @@ package com.tmt.application.domain.nearby
 
 import com.tmt.application.domain.place.CurationPresets
 import com.tmt.application.domain.place.FoodCategories
+import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.GetNearbyPlacesUseCase
 import com.tmt.application.port.input.GetNearbyReviewsUseCase
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyPlacesResult
 import com.tmt.application.port.input.NearbyReviewsRequest
 import com.tmt.application.port.input.NearbyReviewsResult
-import com.tmt.application.port.input.ReviewCardView
 import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
 @Service
 class NearbyService(
     private val nearbyQueryPort: NearbyQueryPort,
-    @param:Value("\${tmt.media.base-url:}") private val mediaBaseUrl: String,
+    private val reviewCardComposer: ReviewCardComposer,
 ) : GetNearbyReviewsUseCase,
     GetNearbyPlacesUseCase {
     override fun get(request: NearbyReviewsRequest): NearbyReviewsResult {
@@ -34,43 +33,7 @@ class NearbyService(
                 limit = request.limit,
                 viewerId = request.viewerId,
             )
-        if (page.rows.isEmpty()) return NearbyReviewsResult(emptyList(), hasNext = false)
-
-        val saveIds = page.rows.map { it.saveId }
-        val photosBySave = nearbyQueryPort.findPhotoRows(saveIds).groupBy { it.saveId }
-        val tagsBySave = nearbyQueryPort.findTagRows(saveIds).groupBy { it.saveId }
-        val summaryByReview = nearbyQueryPort.findSummaryRows(page.rows.map { it.reviewId }).associateBy { it.reviewId }
-
-        val items =
-            page.rows.map { row ->
-                ReviewCardView(
-                    reviewId = row.reviewId,
-                    authorId = row.authorId,
-                    authorNickname = row.authorNickname,
-                    authorProfileImageUrl = row.authorProfileImageUrl,
-                    rating = row.rating,
-                    distanceMeters = row.distanceMeters,
-                    photos =
-                        photosBySave[row.saveId].orEmpty().sortedBy { it.photoOrder }.map { photo ->
-                            ReviewCardView.Photo(
-                                photoId = photo.savePhotoId,
-                                // 공개 읽기 버킷 (TMT-201) — base-url + s3_key가 곧 조회 URL이다
-                                url = "${mediaBaseUrl.trimEnd('/')}/${photo.s3Key}",
-                                order = photo.photoOrder,
-                            )
-                        },
-                    aiSummary =
-                        summaryByReview[row.reviewId]?.let { ReviewCardView.AiSummary(it.pros, it.cons) },
-                    content = row.content,
-                    tags = tagsBySave[row.saveId].orEmpty().map { ReviewCardView.Tag(it.tagId, it.label) },
-                    placeId = row.placeId,
-                    placeName = row.placeName,
-                    placeRegionName = row.placeRegionName,
-                    placeFavorite = row.favorite,
-                    createdAt = row.createdAt,
-                )
-            }
-        return NearbyReviewsResult(items, hasNext = page.hasNext)
+        return NearbyReviewsResult(reviewCardComposer.compose(page.rows), hasNext = page.hasNext)
     }
 
     override fun get(request: NearbyPlacesRequest): NearbyPlacesResult {
