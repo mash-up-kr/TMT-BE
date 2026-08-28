@@ -158,6 +158,14 @@ jobs:
           GROQ_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
           GEMINI_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/gemini-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
 
+          # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
+          # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252)
+          for v in "\$DB_HOST" "\$DB_NAME" "\$DB_USER" "\$DB_PASSWORD" "\$MEDIA_BUCKET" "\$MEDIA_BASE_URL"; do
+            [ -n "\$v" ] && continue
+            echo "필수 설정을 SSM에서 읽지 못했다 — 인스턴스 역할의 ssm:GetParameter 범위를 확인하라 (infra/terraform/iam.tf)" >&2
+            exit 1
+          done
+
           # ECR pull — 인스턴스 역할 권한 (infra/terraform/ecr.tf)
           aws ecr get-login-password --region ${AWS_REGION} \
             | docker login --username AWS --password-stdin ${ECR_REGISTRY}
