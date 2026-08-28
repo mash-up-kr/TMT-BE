@@ -66,6 +66,7 @@ class MockStoreConfig {
      */
     @Bean
     fun mockUserSeedApplier(
+        mockPlaceStore: InMemoryStore<MockPlace>,
         mockSaveStore: InMemoryStore<MockSave>,
         mockAssetStore: InMemoryStore<MockAsset>,
         mockGroupStore: InMemoryStore<MockGroup>,
@@ -74,6 +75,7 @@ class MockStoreConfig {
         mockFavoriteStore: MockFavoriteStore,
         mockAiSummaryStore: MockAiSummaryStore,
         mockReviewIdGenerator: MockReviewIdGenerator,
+        mockTicketLedger: MockTicketLedger,
     ): MockUserSeedApplier {
         MockUserSeeds.apply(
             mockSaveStore,
@@ -84,6 +86,18 @@ class MockStoreConfig {
             mockFavoriteStore,
             mockAiSummaryStore,
             mockReviewIdGenerator,
+        )
+        // UT2 콘텐츠 (TMT-213) — MockUserSeeds가 기존 그룹 순번(0·1)에 기대므로 반드시 그 뒤에 넣는다
+        MockUt2Seeds.apply(
+            mockPlaceStore,
+            mockSaveStore,
+            mockAssetStore,
+            mockGroupStore,
+            mockMembershipStore,
+            mockReviewShareStore,
+            mockAiSummaryStore,
+            mockReviewIdGenerator,
+            mockTicketLedger,
         )
         return MockUserSeedApplier
     }
@@ -141,6 +155,10 @@ class MockStoreConfig {
                 MockUser(3, "면요리 연구가", "tester3@example.com"),
                 MockUser(4, "커피 마시는 곰", null),
                 MockUser(SEED_USER_ID, "딸깍 운영자", null),
+                // UT2 콘텐츠(TMT-213)의 persona 작성자들 — 그룹장·리뷰 작성자로 쓰인다
+                MockUser(MockUt2Seeds.PERSONA_OFFICE, "회사원 미식러", null),
+                MockUser(MockUt2Seeds.PERSONA_JAMSIL, "잠실 토박이", null),
+                MockUser(MockUt2Seeds.PERSONA_EXPLORER, "골목 탐험가", null),
             )
 
         // 부팅 시드 리뷰 (saveId, reviewId, assetId) → 남이 예전에 써둔 완성 리뷰
@@ -254,6 +272,14 @@ class MockTicketLedger {
     private val sequence = AtomicLong()
 
     fun availableCount(userId: Long): Int = historyOf(userId).sumOf { it.amount }
+
+    /**
+     * 가입 보상 없이 잔고 0으로 시작시킨다 (UT2 임시 — TMT-213).
+     * 이력을 빈 리스트로 미리 채워두면 [historyOf]·[append]가 가입 보상 행을 만들지 않는다.
+     */
+    fun startWithNoTickets(userId: Long) {
+        entries.putIfAbsent(userId, emptyList())
+    }
 
     /** 발급·소비 이력. 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 (T10). */
     fun historyOf(userId: Long): List<MockTicketEntry> = entries.computeIfAbsent(userId) { listOf(signupReward(it)) }

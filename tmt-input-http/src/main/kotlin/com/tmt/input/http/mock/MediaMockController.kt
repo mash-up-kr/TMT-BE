@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 
 /** 업로드 대상 URL을 발급한다 (M1). mock에서는 실제 S3 대신 가짜 presigned URL을 내린다. */
 @Tag(name = "미디어 (mock)", description = "명세 v2 — F §3-2")
@@ -64,5 +65,23 @@ class MediaMockController(
     )
 }
 
-/** Save 상세·카드의 사진 노출 URL — mock에서는 assetId로 결정되는 가짜 CDN 주소다. */
-fun mockMediaUrl(assetId: String): String = "https://mock-cdn.tmt.example/$assetId.jpg"
+/**
+ * Save 상세·카드의 사진 노출 URL — mock에서는 assetId로 결정되는 가짜 CDN 주소다.
+ * 단, 시드가 실제 사진을 등록해 둔 asset은 그 URL을 우선한다 (UT2 콘텐츠, TMT-213).
+ */
+fun mockMediaUrl(assetId: String): String =
+    MockSeedMediaUrls.find(assetId) ?: "https://mock-cdn.tmt.example/$assetId.jpg"
+
+/** 시드 asset → 실제 공개 URL 오버라이드. 부팅 시드에서만 쓰고 런타임 업로드는 등록하지 않는다. */
+object MockSeedMediaUrls {
+    private val urls = ConcurrentHashMap<String, String>()
+
+    fun register(
+        assetId: String,
+        url: String,
+    ) {
+        urls[assetId] = url
+    }
+
+    fun find(assetId: String): String? = urls[assetId]
+}
