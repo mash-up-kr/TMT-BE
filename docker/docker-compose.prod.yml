@@ -21,6 +21,9 @@ services:
       # 앱 소비는 TMT-202(사진 업로드 실구현)에서 붙는다.
       - MEDIA_BUCKET=${MEDIA_BUCKET}
       - MEDIA_BASE_URL=${MEDIA_BASE_URL}
+      # 리뷰 요약 LLM 키 (TMT-232). 정본은 SSM /tmt-prod/ai/* — 빈 값이면 해당 프로바이더 비활성
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 

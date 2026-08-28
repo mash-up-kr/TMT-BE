@@ -24,6 +24,16 @@ spring:
         order_updates: true
 
 tmt:
+  ai-summary:
+    # 리뷰 요약 LLM (TMT-232). 키는 SSM /tmt-prod/ai/* -> 배포 .env. 키가 없으면 해당 프로바이더는 건너뛴다
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      model: llama-3.3-70b-versatile
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: gemini-2.5-flash
+    batch-size: 100
+    backfill-cron: "0 */10 * * * *"
   idempotency:
     # 이 기간이 지난 재시도는 멱등 기록이 없어 비즈니스 로직을 다시 탄다.
     ttl: P1D
