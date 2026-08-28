@@ -38,8 +38,9 @@ class UserMockControllerTest {
                     membershipStore,
                     favoriteStore,
                     ticketLedger,
-                    GroupAssembler(saveStore, membershipStore, shareStore),
+                    GroupAssembler(fakeMockMediaUrls(), saveStore, membershipStore, shareStore),
                     PlaceCardAssembler(saveStore, favoriteStore),
+                    fakeMockMediaUrls(),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())

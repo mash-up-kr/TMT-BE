@@ -32,6 +32,7 @@ class UserMockController(
     private val mockTicketLedger: MockTicketLedger,
     private val groupAssembler: GroupAssembler,
     private val placeCardAssembler: PlaceCardAssembler,
+    private val mockMediaUrls: MockMediaUrls,
 ) {
     @Operation(summary = "마이페이지 상단", description = "프로필·티켓 배너·칩 카운트 3종. 칩 숫자는 탭을 열기 전에 보이므로 여기 함께 싣는다 (J §2).")
     @GetMapping("/me")
@@ -62,7 +63,7 @@ class UserMockController(
             MyReviewGridItem(
                 reviewId = save.reviewId!!,
                 saveId = save.saveId,
-                thumbnailUrl = mockMediaUrl(save.photoAssetIds.first()),
+                thumbnailUrl = mockMediaUrls.urlOf(save.photoAssetIds.first()),
                 place = placeSummaryOf(save.placeId),
                 createdAt = save.createdAt.toString(),
             )
@@ -179,7 +180,7 @@ class UserMockController(
         return MockCursor.paginate(reviewsOf(owner), cursor, limit) { save ->
             UserReviewGridItem(
                 reviewId = save.reviewId!!,
-                thumbnailUrl = mockMediaUrl(save.photoAssetIds.first()),
+                thumbnailUrl = mockMediaUrls.urlOf(save.photoAssetIds.first()),
                 place = placeSummaryOf(save.placeId),
                 createdAt = save.createdAt.toString(),
             )

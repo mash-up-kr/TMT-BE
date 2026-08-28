@@ -21,7 +21,7 @@ class HomeMockControllerTest {
     // 등록되지 않은 X-User-Id로도 홈이 열려야 한다 — 닉네임은 만들어 준다
     private val userStore = MockUserStore(emptyList())
     private val aiSummaryStore = MockAiSummaryStore()
-    private val groupAssembler = GroupAssembler(saveStore, membershipStore, shareStore)
+    private val groupAssembler = GroupAssembler(fakeMockMediaUrls(), saveStore, membershipStore, shareStore)
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
@@ -34,7 +34,7 @@ class HomeMockControllerTest {
                     shareStore,
                     userStore,
                     groupAssembler,
-                    ReviewCardAssembler(placeStore, favoriteStore, aiSummaryStore, userStore),
+                    ReviewCardAssembler(fakeMockMediaUrls(), placeStore, favoriteStore, aiSummaryStore, userStore),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
