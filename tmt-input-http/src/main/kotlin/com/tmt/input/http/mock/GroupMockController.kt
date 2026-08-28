@@ -1,5 +1,6 @@
 package com.tmt.input.http.mock
 
+import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
@@ -28,7 +29,7 @@ import java.time.Instant
 @RequestMapping("/v1/groups")
 class GroupMockController(
     private val mockGroupStore: InMemoryStore<MockGroup>,
-    private val mockAssetStore: InMemoryStore<MockAsset>,
+    private val attachMediaUseCase: AttachMediaUseCase,
     private val mockMembershipStore: MockMembershipStore,
     private val groupAssembler: GroupAssembler,
     private val reviewCardAssembler: ReviewCardAssembler,
@@ -264,13 +265,12 @@ class GroupMockController(
             }
         }
         request.imageAssetId?.let { assetId ->
-            val asset = mockAssetStore.findById(assetId)
-            if (asset == null || asset.ownerId != requesterId) {
-                throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
-            }
-            if (asset.attached && assetId != currentImageAssetId) {
-                throw TmtException(ErrorCode.MEDIA_ALREADY_ATTACHED)
-            }
+            attachMediaUseCase.verifyAttachable(
+                ownerId = requesterId,
+                assetIds = listOf(parseAssetId(assetId)),
+                // 이미지를 그대로 둔 편집이면 이미 ATTACHED라 재부착을 허용해야 한다
+                reattachableIds = setOfNotNull(currentImageAssetId?.let(::parseAssetId)),
+            )
         }
     }
 
@@ -284,9 +284,13 @@ class GroupMockController(
         previousAssetId: String?,
     ) {
         if (newAssetId == previousAssetId) return
-        previousAssetId?.let { mockAssetStore.update(it) { asset -> asset.copy(attached = false) } }
-        newAssetId?.let { mockAssetStore.update(it) { asset -> asset.copy(attached = true) } }
+        previousAssetId?.let { attachMediaUseCase.detach(listOf(parseAssetId(it))) }
+        newAssetId?.let { attachMediaUseCase.attach(listOf(parseAssetId(it))) }
     }
+
+    /** 실구현 발급 assetId는 숫자 문자열이다. 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
+    private fun parseAssetId(assetId: String): Long =
+        assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
 
     data class GroupRequest(
         val name: String,
