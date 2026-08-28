@@ -8,10 +8,21 @@ package com.tmt.application.port.input
  * 경합에 밀렸을 때 필요한 롤백과 재조회가 동작하지 않는다.
  */
 interface IdempotentRequestUseCase {
+    /**
+     * [prepare]는 멱등 조회를 통과한 요청에 대해 **트랜잭션이 열리기 전에** 한 번 돈다.
+     * 외부 I/O를 트랜잭션에 넣지 않으면서도 재요청에서는 다시 부르지 않아야 하는 준비 작업
+     * (예: `POST /v1/saves`의 juso 좌표 조회) 자리다.
+     */
+    fun <T : Any, P> execute(
+        request: IdempotentRequest<T>,
+        prepare: () -> P,
+        businessLogic: (P) -> T,
+    ): IdempotentResult<T>
+
     fun <T : Any> execute(
         request: IdempotentRequest<T>,
         businessLogic: () -> T,
-    ): IdempotentResult<T>
+    ): IdempotentResult<T> = execute(request, prepare = {}, businessLogic = { businessLogic() })
 }
 
 /**
