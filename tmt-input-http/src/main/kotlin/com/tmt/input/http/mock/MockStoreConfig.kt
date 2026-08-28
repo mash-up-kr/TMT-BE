@@ -66,6 +66,7 @@ class MockStoreConfig {
      */
     @Bean
     fun mockUserSeedApplier(
+        mockPlaceStore: InMemoryStore<MockPlace>,
         mockSaveStore: InMemoryStore<MockSave>,
         mockAssetStore: InMemoryStore<MockAsset>,
         mockGroupStore: InMemoryStore<MockGroup>,
@@ -82,6 +83,17 @@ class MockStoreConfig {
             mockMembershipStore,
             mockReviewShareStore,
             mockFavoriteStore,
+            mockAiSummaryStore,
+            mockReviewIdGenerator,
+        )
+        // UT2 콘텐츠 (TMT-213) — MockUserSeeds가 기존 그룹 순번(0·1)에 기대므로 반드시 그 뒤에 넣는다
+        MockUt2Seeds.apply(
+            mockPlaceStore,
+            mockSaveStore,
+            mockAssetStore,
+            mockGroupStore,
+            mockMembershipStore,
+            mockReviewShareStore,
             mockAiSummaryStore,
             mockReviewIdGenerator,
         )
@@ -141,6 +153,10 @@ class MockStoreConfig {
                 MockUser(3, "면요리 연구가", "tester3@example.com"),
                 MockUser(4, "커피 마시는 곰", null),
                 MockUser(SEED_USER_ID, "딸깍 운영자", null),
+                // UT2 콘텐츠(TMT-213)의 persona 작성자들 — 그룹장·리뷰 작성자로 쓰인다
+                MockUser(MockUt2Seeds.PERSONA_OFFICE, "회사원 미식러", null),
+                MockUser(MockUt2Seeds.PERSONA_JAMSIL, "잠실 토박이", null),
+                MockUser(MockUt2Seeds.PERSONA_EXPLORER, "골목 탐험가", null),
             )
 
         // 부팅 시드 리뷰 (saveId, reviewId, assetId) → 남이 예전에 써둔 완성 리뷰
