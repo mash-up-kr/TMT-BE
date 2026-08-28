@@ -18,6 +18,7 @@ import com.tmt.input.http.controller.paging.CursorSpec
 import com.tmt.input.http.controller.paging.PageLimit
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -30,8 +31,12 @@ import java.time.Instant
 /**
  * 가게 상세 실구현 (TMT-229) — mock을 대체한다. 응답 형태·ID 표기는 mock과 같아
  * FE 재생성이 필요 없다. 태그 문자열은 TMT-171과 함께 정리할 때까지 유지한다.
+ *
+ * UT2 기간에는 `tmt.mock.place-explore=true`로 내려가 있다 (TMT-250) — mock과 저장소가 갈려
+ * `placeId`가 서로 다른 매장을 가리키기 때문이다. 저장·리뷰가 DB로 넘어오면 스위치를 지운다.
  */
 @Tag(name = "가게 상세 (mock)", description = "명세 v2 — B §3·§4")
+@ConditionalOnProperty(prefix = "tmt.mock", name = ["place-explore"], havingValue = "false", matchIfMissing = true)
 @RestController
 @RequestMapping("/v1/places/{placeId}")
 class PlaceDetailController(
