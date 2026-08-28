@@ -378,7 +378,7 @@ class SaveMockController(
                     name = place?.name ?: "(삭제된 매장)",
                     roadAddress = place?.roadAddress ?: "",
                 ),
-            thumbnailUrl = save.photoAssetIds.firstOrNull()?.let(::mockMediaUrl),
+            thumbnailUrl = save.photoAssetIds.firstOrNull()?.let(mockMediaUrls::urlOf),
             updatedAt = save.updatedAt.toString(),
         )
     }
