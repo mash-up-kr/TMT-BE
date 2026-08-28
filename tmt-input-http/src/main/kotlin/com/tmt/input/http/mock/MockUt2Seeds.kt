@@ -432,6 +432,7 @@ object MockUt2Seeds {
         shareStore: MockReviewShareStore,
         aiSummaryStore: MockAiSummaryStore,
         reviewIdGenerator: MockReviewIdGenerator,
+        ticketLedger: MockTicketLedger,
     ) {
         val placeIdByKey =
             PLACES.associate { p ->
@@ -467,6 +468,10 @@ object MockUt2Seeds {
                 PERSONAS.forEach { membershipStore.join(group.groupId, it, createdAt.plusSeconds(60)) }
                 group
             }
+
+        // UT2 동안 대상자는 티켓 0장으로 시작한다 (임시 — 이어쓰기 진입 지점이 아직 없어서
+        // 가입 보상 1장이 남아 있으면 화면과 어긋난다). 정상 규칙은 가입 보상 1장이다 (T2).
+        UT_USER_JOINS.keys.forEach(ticketLedger::startWithNoTickets)
 
         UT_USER_JOINS.forEach { (userId, indexes) ->
             indexes.forEach { index ->

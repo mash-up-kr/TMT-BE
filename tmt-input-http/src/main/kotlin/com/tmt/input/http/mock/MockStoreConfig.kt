@@ -75,6 +75,7 @@ class MockStoreConfig {
         mockFavoriteStore: MockFavoriteStore,
         mockAiSummaryStore: MockAiSummaryStore,
         mockReviewIdGenerator: MockReviewIdGenerator,
+        mockTicketLedger: MockTicketLedger,
     ): MockUserSeedApplier {
         MockUserSeeds.apply(
             mockSaveStore,
@@ -96,6 +97,7 @@ class MockStoreConfig {
             mockReviewShareStore,
             mockAiSummaryStore,
             mockReviewIdGenerator,
+            mockTicketLedger,
         )
         return MockUserSeedApplier
     }
@@ -270,6 +272,14 @@ class MockTicketLedger {
     private val sequence = AtomicLong()
 
     fun availableCount(userId: Long): Int = historyOf(userId).sumOf { it.amount }
+
+    /**
+     * 가입 보상 없이 잔고 0으로 시작시킨다 (UT2 임시 — TMT-213).
+     * 이력을 빈 리스트로 미리 채워두면 [historyOf]·[append]가 가입 보상 행을 만들지 않는다.
+     */
+    fun startWithNoTickets(userId: Long) {
+        entries.putIfAbsent(userId, emptyList())
+    }
 
     /** 발급·소비 이력. 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 (T10). */
     fun historyOf(userId: Long): List<MockTicketEntry> = entries.computeIfAbsent(userId) { listOf(signupReward(it)) }
