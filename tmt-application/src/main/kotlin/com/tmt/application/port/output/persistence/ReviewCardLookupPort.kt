@@ -27,6 +27,8 @@ data class ReviewCardRow(
     val placeId: Long,
     val placeName: String,
     val placeRegionName: String,
+    /** place.category_id (14종 상수 코드) — 매핑 실패 매장은 null (E11) */
+    val placeCategoryId: String? = null,
     /** 좌표 파라미터가 없는 목록에서는 null (규약 §6-3) */
     val distanceMeters: Int?,
     val favorite: Boolean,

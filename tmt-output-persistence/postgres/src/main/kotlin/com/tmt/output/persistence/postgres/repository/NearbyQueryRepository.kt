@@ -31,6 +31,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
                        p.id          AS placeId,
                        p.name        AS placeName,
                        p.region_name AS placeRegionName,
+                       p.category_id AS placeCategoryId,
                        CAST(round(ST_Distance(p.location, pt.g)) AS int) AS distanceMeters,
                        EXISTS(
                            SELECT 1 FROM place_favorite f
@@ -84,6 +85,8 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         fun getPlaceName(): String
 
         fun getPlaceRegionName(): String
+
+        fun getPlaceCategoryId(): String?
 
         fun getDistanceMeters(): Int?
 

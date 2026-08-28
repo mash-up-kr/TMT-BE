@@ -82,6 +82,7 @@ class PlaceQueryAdapter(
                         placeId = it.getPlaceId(),
                         placeName = it.getPlaceName(),
                         placeRegionName = it.getPlaceRegionName(),
+                        placeCategoryId = it.getPlaceCategoryId(),
                         distanceMeters = it.getDistanceMeters(),
                         favorite = it.getFavorite(),
                     )

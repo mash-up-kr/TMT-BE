@@ -90,6 +90,7 @@ interface PlaceQueryRepository : JpaRepository<PlaceEntity, Long> {
                    p.id          AS placeId,
                    p.name        AS placeName,
                    p.region_name AS placeRegionName,
+                   p.category_id AS placeCategoryId,
                    CASE WHEN CAST(:viewerLat AS float8) IS NULL THEN NULL
                         ELSE CAST(round(ST_Distance(
                                  p.location,
