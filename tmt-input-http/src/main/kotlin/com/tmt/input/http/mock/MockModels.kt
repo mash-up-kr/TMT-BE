@@ -14,7 +14,11 @@ data class MockPlace(
     val phoneNumber: String? = null,
 )
 
-/** 주소 검색 결과 1건. addressId 토큰에 통째로 실려 오가므로 저장소를 쓰지 않는다. */
+/**
+ * 주소 검색 결과 1건. addressId 토큰에 통째로 실려 오가므로 저장소를 쓰지 않는다.
+ * 주소 검색은 실구현으로 갈아탔고(TMT-192) 이제 `POST /v1/saves` mock만 이걸 쓴다 —
+ * newPlace 실구현(TMT-193)에서 [MockAddressToken]과 함께 지운다.
+ */
 data class MockAddress(
     val roadAddress: String,
     val jibunAddress: String,
