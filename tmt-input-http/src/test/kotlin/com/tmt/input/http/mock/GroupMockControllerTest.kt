@@ -19,7 +19,7 @@ import java.time.Instant
 class GroupMockControllerTest {
     private val placeStore = InMemoryStore<MockPlace>(idPrefix = "place")
     private val saveStore = InMemoryStore<MockSave>(idPrefix = "save")
-    private val assetStore = InMemoryStore<MockAsset>(idPrefix = "asset")
+    private val attachMediaUseCase = FakeAttachMediaUseCase()
     private val groupStore = InMemoryStore<MockGroup>(idPrefix = "group")
     private val membershipStore = MockMembershipStore()
     private val shareStore = MockReviewShareStore()
@@ -33,7 +33,7 @@ class GroupMockControllerTest {
             .standaloneSetup(
                 GroupMockController(
                     groupStore,
-                    assetStore,
+                    attachMediaUseCase,
                     membershipStore,
                     groupAssembler,
                     ReviewCardAssembler(fakeMockMediaUrls(), placeStore, favoriteStore, aiSummaryStore, userStore),
@@ -318,52 +318,97 @@ class GroupMockControllerTest {
 
     @Test
     fun `대표 이미지로 쓴 asset은 ATTACHED가 된다 (M4·M7)`() {
-        val asset = assetStore.create { id -> MockAsset(assetId = id, ownerId = 1, contentType = "image/jpeg") }
+        val assetId = attachMediaUseCase.issue(42, ownerId = 1)
 
         mockMvc
             .perform(
                 post("/v1/groups")
                     .header(UserIdArgumentResolver.HEADER, "1")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(createBody.dropLast(1) + ""","imageAssetId": "${asset.assetId}" }"""),
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "$assetId" }"""),
             ).andExpect(status().isCreated)
 
         // STAGED로 남으면 TTL 정리가 사용 중인 그룹 이미지를 지운다
-        assertEquals(true, assetStore.findById(asset.assetId)?.attached)
+        assertEquals(true, attachMediaUseCase.isAttached(42))
     }
 
     @Test
-    fun `이미 붙은 asset은 그룹 이미지로 다시 쓸 수 없다`() {
-        assetStore.create { id -> MockAsset(assetId = id, ownerId = 1, contentType = "image/jpeg", attached = true) }
+    fun `남의 asset은 그룹 이미지로 쓸 수 없다 (M2)`() {
+        attachMediaUseCase.issue(43, ownerId = 999)
 
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "43" }"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("MEDIA_NOT_OWNED"))
+    }
+
+    @Test
+    fun `접두가 붙은 옛 assetId는 없는 사진과 같다`() {
         mockMvc
             .perform(
                 post("/v1/groups")
                     .header(UserIdArgumentResolver.HEADER, "1")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "asset_1" }"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("MEDIA_NOT_OWNED"))
+    }
+
+    @Test
+    fun `이미 붙은 asset은 그룹 이미지로 다시 쓸 수 없다`() {
+        attachMediaUseCase.issue(44, ownerId = 1)
+        attachMediaUseCase.attach(listOf(44))
+
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "44" }"""),
             ).andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("MEDIA_ALREADY_ATTACHED"))
     }
 
     @Test
     fun `이미지를 교체하면 이전 asset은 STAGED로 돌아간다`() {
-        val old = assetStore.create { id -> MockAsset(assetId = id, ownerId = 999, contentType = "image/jpeg") }
-        val new = assetStore.create { id -> MockAsset(assetId = id, ownerId = 999, contentType = "image/jpeg") }
+        attachMediaUseCase.issue(45, ownerId = 999)
+        attachMediaUseCase.issue(46, ownerId = 999)
+        attachMediaUseCase.attach(listOf(45))
         val group = seedGroup()
-        groupStore.update(group.groupId) { it.copy(imageAssetId = old.assetId) }
-        assetStore.update(old.assetId) { it.copy(attached = true) }
+        groupStore.update(group.groupId) { it.copy(imageAssetId = "45") }
 
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
                     .header(UserIdArgumentResolver.HEADER, "999")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(createBody.dropLast(1) + ""","imageAssetId": "${new.assetId}" }"""),
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "46" }"""),
             ).andExpect(status().isOk)
 
-        assertEquals(false, assetStore.findById(old.assetId)?.attached)
-        assertEquals(true, assetStore.findById(new.assetId)?.attached)
+        assertEquals(false, attachMediaUseCase.isAttached(45))
+        assertEquals(true, attachMediaUseCase.isAttached(46))
+    }
+
+    @Test
+    fun `이미지를 그대로 둔 편집은 재부착으로 막히지 않는다`() {
+        attachMediaUseCase.issue(47, ownerId = 999)
+        attachMediaUseCase.attach(listOf(47))
+        val group = seedGroup()
+        groupStore.update(group.groupId) { it.copy(imageAssetId = "47") }
+
+        mockMvc
+            .perform(
+                put("/v1/groups/${group.groupId}")
+                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(createBody.dropLast(1) + ""","imageAssetId": "47" }"""),
+            ).andExpect(status().isOk)
+
+        assertEquals(true, attachMediaUseCase.isAttached(47))
     }
 
     @Test
