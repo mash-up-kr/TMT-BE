@@ -16,6 +16,7 @@ class MediaPurgeServiceTest {
             override fun presignPut(
                 s3Key: String,
                 contentType: String,
+                contentLength: Long,
             ): PresignedUpload = throw UnsupportedOperationException()
 
             override fun delete(s3Keys: Collection<String>) {

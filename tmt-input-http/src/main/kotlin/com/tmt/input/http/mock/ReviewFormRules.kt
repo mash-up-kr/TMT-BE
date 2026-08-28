@@ -1,13 +1,15 @@
 package com.tmt.input.http.mock
 
+import com.tmt.application.domain.media.MediaRules
+
 /**
  * 리뷰 폼 제약과 태그 풀 — 명세 v2 F §3-1의 서버 상수.
  * review-form-config 응답과 작성 완료(C4) 판정이 같은 값을 봐야 하므로 한 곳에 둔다.
  */
 object ReviewFormRules {
     const val PHOTO_MAX_COUNT = 3
-    const val PHOTO_MAX_BYTES = 5_242_880L
-    val ALLOWED_CONTENT_TYPES = listOf("image/jpeg", "image/png", "image/webp")
+    const val PHOTO_MAX_BYTES = MediaRules.MAX_CONTENT_LENGTH
+    val ALLOWED_CONTENT_TYPES = MediaRules.ALLOWED_CONTENT_TYPES.toList()
 
     const val RATING_MIN = 1
     const val RATING_MAX = 5

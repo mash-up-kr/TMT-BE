@@ -36,6 +36,7 @@ class S3MediaStorageAdapter(
     override fun presignPut(
         s3Key: String,
         contentType: String,
+        contentLength: Long,
     ): PresignedUpload {
         val objectRequest =
             PutObjectRequest
@@ -43,6 +44,7 @@ class S3MediaStorageAdapter(
                 .bucket(bucket)
                 .key(s3Key)
                 .contentType(contentType)
+                .contentLength(contentLength)
                 .build()
         val presigned =
             presigner.presignPutObject(
