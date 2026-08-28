@@ -4,9 +4,12 @@ import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
 import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
@@ -447,5 +450,60 @@ class SaveMockControllerTest {
                     .content("""{ "newPlace": { "name": "한판승부", "addressId": "${addressToken()}" } }"""),
             ).andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("SAVE_PLACE_IMMUTABLE"))
+    }
+
+    private fun deleteSave(
+        saveId: String,
+        userId: Long = 1,
+    ) = mockMvc.perform(delete("/v1/saves/$saveId").header(UserIdArgumentResolver.HEADER, userId.toString()))
+
+    @Test
+    fun `임시저장을 버리면 204이고 이어쓰기 목록에서 사라진다`() {
+        postSave("""{ "placeId": "place_1" }""").andExpect(status().isCreated)
+
+        deleteSave("save_1").andExpect(status().isNoContent)
+
+        mockMvc
+            .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items").isEmpty)
+    }
+
+    @Test
+    fun `버린 임시저장의 사진은 STAGED로 돌아가 다시 붙일 수 있다 (M4)`() {
+        val assetId = ownedAsset()
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["$assetId"] }""").andExpect(status().isCreated)
+        assertTrue(attachMedia.isAttached(1))
+
+        deleteSave("save_1").andExpect(status().isNoContent)
+
+        assertFalse(attachMedia.isAttached(1))
+        // 되돌아왔으므로 새 저장에 그대로 붙는다 — MEDIA_ALREADY_ATTACHED가 아니다
+        postSave("""{ "placeId": "place_1", "photoAssetIds": ["$assetId"] }""", idempotencyKey = "key-2")
+            .andExpect(status().isCreated)
+    }
+
+    @Test
+    fun `리뷰가 된 저장은 SAVE_ALREADY_REVIEWED다 — 티켓 회수 규칙을 우회할 수 없다 (R7)`() {
+        ownedAsset()
+        postSave(completeBody).andExpect(status().isCreated)
+
+        deleteSave("save_1")
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("SAVE_ALREADY_REVIEWED"))
+    }
+
+    @Test
+    fun `타인의 저장과 이미 지운 저장은 모두 SAVE_NOT_FOUND다 (S8)`() {
+        postSave("""{ "placeId": "place_1" }""").andExpect(status().isCreated)
+
+        deleteSave("save_1", userId = 2)
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("SAVE_NOT_FOUND"))
+
+        deleteSave("save_1").andExpect(status().isNoContent)
+        deleteSave("save_1")
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("SAVE_NOT_FOUND"))
     }
 }
