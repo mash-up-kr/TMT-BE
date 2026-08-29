@@ -7,7 +7,9 @@ services:
     # 아직 이 경로를 쓴다. HTTPS 경로(caddy)로 완전히 넘어가면 닫는다.
     ports:
       - "8080:8080"
-    mem_limit: 1280m
+    # 물리 메모리보다 작아야 한다 — 크면 도커가 막아주기 전에 호스트가 먼저 마른다.
+    # WAS는 t3.micro(916MiB)다. JVM 예산은 Dockerfile의 JAVA_OPTS와 같이 움직인다 (TMT-259)
+    mem_limit: 850m
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - TZ=Asia/Seoul

@@ -7,8 +7,8 @@ COPY tmt-bootstrap/build/libs/*.jar app.jar
 ENV JAVA_OPTS="-XX:+UseG1GC \
   -XX:+UseContainerSupport \
   -Xms256m -Xmx384m \
-  -XX:ReservedCodeCacheSize=128m \
-  -XX:MaxMetaspaceSize=128m \
+  -XX:ReservedCodeCacheSize=96m \
+  -XX:MaxMetaspaceSize=192m \
   -XX:+HeapDumpOnOutOfMemoryError \
   -XX:+ExitOnOutOfMemoryError \
   -XX:+UseStringDeduplication \
