@@ -356,10 +356,9 @@ class SaveMockController(
         ) : PlaceSelection
     }
 
-    /** 리뷰 성립 판정 (C4) — 사진·동행 태그·좋은 점 태그·별점·본문(공백 제외 1자 이상)을 전부 충족해야 한다. */
+    /** 리뷰 성립 판정 (C4) — 동행 태그·좋은 점 태그·별점·본문(공백 제외 1자 이상)을 전부 충족해야 한다. 사진은 선택이다. */
     private fun satisfiesReviewCriteria(request: SaveRequest): Boolean =
-        request.photoAssetIds.isNotEmpty() &&
-            request.companionTagIds.isNotEmpty() &&
+        request.companionTagIds.isNotEmpty() &&
             request.positivePointTagIds.isNotEmpty() &&
             request.rating != null &&
             !request.content.isNullOrBlank()
