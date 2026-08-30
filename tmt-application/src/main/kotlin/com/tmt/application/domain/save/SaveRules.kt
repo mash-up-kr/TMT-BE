@@ -5,6 +5,9 @@ object SaveRules {
     const val PHOTO_MAX_COUNT = 3
     const val RATING_MIN = 1
     const val RATING_MAX = 5
+
+    /** 별점은 1점 단위다 — review-form-config가 그대로 내려준다. */
+    const val RATING_STEP = 1
     const val CONTENT_MAX_LENGTH = 500
 
     /** 보유 상한 (T6). 상한에 닿으면 리뷰가 성립해도 티켓이 나가지 않는다. */

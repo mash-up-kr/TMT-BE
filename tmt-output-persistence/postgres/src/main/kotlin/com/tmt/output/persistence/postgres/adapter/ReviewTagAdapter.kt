@@ -1,5 +1,6 @@
 package com.tmt.output.persistence.postgres.adapter
 
+import com.tmt.application.port.output.persistence.ReviewTagDefinitionRow
 import com.tmt.application.port.output.persistence.ReviewTagPort
 import com.tmt.application.port.output.persistence.ReviewTagRow
 import com.tmt.output.persistence.postgres.entity.ReviewTagType
@@ -18,4 +19,16 @@ class ReviewTagAdapter(
             .findAllByIdInAndActiveIsTrue(tagIds)
             .map { ReviewTagRow(tagId = it.id, companion = it.tagType == ReviewTagType.COMPANION) }
     }
+
+    @Transactional(readOnly = true)
+    override fun findAllActiveDefinitions(): List<ReviewTagDefinitionRow> =
+        reviewTagDefinitionRepository
+            .findAllByActiveIsTrueOrderByTagTypeAscDisplayOrderAsc()
+            .map {
+                ReviewTagDefinitionRow(
+                    tagId = it.id,
+                    label = it.label,
+                    companion = it.tagType == ReviewTagType.COMPANION,
+                )
+            }
 }

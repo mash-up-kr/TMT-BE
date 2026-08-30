@@ -1,14 +1,21 @@
 package com.tmt.application.domain.save
 
 import com.tmt.application.port.output.persistence.GroupJoinTicketPort
+import com.tmt.application.port.output.persistence.MySaveRow
+import com.tmt.application.port.output.persistence.MySaveRows
 import com.tmt.application.port.output.persistence.PlaceDetailRow
 import com.tmt.application.port.output.persistence.PlacePhotoRow
 import com.tmt.application.port.output.persistence.PlaceQueryPort
 import com.tmt.application.port.output.persistence.PlaceReviewRows
 import com.tmt.application.port.output.persistence.PlaceStatsPort
+import com.tmt.application.port.output.persistence.ReviewTagDefinitionRow
 import com.tmt.application.port.output.persistence.ReviewTagPort
 import com.tmt.application.port.output.persistence.ReviewTagRow
 import com.tmt.application.port.output.persistence.SaveCommandPort
+import com.tmt.application.port.output.persistence.SavePhotoRow
+import com.tmt.application.port.output.persistence.SaveQueryPort
+import com.tmt.application.port.output.persistence.SaveRow
+import com.tmt.application.port.output.persistence.SaveTagRow
 import java.time.Instant
 
 class FakeSaveCommandPort : SaveCommandPort {
@@ -24,6 +31,9 @@ class FakeSaveCommandPort : SaveCommandPort {
     val photos = mutableMapOf<Long, List<Long>>()
     val tags = mutableMapOf<Long, List<String>>()
     val reviews = mutableListOf<Long>()
+    val reviewIdBySave = mutableMapOf<Long, Long>()
+    val deleted = mutableSetOf<Long>()
+    val updatedAt = mutableMapOf<Long, Instant>()
 
     private var nextSaveId = 1L
     private var nextReviewId = 100L
@@ -60,7 +70,100 @@ class FakeSaveCommandPort : SaveCommandPort {
     ): Long {
         val id = nextReviewId++
         reviews += id
+        reviewIdBySave[saveId] = id
         return id
+    }
+
+    override fun updateSave(
+        saveId: Long,
+        rating: Int?,
+        content: String?,
+    ) {
+        val index = saves.indexOfFirst { it.id == saveId }
+        if (index >= 0) saves[index] = saves[index].copy(rating = rating, content = content)
+        updatedAt[saveId] = Instant.now()
+    }
+
+    override fun deletePhotos(saveId: Long) {
+        photos -= saveId
+    }
+
+    override fun deleteTags(saveId: Long) {
+        tags -= saveId
+    }
+
+    override fun softDeleteSave(saveId: Long): Int {
+        if (!deleted.add(saveId)) return 0
+        return 1
+    }
+}
+
+/** 쓰기는 FakeSaveCommandPort가 정본이다 — 읽기는 그 상태를 그대로 비춘다. */
+class FakeSaveQueryPort(
+    private val commandPort: FakeSaveCommandPort,
+) : SaveQueryPort {
+    override fun findSave(saveId: Long): SaveRow? {
+        if (saveId in commandPort.deleted) return null
+        val row = commandPort.saves.firstOrNull { it.id == saveId } ?: return null
+        return SaveRow(
+            saveId = row.id,
+            userId = row.userId,
+            reviewId = commandPort.reviewIdBySave[saveId],
+            rating = row.rating,
+            content = row.content,
+            createdAt = Instant.EPOCH,
+            placeId = row.placeId,
+            placeName = "한판승부",
+            placeRoadAddress = "서울 마포구 도화동 1",
+            placeCategoryId = "cat_korean",
+            aiSummaryPros = null,
+            aiSummaryCons = null,
+        )
+    }
+
+    override fun findSavePhotos(saveId: Long): List<SavePhotoRow> =
+        commandPort.photos[saveId].orEmpty().mapIndexed { index, assetId ->
+            SavePhotoRow(savePhotoId = assetId, s3Key = "photos/$assetId.jpg", photoOrder = index)
+        }
+
+    override fun findSaveTags(saveId: Long): List<SaveTagRow> =
+        commandPort.tags[saveId].orEmpty().map { SaveTagRow(it, "라벨") }
+
+    override fun findPhotoAssetIds(saveId: Long): List<Long> = commandPort.photos[saveId].orEmpty()
+
+    override fun findMySaveRows(
+        userId: Long,
+        afterUpdatedAt: Instant?,
+        afterSaveId: Long?,
+        limit: Int,
+    ): MySaveRows {
+        val ordered =
+            commandPort.saves
+                .filter { it.userId == userId && it.id !in commandPort.deleted }
+                .filter { it.id !in commandPort.reviewIdBySave }
+                .map { it to commandPort.updatedAt.getOrDefault(it.id, Instant.EPOCH.plusSeconds(it.id)) }
+                .sortedWith(
+                    compareByDescending<Pair<FakeSaveCommandPort.Row, Instant>> { it.second }
+                        .thenByDescending { it.first.id },
+                ).filter { (row, updatedAt) ->
+                    afterUpdatedAt == null ||
+                        updatedAt < afterUpdatedAt ||
+                        (updatedAt == afterUpdatedAt && row.id < afterSaveId!!)
+                }
+        return MySaveRows(
+            rows =
+                ordered.take(limit).map { (row, updatedAt) ->
+                    MySaveRow(
+                        saveId = row.id,
+                        placeId = row.placeId,
+                        placeName = "한판승부",
+                        placeRoadAddress = "서울 마포구 도화동 1",
+                        thumbnailS3Key = commandPort.photos[row.id]?.firstOrNull()?.let { "photos/$it.jpg" },
+                        updatedAt = updatedAt,
+                    )
+                },
+            hasNext = ordered.size > limit,
+        )
     }
 }
 
@@ -100,6 +203,10 @@ class FakeReviewTagPort : ReviewTagPort {
         companion -= tagId
         positive -= tagId
     }
+
+    override fun findAllActiveDefinitions(): List<ReviewTagDefinitionRow> =
+        companion.map { ReviewTagDefinitionRow(it, "동행", companion = true) } +
+            positive.map { ReviewTagDefinitionRow(it, "좋은 점", companion = false) }
 
     override fun findActiveTags(tagIds: Collection<String>): List<ReviewTagRow> =
         tagIds.mapNotNull {

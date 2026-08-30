@@ -5,10 +5,8 @@ import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.CreateSaveUseCase
 import com.tmt.application.port.input.SaveResult
-import com.tmt.application.port.output.persistence.GroupJoinTicketPort
 import com.tmt.application.port.output.persistence.PlaceQueryPort
 import com.tmt.application.port.output.persistence.PlaceStatsPort
-import com.tmt.application.port.output.persistence.ReviewTagPort
 import com.tmt.application.port.output.persistence.SaveCommandPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
@@ -27,16 +25,22 @@ import org.springframework.transaction.annotation.Transactional
 class SaveCreationService(
     private val saveCommandPort: SaveCommandPort,
     private val placeQueryPort: PlaceQueryPort,
-    private val reviewTagPort: ReviewTagPort,
+    private val saveWriteSupport: SaveWriteSupport,
     private val attachMediaUseCase: AttachMediaUseCase,
-    private val groupJoinTicketPort: GroupJoinTicketPort,
     private val placeStatsPort: PlaceStatsPort,
     private val eventPublisher: ApplicationEventPublisher,
 ) : CreateSaveUseCase {
     @Transactional
     override fun create(command: CreateSaveCommand): SaveResult {
         if (!placeQueryPort.existsPlace(command.placeId)) throw TmtException(ErrorCode.PLACE_NOT_FOUND)
-        validate(command)
+        saveWriteSupport.validate(
+            userId = command.userId,
+            photoAssetIds = command.photoAssetIds,
+            companionTagIds = command.companionTagIds,
+            positivePointTagIds = command.positivePointTagIds,
+            rating = command.rating,
+            content = command.content,
+        )
 
         val saveId =
             saveCommandPort.insertSave(
@@ -65,12 +69,12 @@ class SaveCreationService(
                 reviewId = null,
                 placeId = command.placeId,
                 grantedCount = 0,
-                availableCount = groupJoinTicketPort.countAvailable(command.userId),
+                availableCount = saveWriteSupport.availableTicketCount(command.userId),
             )
         }
 
         val reviewId = saveCommandPort.insertReview(saveId, command.userId, command.placeId)
-        val granted = tryGrantTicket(command.userId, reviewId)
+        val granted = saveWriteSupport.tryGrantTicket(command.userId, reviewId)
         placeStatsPort.addReview(command.placeId, requireNotNull(command.rating))
         // 커밋 후 비동기로 요약을 당겨 채운다 (TMT-232). 유실분은 주기 배치가 줍는다
         eventPublisher.publishEvent(ReviewCommittedEvent(reviewId = reviewId, placeId = command.placeId))
@@ -80,55 +84,7 @@ class SaveCreationService(
             reviewId = reviewId,
             placeId = command.placeId,
             grantedCount = granted,
-            availableCount = groupJoinTicketPort.countAvailable(command.userId),
+            availableCount = saveWriteSupport.availableTicketCount(command.userId),
         )
-    }
-
-    /** 보유 999장 미만일 때만 발급한다 (T6). 상한이면 리뷰는 성립하고 티켓만 안 나간다. */
-    private fun tryGrantTicket(
-        userId: Long,
-        reviewId: Long,
-    ): Int {
-        if (groupJoinTicketPort.countAvailable(userId) >= SaveRules.TICKET_MAX_AVAILABLE) return 0
-        groupJoinTicketPort.grantForReview(userId, reviewId)
-        return 1
-    }
-
-    private fun validate(command: CreateSaveCommand) {
-        if (command.photoAssetIds.size > SaveRules.PHOTO_MAX_COUNT) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "사진은 최대 ${SaveRules.PHOTO_MAX_COUNT}장입니다.")
-        }
-        // save_photo.media_asset_id UNIQUE가 거부하는 자리를 미리 막는다
-        if (command.photoAssetIds.distinct().size != command.photoAssetIds.size) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "photoAssetIds에 같은 사진이 두 번 들어 있습니다.")
-        }
-        attachMediaUseCase.verifyAttachable(ownerId = command.userId, assetIds = command.photoAssetIds)
-
-        verifyTags(command.companionTagIds, companion = true)
-        verifyTags(command.positivePointTagIds, companion = false)
-
-        command.rating?.let {
-            if (it !in SaveRules.RATING_MIN..SaveRules.RATING_MAX) {
-                throw TmtException(ErrorCode.VALIDATION_FAILED, "rating은 1~5 정수입니다.")
-            }
-        }
-        command.content?.let {
-            if (it.length > SaveRules.CONTENT_MAX_LENGTH) throw TmtException(ErrorCode.REVIEW_CONTENT_TOO_LONG)
-        }
-    }
-
-    /** 분류가 어긋난 태그도 없는 태그와 같게 본다 — 좋은 점 자리에 동행 태그가 들어오면 판정이 깨진다. */
-    private fun verifyTags(
-        tagIds: List<String>,
-        companion: Boolean,
-    ) {
-        if (tagIds.isEmpty()) return
-        val known =
-            reviewTagPort
-                .findActiveTags(tagIds.distinct())
-                .filter { it.companion == companion }
-                .map { it.tagId }
-                .toSet()
-        tagIds.firstOrNull { it !in known }?.let { throw TmtException(ErrorCode.REVIEW_TAG_NOT_FOUND, it) }
     }
 }

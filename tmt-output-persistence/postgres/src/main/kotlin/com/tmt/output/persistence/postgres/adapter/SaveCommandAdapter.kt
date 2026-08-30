@@ -55,6 +55,24 @@ class SaveCommandAdapter(
         saveTagRepository.saveAll(tagIds.map { SaveTagEntity(SaveTagId(saveId = saveId, tagId = it)) })
     }
 
+    override fun updateSave(
+        saveId: Long,
+        rating: Int?,
+        content: String?,
+    ) {
+        saveRepository.updateContent(saveId, rating?.toShort(), content)
+    }
+
+    override fun deletePhotos(saveId: Long) {
+        savePhotoRepository.deleteBySaveId(saveId)
+    }
+
+    override fun deleteTags(saveId: Long) {
+        saveTagRepository.deleteBySaveId(saveId)
+    }
+
+    override fun softDeleteSave(saveId: Long): Int = saveRepository.softDelete(saveId)
+
     override fun insertReview(
         saveId: Long,
         userId: Long,

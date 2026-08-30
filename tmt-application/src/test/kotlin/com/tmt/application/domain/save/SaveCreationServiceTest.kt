@@ -21,14 +21,19 @@ class SaveCreationServiceTest {
     private val ticketPort = FakeGroupJoinTicketPort()
     private val placeStatsPort = FakePlaceStatsPort()
     private val published = mutableListOf<Any>()
+    private val attachMediaUseCase = MediaAttachmentService(mediaAssetPort, baseUrl = "https://media.tmt.example")
 
     private val service =
         SaveCreationService(
             saveCommandPort = saveCommandPort,
             placeQueryPort = placeQueryPort,
-            reviewTagPort = reviewTagPort,
-            attachMediaUseCase = MediaAttachmentService(mediaAssetPort, baseUrl = "https://media.tmt.example"),
-            groupJoinTicketPort = ticketPort,
+            saveWriteSupport =
+                SaveWriteSupport(
+                    reviewTagPort = reviewTagPort,
+                    attachMediaUseCase = attachMediaUseCase,
+                    groupJoinTicketPort = ticketPort,
+                ),
+            attachMediaUseCase = attachMediaUseCase,
             placeStatsPort = placeStatsPort,
             eventPublisher = ApplicationEventPublisher { event -> published += event },
         )
