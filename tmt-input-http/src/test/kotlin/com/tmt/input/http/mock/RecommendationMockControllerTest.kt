@@ -16,7 +16,7 @@ class RecommendationMockControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(RecommendationMockController(saveStore, placeStore, aiSummaryStore))
+            .standaloneSetup(RecommendationMockController(fakeMockMediaUrls(), saveStore, placeStore, aiSummaryStore))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()

@@ -46,6 +46,7 @@ class GroupMembershipMockControllerTest {
         MockMvcBuilders
             .standaloneSetup(
                 GroupMembershipMockController(
+                    fakeMockMediaUrls(),
                     groupStore,
                     saveStore,
                     placeStore,

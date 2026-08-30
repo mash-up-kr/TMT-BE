@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -166,6 +167,27 @@ class SaveMockController(
                 .filter { it.ownerId == userId && it.reviewId == null }
                 .sortedWith(compareByDescending<MockSave> { it.updatedAt }.thenByDescending { it.saveId })
         return MockCursor.paginate(drafts, cursor, limit) { toListItem(it) }
+    }
+
+    @Operation(
+        summary = "임시저장 버리기",
+        description = "`새로 작성하기`가 이전 임시저장을 버린다. 리뷰가 된 저장은 DELETE /v1/reviews/{reviewId}로 지운다 (F·G·I §5-2).",
+    )
+    @ApiErrorCodes(ErrorCode.SAVE_NOT_FOUND, ErrorCode.SAVE_ALREADY_REVIEWED)
+    @DeleteMapping("/{saveId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun deleteSave(
+        @UserId userId: Long,
+        @PathVariable saveId: String,
+    ) {
+        val save = findOwned(saveId, userId)
+        // 리뷰 삭제는 티켓 1장을 회수하고 회수할 게 없으면 삭제를 막는다 (R6·R7).
+        // 이 경로로 지울 수 있으면 그 규칙이 우회된다.
+        if (save.reviewId != null) throw TmtException(ErrorCode.SAVE_ALREADY_REVIEWED)
+
+        // 사진은 지우지 않고 STAGED로 되돌린다 — 미부착 TTL이 정리한다 (M4)
+        detachAssets(save.photoAssetIds)
+        mockSaveStore.delete(saveId)
     }
 
     @Operation(summary = "본인 상세", description = "이어쓰기 재진입과 상세 시트를 모두 이걸로 그린다. 소유자에게만 응답한다 (S8).")
@@ -378,7 +400,7 @@ class SaveMockController(
                     name = place?.name ?: "(삭제된 매장)",
                     roadAddress = place?.roadAddress ?: "",
                 ),
-            thumbnailUrl = save.photoAssetIds.firstOrNull()?.let(::mockMediaUrl),
+            thumbnailUrl = save.photoAssetIds.firstOrNull()?.let(mockMediaUrls::urlOf),
             updatedAt = save.updatedAt.toString(),
         )
     }

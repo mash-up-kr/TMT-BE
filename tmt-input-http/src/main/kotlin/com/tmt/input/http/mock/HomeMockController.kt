@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/v1/home")
 class HomeMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockGroupStore: InMemoryStore<MockGroup>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
@@ -47,7 +48,7 @@ class HomeMockController(
                     HomeResponse.MyGroup(
                         groupId = it.groupId,
                         name = it.name,
-                        imageUrl = it.imageAssetId?.let(::mockMediaUrl),
+                        imageUrl = it.imageAssetId?.let(mockMediaUrls::urlOf),
                     )
                 }
 

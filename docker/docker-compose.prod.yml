@@ -7,7 +7,11 @@ services:
     # 아직 이 경로를 쓴다. HTTPS 경로(caddy)로 완전히 넘어가면 닫는다.
     ports:
       - "8080:8080"
-    mem_limit: 1280m
+    # 물리 메모리 아래여야 한다 — 한도가 물리보다 크면 컨테이너가 한도에 닿기 전에
+    # 호스트가 먼저 말라, 도커가 이 컨테이너만 죽여주지 못하고 커널 OOM 킬러가
+    # 임의의 프로세스(Caddy·SSM 에이전트)를 고른다. WAS는 t3.micro(916MiB)이고
+    # OS·Caddy가 함께 올라가 앱 몫은 750m 안팎이다. JAVA_OPTS와 같이 움직인다 (TMT-259)
+    mem_limit: 750m
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - TZ=Asia/Seoul

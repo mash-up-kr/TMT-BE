@@ -25,8 +25,12 @@ class MockMediaUrls(
             ?: mockMediaUrl(assetId)
 }
 
-/** 부팅 시드 사진의 가짜 CDN 주소 — 실객체가 없는 시드 전용이다. */
-fun mockMediaUrl(assetId: String): String = "https://mock-cdn.tmt.example/$assetId.jpg"
+/**
+ * 부팅 시드 사진의 가짜 CDN 주소 — 실객체가 없는 시드 전용이다.
+ * private으로 닫아 [MockMediaUrls.urlOf]만 거치게 한다 — 바깥에서 직접 부르면 UT2 시드의
+ * 실URL을 건너뛰어 깨진 이미지가 나간다 (TMT-251).
+ */
+private fun mockMediaUrl(assetId: String): String = "https://mock-cdn.tmt.example/$assetId.jpg"
 
 /** 시드 asset → 실제 공개 URL 오버라이드. 부팅 시드에서만 쓰고 런타임 업로드는 등록하지 않는다 (TMT-213). */
 object MockSeedMediaUrls {
