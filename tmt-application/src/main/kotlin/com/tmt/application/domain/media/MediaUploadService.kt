@@ -32,7 +32,7 @@ class MediaUploadService(
         // UUID 키 — 버킷이 공개 읽기라 순번 키면 전량 열거가 가능해진다 (M2, media.tf 주석)
         val s3Key = "review/${UUID.randomUUID()}.$extension"
         val assetId = mediaAssetPort.createStaged(ownerId, s3Key, contentType, contentLength)
-        val presigned = mediaStoragePort.presignPut(s3Key, contentType)
+        val presigned = mediaStoragePort.presignPut(s3Key, contentType, contentLength)
 
         return UploadIntent(assetId = assetId, uploadUrl = presigned.url, expiresAt = presigned.expiresAt)
     }

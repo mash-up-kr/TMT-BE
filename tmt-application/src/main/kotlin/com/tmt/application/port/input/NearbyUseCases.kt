@@ -45,6 +45,8 @@ data class ReviewCardView(
     val placeId: Long,
     val placeName: String,
     val placeRegionName: String,
+    /** 14종 라벨 — 카테고리 매핑 실패 매장은 null이고 FE가 미노출 처리한다 (TMT-240) */
+    val placeCategoryName: String?,
     val placeFavorite: Boolean,
     val createdAt: Instant,
 ) {

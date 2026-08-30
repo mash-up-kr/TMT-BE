@@ -28,10 +28,9 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 /**
- * 가게 상세 실구현 (TMT-229) — mock을 대체한다. 응답 형태·ID 표기는 mock과 같아
- * FE 재생성이 필요 없다. 태그 문자열은 TMT-171과 함께 정리할 때까지 유지한다.
+ * 가게 상세 실구현 (TMT-229). 응답 형태·ID 표기는 mock과 같다.
  */
-@Tag(name = "가게 상세 (mock)", description = "명세 v2 — B §3·§4")
+@Tag(name = "가게 상세", description = "명세 v2 — B §3·§4")
 @RestController
 @RequestMapping("/v1/places/{placeId}")
 class PlaceDetailController(

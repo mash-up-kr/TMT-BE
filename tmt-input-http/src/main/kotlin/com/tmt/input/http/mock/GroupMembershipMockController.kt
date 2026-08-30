@@ -6,6 +6,7 @@ import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -26,6 +27,7 @@ import java.time.Instant
 @RestController
 @RequestMapping("/v1/groups/{groupId}")
 class GroupMembershipMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockGroupStore: InMemoryStore<MockGroup>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
@@ -54,7 +56,7 @@ class GroupMembershipMockController(
                 JoinPreviewResponse.GroupSummary(
                     groupId = group.groupId,
                     name = group.name,
-                    imageUrl = group.imageAssetId?.let(::mockMediaUrl),
+                    imageUrl = group.imageAssetId?.let(mockMediaUrls::urlOf),
                 ),
             availableTicketCount = available,
             requiredTicketCount = REQUIRED_TICKETS,
@@ -98,12 +100,17 @@ class GroupMembershipMockController(
             throw TmtException(ErrorCode.ALREADY_GROUP_MEMBER)
         }
 
-        val sourceReviewId = request.sourceReviewId
-        val sourceReview =
-            sourceReviewId?.let { reviewId ->
-                mockSaveStore.findAll().find { it.reviewId == reviewId && it.ownerId == userId }
-                    ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
-            }
+        // 단수(deprecated)와 복수를 합집합으로 받는다 (TMT-241) — 전건이 내 리뷰여야 공유가 시작된다
+        val sourceReviewIds = (listOfNotNull(request.sourceReviewId) + request.sourceReviewIds.orEmpty()).distinct()
+        val myReviewIds =
+            mockSaveStore
+                .findAll()
+                .filter { it.ownerId == userId }
+                .mapNotNull { it.reviewId }
+                .toSet()
+        if (sourceReviewIds.any { it !in myReviewIds }) {
+            throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
+        }
 
         if (!mockTicketLedger.tryConsume(userId, TicketEntryType.GROUP_JOIN, groupId = groupId)) {
             throw GroupJoinTicketRequiredException(availableCount = mockTicketLedger.availableCount(userId))
@@ -111,13 +118,13 @@ class GroupMembershipMockController(
 
         val joinedAt = Instant.now()
         mockMembershipStore.join(groupId, userId, joinedAt)
-        sourceReview?.let { mockReviewShareStore.add(groupId, userId, it.reviewId!!) }
+        sourceReviewIds.forEach { mockReviewShareStore.add(groupId, userId, it) }
 
         val response =
             JoinResponse(
                 groupId = groupId,
                 joinedAt = joinedAt.toString(),
-                sharedReviewIds = listOfNotNull(sourceReview?.reviewId),
+                sharedReviewIds = sourceReviewIds,
                 ticket =
                     JoinResponse.TicketConsumeSummary(
                         consumedCount = 1,
@@ -176,7 +183,7 @@ class GroupMembershipMockController(
                 ReviewSharesResponse.Item(
                     reviewId = save.reviewId!!,
                     placeName = placeNameOf(save.placeId),
-                    thumbnailUrl = save.photoAssetIds.first().let(::mockMediaUrl),
+                    thumbnailUrl = save.photoAssetIds.first().let(mockMediaUrls::urlOf),
                     contentPreview = save.content.orEmpty(),
                     isShared = save.reviewId in shared,
                     createdAt = save.createdAt.toString(),
@@ -230,7 +237,10 @@ class GroupMembershipMockController(
     private fun placeNameOf(placeId: String): String = mockPlaceStore.findById(placeId)?.name ?: "(삭제된 매장)"
 
     data class JoinRequest(
+        @field:Schema(deprecated = true, description = "단수 공유 — sourceReviewIds로 대체됐다. 둘 다 오면 합집합 (TMT-241)")
         val sourceReviewId: String? = null,
+        @field:Schema(description = "가입과 함께 공유할 내 리뷰 목록 — 가입 화면의 체크박스 복수 선택 (TMT-241)")
+        val sourceReviewIds: List<String>? = null,
     )
 
     data class JoinPreviewResponse(

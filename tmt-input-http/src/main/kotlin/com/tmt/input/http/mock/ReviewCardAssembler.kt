@@ -58,6 +58,7 @@ class ReviewCardAssembler(
                     placeId = save.placeId,
                     name = place?.name ?: "(삭제된 매장)",
                     regionName = place?.regionName ?: "",
+                    categoryName = place?.categoryName,
                     isFavorite = favoriteStore.isFavorite(viewerId, save.placeId),
                 ),
             createdAt = save.createdAt.toString(),

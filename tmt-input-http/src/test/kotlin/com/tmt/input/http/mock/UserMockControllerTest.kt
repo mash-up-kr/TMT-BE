@@ -2,6 +2,7 @@ package com.tmt.input.http.mock
 
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
+import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.Test
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -38,7 +39,8 @@ class UserMockControllerTest {
                     favoriteStore,
                     ticketLedger,
                     GroupAssembler(fakeMockMediaUrls(), saveStore, membershipStore, shareStore),
-                    PlaceCardAssembler(saveStore, favoriteStore),
+                    PlaceCardAssembler(fakeMockMediaUrls(), saveStore, favoriteStore),
+                    fakeMockMediaUrls(),
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -275,8 +277,10 @@ class UserMockControllerTest {
             .andExpect(jsonPath("$.items.length()").value(4))
             // 최신순 — 방금 만든 미완성 저장이 맨 위다
             .andExpect(jsonPath("$.items[0].type").value("SAVE_IN_PROGRESS"))
-            .andExpect(jsonPath("$.items[0].amount").doesNotExist())
+            .andExpect(jsonPath("$.items[0].amount").value(nullValue()))
             .andExpect(jsonPath("$.items[0].saveId").isNotEmpty)
+            // 저장에서 파생한 행의 id — saveId가 이미 save_N이라 접두사를 겹쳐 붙이지 않는다
+            .andExpect(jsonPath("$.items[0].entryId").value("tkh_save_2"))
             .andExpect(jsonPath("$.items[1].type").value("GROUP_JOIN"))
             .andExpect(jsonPath("$.items[1].amount").value(-1))
             .andExpect(jsonPath("$.items[1].group.name").value("성수 커피 탐험대"))

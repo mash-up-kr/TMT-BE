@@ -20,27 +20,9 @@ class MockStoreConfig {
     @Bean
     fun mockAssetStore(): InMemoryStore<MockAsset> = InMemoryStore(idPrefix = "asset")
 
-    /**
-     * 시드 리뷰를 함께 넣는다 — 부팅 직후 피드·가게 상세·검색이 비어 있으면 FE가 화면을
-     * 그려볼 수 없다. 시드 리뷰만 AI 요약을 갖고(A2), 런타임에 작성한 리뷰는 요약이 없다.
-     */
+    /** 리뷰·저장은 전부 UT2 시드가 채운다 (TMT-213) — [MockUt2Seeds]. */
     @Bean
-    fun mockSaveStore(
-        mockReviewIdGenerator: MockReviewIdGenerator,
-        mockAiSummaryStore: MockAiSummaryStore,
-        mockAssetStore: InMemoryStore<MockAsset>,
-    ): InMemoryStore<MockSave> =
-        InMemoryStore<MockSave>(idPrefix = "save").apply {
-            SEED_REVIEWS.forEach { seed ->
-                val asset =
-                    mockAssetStore.create { id ->
-                        MockAsset(assetId = id, ownerId = SEED_USER_ID, contentType = "image/jpeg", attached = true)
-                    }
-                val reviewId = mockReviewIdGenerator.next()
-                create { id -> seed(id, reviewId, asset.assetId) }
-                mockAiSummaryStore.put(reviewId, pros = "분위기가 좋아요", cons = "가격이 좀 나가고 웨이팅이 많아요")
-            }
-        }
+    fun mockSaveStore(): InMemoryStore<MockSave> = InMemoryStore(idPrefix = "save")
 
     @Bean
     fun mockAiSummaryStore(): MockAiSummaryStore = MockAiSummaryStore()
@@ -61,48 +43,45 @@ class MockStoreConfig {
     fun mockUserStore(): MockUserStore = MockUserStore(SEED_USERS)
 
     /**
-     * UT 대상자 계정에 리뷰·가입·찜을 붙인다. 다른 시드 빈이 모두 만들어진 뒤에 실행돼야 해서
+     * UT2 콘텐츠를 붙인다 (TMT-213). 다른 시드 빈이 모두 만들어진 뒤에 실행돼야 해서
      * 스토어를 전부 주입받는 빈으로 둔다 — 반환값은 쓰이지 않고 부팅 시 한 번 도는 것이 전부다.
      */
     @Bean
     fun mockUserSeedApplier(
+        mockPlaceStore: InMemoryStore<MockPlace>,
         mockSaveStore: InMemoryStore<MockSave>,
         mockAssetStore: InMemoryStore<MockAsset>,
         mockGroupStore: InMemoryStore<MockGroup>,
         mockMembershipStore: MockMembershipStore,
         mockReviewShareStore: MockReviewShareStore,
-        mockFavoriteStore: MockFavoriteStore,
         mockAiSummaryStore: MockAiSummaryStore,
         mockReviewIdGenerator: MockReviewIdGenerator,
+        mockTicketLedger: MockTicketLedger,
     ): MockUserSeedApplier {
-        MockUserSeeds.apply(
+        MockUt2Seeds.apply(
+            mockPlaceStore,
             mockSaveStore,
             mockAssetStore,
             mockGroupStore,
             mockMembershipStore,
             mockReviewShareStore,
-            mockFavoriteStore,
             mockAiSummaryStore,
             mockReviewIdGenerator,
+            mockTicketLedger,
         )
         return MockUserSeedApplier
     }
 
     @Bean
     fun placeCardAssembler(
+        mockMediaUrls: MockMediaUrls,
         mockSaveStore: InMemoryStore<MockSave>,
         mockFavoriteStore: MockFavoriteStore,
-    ): PlaceCardAssembler = PlaceCardAssembler(mockSaveStore, mockFavoriteStore)
+    ): PlaceCardAssembler = PlaceCardAssembler(mockMediaUrls, mockSaveStore, mockFavoriteStore)
 
+    /** 그룹은 전부 UT2 시드가 만든다 (TMT-213) — [MockUt2Seeds]. */
     @Bean
-    fun mockGroupStore(mockMembershipStore: MockMembershipStore): InMemoryStore<MockGroup> =
-        InMemoryStore<MockGroup>(idPrefix = "group").apply {
-            SEED_GROUPS.forEach { seed ->
-                val group = create { id -> seed(id) }
-                // 생성자는 자동 가입 (그룹장은 탈퇴 불가 = 멤버)
-                mockMembershipStore.join(group.groupId, group.ownerId, group.createdAt)
-            }
-        }
+    fun mockGroupStore(): InMemoryStore<MockGroup> = InMemoryStore(idPrefix = "group")
 
     @Bean
     fun mockMembershipStore(): MockMembershipStore = MockMembershipStore()
@@ -129,12 +108,9 @@ class MockStoreConfig {
         ReviewCardAssembler(mockMediaUrls, mockPlaceStore, mockFavoriteStore, mockAiSummaryStore, mockUserStore)
 
     companion object {
-        // 시드 데이터의 작성자 — 실제 사용자와 겹치지 않는 가상 ID (그룹 시드의 ownerId와 같다)
-        const val SEED_USER_ID = 999L
-
         /**
          * UT 대상자 계정 4개 — `X-User-Id: 1~4`가 그대로 이 사람들이다.
-         * 각자에게 맞는 그룹·리뷰는 [MockUserSeeds]에서 붙인다. 여기 없는 ID로도 호출은 되지만
+         * 가입 그룹은 [MockUt2Seeds]가 붙인다 — 리뷰는 대상자가 UT에서 직접 쓴다. 여기 없는 ID로도 호출은 되지만
          * 타인 프로필(`GET /v1/users/{userId}`)은 USER_NOT_FOUND다.
          */
         private val SEED_USERS: List<MockUser> =
@@ -143,108 +119,25 @@ class MockStoreConfig {
                 MockUser(2, "매콤한 하루", "tester2@example.com"),
                 MockUser(3, "면요리 연구가", "tester3@example.com"),
                 MockUser(4, "커피 마시는 곰", null),
-                MockUser(SEED_USER_ID, "딸깍 운영자", null),
+                // UT2 콘텐츠(TMT-213)의 persona 작성자들 — 그룹장·리뷰 작성자로 쓰인다
+                MockUser(MockUt2Seeds.PERSONA_OFFICE, "회사원 미식러", null),
+                MockUser(MockUt2Seeds.PERSONA_JAMSIL, "잠실 토박이", null),
+                MockUser(MockUt2Seeds.PERSONA_EXPLORER, "골목 탐험가", null),
             )
 
-        // 부팅 시드 리뷰 (saveId, reviewId, assetId) → 남이 예전에 써둔 완성 리뷰
-        private val SEED_REVIEWS: List<(String, String, String) -> MockSave> =
-            listOf(
-                { id, reviewId, assetId ->
-                    seedReview(
-                        id,
-                        reviewId,
-                        assetId,
-                        placeId = "place_1",
-                        rating = 5,
-                        content = "도우가 얇고 바삭해요. 재방문 의사 있습니다.",
-                    )
-                },
-                { id, reviewId, assetId ->
-                    seedReview(id, reviewId, assetId, placeId = "place_3", rating = 4, content = "육수가 깔끔하고 면이 쫄깃합니다.")
-                },
-                { id, reviewId, assetId ->
-                    seedReview(
-                        id,
-                        reviewId,
-                        assetId,
-                        placeId = "place_6",
-                        rating = 5,
-                        content = "오마카세 구성이 알차고 셰프님이 친절해요.",
-                    )
-                },
-            )
-
-        // 그룹 탐색이 비어 있으면 FE가 목록 화면을 못 그린다 — 시드 그룹 2개 (owner는 가상 사용자 999)
-        private val SEED_GROUPS: List<(String) -> MockGroup> =
-            listOf(
-                { id ->
-                    MockGroup(
-                        groupId = id,
-                        name = "성수 커피 탐험대",
-                        oneLineDescription = "조용히 커피 맛에 집중하는 사람들",
-                        description = "아직 뚫리지 않은 느좋 카페들을 다 모아보고싶어요. 좋은데 있으면 공유합시다.",
-                        imageAssetId = null,
-                        foodCategoryId = "cat_cafe",
-                        regionTagIds = listOf("region_seongdong"),
-                        ownerId = 999,
-                        createdAt = java.time.Instant.parse("2026-08-10T00:00:00Z"),
-                    )
-                },
-                { id ->
-                    MockGroup(
-                        groupId = id,
-                        name = "나는야 초밥왕",
-                        oneLineDescription = "회전 초밥부터 오마카세까지",
-                        description = null,
-                        imageAssetId = null,
-                        foodCategoryId = "cat_japanese",
-                        regionTagIds = listOf("region_seoul_all"),
-                        ownerId = 999,
-                        createdAt = java.time.Instant.parse("2026-08-11T00:00:00Z"),
-                    )
-                },
-            )
-
-        private fun seedReview(
-            saveId: String,
-            reviewId: String,
-            assetId: String,
-            placeId: String,
-            rating: Int,
-            content: String,
-        ): MockSave {
-            val at = java.time.Instant.parse("2026-08-12T09:11:03.412Z")
-            return MockSave(
-                saveId = saveId,
-                ownerId = SEED_USER_ID,
-                placeId = placeId,
-                photoAssetIds = listOf(assetId),
-                companionTagIds = listOf("tag_friend"),
-                positivePointTagIds = listOf("tag_tasty"),
-                rating = rating,
-                content = content,
-                reviewId = reviewId,
-                createdAt = at,
-                updatedAt = at,
-            )
-        }
-
-        // 도그푸딩 시나리오용 시드 — 검색이 비어 있으면 FE가 1단계를 진행할 수 없다
+        /**
+         * UT2 시드가 이름으로 찾아 재사용하는 유일한 매장 (TMT-213, MockUt2Seeds.apply).
+         * 나머지 매장·그룹·리뷰는 UT2 콘텐츠가 대신하므로 걷어냈다 (TMT-248).
+         */
         private val SEED_PLACES: List<(String) -> MockPlace> =
             listOf(
-                { id ->
-                    MockPlace(id, "델리스피자", "서울 마포구 도화동 200-14", "마포구 도화동", "양식", 37.5399, 126.9515, "010 5244 6041")
-                },
-                { id -> MockPlace(id, "오즈 커피", "서울 마포구 도화동 201-1", "마포구 도화동", "카페·디저트", 37.5401, 126.9520) },
-                { id -> MockPlace(id, "서북면옥", "서울 중구 을지로3가 296-1", "중구 을지로3가", "한식", 37.5663, 126.9910) },
-                { id -> MockPlace(id, "을지면옥", "서울 중구 입정동 161", "중구 입정동", "한식", 37.5667, 126.9925) },
                 { id -> MockPlace(id, "한판승부", "서울 은평구 갈현동 403-38", "은평구 갈현동", "고기·구이", 37.6205, 126.9127) },
-                { id -> MockPlace(id, "강남 초밥왕", "서울 강남구 역삼동 812-1", "강남구 역삼동", "일식", 37.4989, 127.0281) },
-                { id -> MockPlace(id, "역전할머니맥주 강남점", "서울 강남구 역삼동 815-3", "강남구 역삼동", "주점", 37.4993, 127.0275) },
-                { id -> MockPlace(id, "마피아 피자", "서울 양천구 신정동 948-1", "양천구 신정동", "양식", 37.5261, 126.8558) },
             )
     }
 }
+
+/** 시드 적용이 부팅 시 한 번 돌았다는 표식 — 빈 그래프에 순서를 주기 위한 것이다. */
+object MockUserSeedApplier
 
 /**
  * 사용자별 보유 티켓과 그 이력. 회원가입 기본 1장(T2), 상한 999장(T6).
@@ -257,6 +150,14 @@ class MockTicketLedger {
     private val sequence = AtomicLong()
 
     fun availableCount(userId: Long): Int = historyOf(userId).sumOf { it.amount }
+
+    /**
+     * 가입 보상 없이 잔고 0으로 시작시킨다 (UT2 임시 — TMT-213).
+     * 이력을 빈 리스트로 미리 채워두면 [historyOf]·[append]가 가입 보상 행을 만들지 않는다.
+     */
+    fun startWithNoTickets(userId: Long) {
+        entries.putIfAbsent(userId, emptyList())
+    }
 
     /** 발급·소비 이력. 미완성 저장(SAVE_IN_PROGRESS)은 저장에서 파생하므로 여기 없다 (T10). */
     fun historyOf(userId: Long): List<MockTicketEntry> = entries.computeIfAbsent(userId) { listOf(signupReward(it)) }

@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/v1/home")
 class HomeMockController(
+    private val mockMediaUrls: MockMediaUrls,
     private val mockGroupStore: InMemoryStore<MockGroup>,
     private val mockSaveStore: InMemoryStore<MockSave>,
     private val mockPlaceStore: InMemoryStore<MockPlace>,
@@ -30,7 +31,10 @@ class HomeMockController(
     private val groupAssembler: GroupAssembler,
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
-    @Operation(summary = "인사·내 그룹·추천 그룹", description = "recommendedGroups는 myGroups가 비었을 때만 채운다 — 추천순(G17) 상위 5개.")
+    @Operation(
+        summary = "인사·내 그룹·추천 그룹",
+        description = "recommendedGroups는 가입 여부와 무관하게 채운다 — 이미 가입한 그룹을 뺀 추천순(G17) 상위 5개.",
+    )
     @GetMapping
     fun home(
         @UserId userId: Long,
@@ -44,21 +48,21 @@ class HomeMockController(
                     HomeResponse.MyGroup(
                         groupId = it.groupId,
                         name = it.name,
-                        imageUrl = it.imageAssetId?.let(::mockMediaUrl),
+                        imageUrl = it.imageAssetId?.let(mockMediaUrls::urlOf),
                     )
                 }
 
+        // 이미 가입한 그룹은 뺀다 — GroupCard에 가입 여부 필드가 없어 FE가 걸러낼 수 없다 (A §2).
+        // 그룹 탐색 목록은 전체를 내리므로 이 제외는 홈 캐러셀에만 적용된다 (G17).
+        val joinedGroupIds = mockMembershipStore.joinedGroups(userId).mapTo(mutableSetOf()) { (groupId, _) -> groupId }
         val recommended =
-            if (myGroups.isEmpty()) {
+            mockGroupStore
+                .findAll()
+                .filterNot { it.groupId in joinedGroupIds }
                 // 탐색의 추천순(G17)과 같은 기준 — 일치 칩이 추천 이유를 그대로 설명한다
-                mockGroupStore
-                    .findAll()
-                    .map { groupAssembler.card(it, userId) }
-                    .sortedWith(GroupAssembler.RECOMMENDED_ORDER)
-                    .take(RECOMMENDED_COUNT)
-            } else {
-                emptyList()
-            }
+                .map { groupAssembler.card(it, userId) }
+                .sortedWith(GroupAssembler.RECOMMENDED_ORDER)
+                .take(RECOMMENDED_COUNT)
 
         return HomeResponse(
             nickname = mockUserStore.authorOf(userId).nickname,

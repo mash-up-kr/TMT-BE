@@ -1,5 +1,6 @@
 package com.tmt.application.domain.review
 
+import com.tmt.application.domain.place.FoodCategories
 import com.tmt.application.port.input.ReviewCardView
 import com.tmt.application.port.output.persistence.ReviewCardLookupPort
 import com.tmt.application.port.output.persistence.ReviewCardRow
@@ -46,6 +47,7 @@ class ReviewCardComposer(
                 placeId = row.placeId,
                 placeName = row.placeName,
                 placeRegionName = row.placeRegionName,
+                placeCategoryName = FoodCategories.labelOf(row.placeCategoryId),
                 placeFavorite = row.favorite,
                 createdAt = row.createdAt,
             )

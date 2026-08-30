@@ -24,18 +24,29 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# 인스턴스가 부팅 시 DB 접속 정보를 SSM Parameter Store에서 직접 읽는다.
-# user_data에 평문으로 박지 않기 위한 것 — user_data는 인스턴스 메타데이터로
+# 인스턴스가 배포 시 앱 설정을 SSM Parameter Store에서 직접 읽는다.
+# user_data나 이미지에 평문으로 박지 않기 위한 것 — user_data는 인스턴스 메타데이터로
 # 조회 가능하므로 시크릿을 넣으면 안 된다.
 #
 # DB 인스턴스는 password만, WAS는 host/name/user까지 읽어야 하므로 경로 단위로 준다.
 # 두 인스턴스가 프로파일을 공유하는 결과로 WAS도 password를 읽을 수 있는데,
 # 어차피 접속하려면 필요한 값이라 분리 실익이 없다.
+#
+# **배포 스크립트가 읽는 경로를 전부 열어야 한다.** 빠지면 `aws ssm get-parameter`가
+# AccessDenied로 끝나고, 명령 치환이라 배포는 성공한 채 .env에 빈 값이 들어간다 —
+# 앱이 기동은 되고 그 기능만 죽는다 (TMT-252). 워크플로의 SSM_*_PREFIX와 같이 움직인다.
 data "aws_iam_policy_document" "db_secret_read" {
   statement {
     actions = ["ssm:GetParameter", "ssm:GetParameters"]
     resources = [
-      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/db/*"
+      # /db/*      DB 접속 정보 (ci-push.yml · cicd-release.yml)
+      # /media/*   미디어 버킷·조회 base URL (TMT-201)
+      # /address/* juso 승인키·addressId 서명키 (TMT-187)
+      # /ai/*      Groq·Gemini 요약 키 (TMT-232) — 키 등록 완료로 이번에 연다
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/db/*",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/media/*",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/address/*",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/ai/*",
     ]
   }
 
