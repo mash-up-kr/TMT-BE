@@ -18,7 +18,6 @@ import com.tmt.input.http.controller.paging.CursorSpec
 import com.tmt.input.http.controller.paging.PageLimit
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -28,12 +27,8 @@ import org.springframework.web.bind.annotation.RestController
  * 근처 탐색 실구현 (TMT-228) — mock을 대체한다. 응답 형태·ID 표기(`rv_`·`place_`·`user_`)는
  * mock과 같아 FE 재생성이 필요 없다. 태그 문자열은 TMT-171(orval 경로가 태그에 묶임)과
  * 함께 정리할 때까지 mock 시절 것을 유지한다.
- *
- * UT2 기간에는 `tmt.mock.place-explore=true`로 내려가 있다 (TMT-250) — mock과 저장소가 갈려
- * `placeId`가 서로 다른 매장을 가리키기 때문이다. 저장·리뷰가 DB로 넘어오면 스위치를 지운다.
  */
 @Tag(name = "근처 탐색 (mock)", description = "명세 v2 — B. 근처 탐색")
-@ConditionalOnProperty(prefix = "tmt.mock", name = ["place-explore"], havingValue = "false", matchIfMissing = true)
 @RestController
 @RequestMapping("/v1/nearby")
 class NearbyController(

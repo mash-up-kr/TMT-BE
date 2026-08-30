@@ -21,8 +21,6 @@ import java.time.Instant
 
 /**
  * 근처 탐색 실구현의 어댑터 계약 — 응답 형태·ID 표기·커서 왕복·필수 파라미터가 mock과 같은지 지킨다.
- * UT2 동안 이 컨트롤러는 `tmt.mock.place-explore=true`로 내려가 있어(TMT-250) 실행되지 않으므로,
- * 스위치를 되돌릴 때 처음 도는 곳이 운영이 되지 않도록 여기서 잡는다.
  */
 class NearbyControllerTest {
     private var lastReviewsRequest: NearbyReviewsRequest? = null
