@@ -33,9 +33,8 @@ jobs:
     permissions:
       contents: read
 
-    # ci-push.yml의 deploy job과 같은 그룹을 쓴다. 두 워크플로가 같은 WAS를
-    # 동시에 재기동하지 않도록 큐에 세운다 — 배포 도중 취소되면 컨테이너가
-    # 어중간한 상태로 남으므로 끊지 않는다.
+    # 릴리즈가 연달아 발행되면 같은 WAS를 동시에 재기동하지 않도록 큐에 세운다 —
+    # 배포 도중 취소되면 컨테이너가 어중간한 상태로 남으므로 끊지 않는다.
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
