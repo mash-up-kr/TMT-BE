@@ -142,8 +142,11 @@ jobs:
           ADDRESS_TOKEN_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/token-secret --with-decryption --query Parameter.Value --output text)
 
           # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
-          # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252)
-          for v in "\$DB_HOST" "\$DB_NAME" "\$DB_USER" "\$DB_PASSWORD" "\$MEDIA_BUCKET" "\$MEDIA_BASE_URL"; do
+          # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252).
+          # 주소 키는 조용히 죽지도 않는다 — 없으면 앱이 기동에 실패하는데, 그때는 이미
+          # 기존 컨테이너를 내린 뒤라 서비스가 함께 내려간다. 여기서 먼저 끊는다 (TMT-191)
+          for v in "\$DB_HOST" "\$DB_NAME" "\$DB_USER" "\$DB_PASSWORD" "\$MEDIA_BUCKET" "\$MEDIA_BASE_URL" \
+                   "\$JUSO_SEARCH_KEY" "\$JUSO_COORD_KEY" "\$ADDRESS_TOKEN_SECRET"; do
             [ -n "\$v" ] && continue
             echo "필수 설정을 SSM에서 읽지 못했다 — 인스턴스 역할의 ssm:GetParameter 범위를 확인하라 (infra/terraform/iam.tf)" >&2
             exit 1
