@@ -3,6 +3,8 @@ package com.tmt.application.domain.save
 import com.tmt.application.port.output.persistence.GroupJoinTicketPort
 import com.tmt.application.port.output.persistence.MySaveRow
 import com.tmt.application.port.output.persistence.MySaveRows
+import com.tmt.application.port.output.persistence.NewPlaceRow
+import com.tmt.application.port.output.persistence.PlaceCommandPort
 import com.tmt.application.port.output.persistence.PlaceDetailRow
 import com.tmt.application.port.output.persistence.PlacePhotoRow
 import com.tmt.application.port.output.persistence.PlaceQueryPort
@@ -92,8 +94,9 @@ class FakeSaveCommandPort : SaveCommandPort {
         tags -= saveId
     }
 
-    override fun softDeleteSave(saveId: Long): Int {
+    override fun deleteSave(saveId: Long): Int {
         if (!deleted.add(saveId)) return 0
+        saves.removeIf { it.id == saveId }
         return 1
     }
 }
@@ -164,6 +167,17 @@ class FakeSaveQueryPort(
                 },
             hasNext = ordered.size > limit,
         )
+    }
+}
+
+class FakePlaceCommandPort : PlaceCommandPort {
+    val inserted = mutableListOf<NewPlaceRow>()
+
+    private var nextPlaceId = 900L
+
+    override fun insertManualPlace(place: NewPlaceRow): Long {
+        inserted += place
+        return nextPlaceId++
     }
 }
 

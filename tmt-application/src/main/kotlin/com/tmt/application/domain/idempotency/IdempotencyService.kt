@@ -20,15 +20,20 @@ class IdempotencyService(
     private val payloadCodec: IdempotencyPayloadCodec,
     private val idempotentRequestTransaction: IdempotentRequestTransaction,
 ) : IdempotentRequestUseCase {
-    override fun <T : Any> execute(
+    override fun <T : Any, P> execute(
         request: IdempotentRequest<T>,
-        businessLogic: () -> T,
+        prepare: () -> P,
+        businessLogic: (P) -> T,
     ): IdempotentResult<T> {
         val fingerprint = payloadCodec.fingerprint(request.payload)
 
         idempotencyPort.find(request.userId, request.endpoint, request.idemKey)?.let {
             return replay(it, fingerprint, request.responseType)
         }
+
+        // 트랜잭션 밖이다 — 외부 I/O가 커넥션을 잡은 채 대기하지 않는다. 재요청은 위에서 끊겨
+        // 여기까지 오지 않으므로 준비 작업도 다시 돌지 않는다
+        val prepared = prepare()
 
         return try {
             val response =
@@ -38,7 +43,7 @@ class IdempotencyService(
                     idemKey = request.idemKey,
                     requestFingerprint = fingerprint,
                     responseStatus = request.successStatus,
-                    businessLogic = businessLogic,
+                    businessLogic = { businessLogic(prepared) },
                 )
             IdempotentResult(response, request.successStatus, replayed = false)
         } catch (e: IdempotencyRaceLostException) {

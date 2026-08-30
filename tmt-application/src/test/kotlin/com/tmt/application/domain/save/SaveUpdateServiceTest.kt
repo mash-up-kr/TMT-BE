@@ -4,6 +4,7 @@ import com.tmt.application.domain.aisummary.ReviewCommittedEvent
 import com.tmt.application.domain.media.FakeMediaAssetPort
 import com.tmt.application.domain.media.MediaAttachmentService
 import com.tmt.application.port.input.CreateSaveCommand
+import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.UpdateSaveCommand
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
@@ -36,6 +37,7 @@ class SaveUpdateServiceTest {
         SaveCreationService(
             saveCommandPort = saveCommandPort,
             placeQueryPort = placeQueryPort,
+            placeCommandPort = FakePlaceCommandPort(),
             saveWriteSupport = writeSupport,
             attachMediaUseCase = attachMediaUseCase,
             placeStatsPort = placeStatsPort,
@@ -63,7 +65,7 @@ class SaveUpdateServiceTest {
             .create(
                 CreateSaveCommand(
                     userId = userId,
-                    placeId = placeId,
+                    place = PlaceSelection.Existing(placeId),
                     photoAssetIds = photoAssetIds,
                     companionTagIds = emptyList(),
                     positivePointTagIds = emptyList(),
@@ -136,7 +138,7 @@ class SaveUpdateServiceTest {
                 .create(
                     CreateSaveCommand(
                         userId = 1,
-                        placeId = 1,
+                        place = PlaceSelection.Existing(1),
                         photoAssetIds = listOf(assetId),
                         companionTagIds = listOf("tag_couple"),
                         positivePointTagIds = listOf("tag_kind"),
@@ -172,15 +174,15 @@ class SaveUpdateServiceTest {
     }
 
     @Test
-    fun `남의 저장은 이어쓸 수도 지울 수도 없다 (S8)`() {
+    fun `남의 저장은 없는 저장과 같게 404다 (S8)`() {
         val saveId = seedDraft(userId = 1)
 
         assertEquals(
-            ErrorCode.FORBIDDEN,
+            ErrorCode.SAVE_NOT_FOUND,
             assertThrows<TmtException> { service.update(updateCommand(saveId = saveId, userId = 2)) }.errorCode,
         )
         assertEquals(
-            ErrorCode.FORBIDDEN,
+            ErrorCode.SAVE_NOT_FOUND,
             assertThrows<TmtException> { service.delete(userId = 2, saveId = saveId) }.errorCode,
         )
     }
@@ -199,14 +201,27 @@ class SaveUpdateServiceTest {
     }
 
     @Test
-    fun `임시저장을 버리면 사진이 풀리고 목록에서 사라진다 (F·G·I §5-2)`() {
+    fun `임시저장을 버리면 행이 사라지고 사진은 STAGED로 돌아간다 (F·G·I §5-2·M4)`() {
         val assetId = mediaAssetPort.seed(ownerId = 1)
         val saveId = seedDraft(photoAssetIds = listOf(assetId))
 
         service.delete(userId = 1, saveId = saveId)
 
         assertNull(saveQueryPort.findSave(saveId))
+        // 사진은 지우지 않는다 — 미부착 TTL이 정리한다
+        assertTrue(mediaAssetPort.exists(assetId))
         assertTrue(!mediaAssetPort.isAttached(assetId))
+    }
+
+    @Test
+    fun `이미 지운 저장을 다시 지워도 404다 (F·G·I §5-2)`() {
+        val saveId = seedDraft()
+        service.delete(userId = 1, saveId = saveId)
+
+        assertEquals(
+            ErrorCode.SAVE_NOT_FOUND,
+            assertThrows<TmtException> { service.delete(userId = 1, saveId = saveId) }.errorCode,
+        )
     }
 
     @Test
@@ -217,7 +232,7 @@ class SaveUpdateServiceTest {
                 .create(
                     CreateSaveCommand(
                         userId = 1,
-                        placeId = 1,
+                        place = PlaceSelection.Existing(1),
                         photoAssetIds = listOf(assetId),
                         companionTagIds = listOf("tag_couple"),
                         positivePointTagIds = listOf("tag_kind"),
