@@ -10,22 +10,19 @@ import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.net.URI
 import java.time.Instant
 
 /**
- * 작성 완료(F §4)·이어쓰기(G §5)·본인 상세(I §6-2).
+ * 이어쓰기(G §5)·본인 상세(I §6-2). 작성 완료(POST)는 실구현으로 옮겼다 (TMT-224 → SaveController).
  * 저장/리뷰 구분은 서버의 완성도 판정(C4)이 하고, 클라이언트는 보내지 않는다 (C7).
  */
 @Tag(name = "저장·리뷰 작성 (mock)", description = "명세 v2 — F. 리뷰 작성 · G. 이어쓰기 · I. 리뷰 상세")
@@ -41,60 +38,6 @@ class SaveMockController(
     private val mockIdempotencyRegistry: MockIdempotencyRegistry,
     private val mockAiSummaryStore: MockAiSummaryStore,
 ) {
-    @Operation(
-        summary = "작성 완료 (신규)",
-        description = "placeId와 newPlace 중 정확히 하나를 보낸다. 완성도 판정(C4)을 충족하면 리뷰와 티켓까지 같은 트랜잭션에서 나간다.",
-    )
-    @ApiErrorCodes(
-        ErrorCode.PLACE_CATEGORY_NOT_FOUND,
-        ErrorCode.REVIEW_TAG_NOT_FOUND,
-        ErrorCode.REVIEW_CONTENT_TOO_LONG,
-        ErrorCode.MEDIA_NOT_OWNED,
-        ErrorCode.PLACE_NOT_FOUND,
-        ErrorCode.ADDRESS_NOT_FOUND,
-        ErrorCode.MEDIA_ALREADY_ATTACHED,
-    )
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    fun createSave(
-        @UserId userId: Long,
-        @IdempotencyKey key: String,
-        @RequestBody request: SaveRequest,
-    ): ResponseEntity<SaveResultResponse> {
-        replayed(userId, ENDPOINT_CREATE, key, request)?.let { return created(it) }
-
-        // 검증을 다 끝낸 뒤에 매장을 만든다 — 먼저 만들면 뒤에서 실패했을 때 리뷰 없는 매장이 남는다
-        val selection = resolvePlaceSelection(request)
-        validate(request, ownerId = userId, existingSave = null)
-        val placeId = materialize(selection)
-
-        val now = Instant.now()
-        val completed = satisfiesReviewCriteria(request)
-        val reviewId = if (completed) mockReviewIdGenerator.next() else null
-        val save =
-            mockSaveStore.create { id ->
-                MockSave(
-                    saveId = id,
-                    ownerId = userId,
-                    placeId = placeId,
-                    photoAssetIds = request.photoAssetIds,
-                    companionTagIds = request.companionTagIds,
-                    positivePointTagIds = request.positivePointTagIds,
-                    rating = request.rating,
-                    content = request.content,
-                    reviewId = reviewId,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            }
-        attachAssets(request.photoAssetIds)
-
-        val granted = if (completed) mockTicketLedger.tryGrant(userId, save.saveId, save.placeId) else 0
-        val result = toResult(save, granted, userId)
-        mockIdempotencyRegistry.register(userId, ENDPOINT_CREATE, key, request.toString(), result)
-        return created(result)
-    }
-
     @Operation(
         summary = "작성 완료 (이어쓰기)",
         description = "전체 교체다. 매장은 바꿀 수 없어 newPlace를 받지 않는다(S6). 서버는 같은 완성도 판정을 다시 돌린다 (C6).",
@@ -296,66 +239,6 @@ class SaveMockController(
         }
     }
 
-    /**
-     * placeId·newPlace 중 하나를 확정한다. 부수 효과가 없다 — 매장 생성은 [materialize]에서만 일어난다.
-     */
-    private fun resolvePlaceSelection(request: SaveRequest): PlaceSelection {
-        val placeId = request.placeId
-        val newPlace = request.newPlace
-        if ((placeId == null) == (newPlace == null)) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "placeId와 newPlace 중 정확히 하나만 있어야 합니다.")
-        }
-        if (placeId != null) {
-            mockPlaceStore.findById(placeId) ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
-            return PlaceSelection.Existing(placeId)
-        }
-        requireNotNull(newPlace)
-
-        val name = newPlace.name.trim()
-        if (name.isEmpty() || name.length > PLACE_NAME_MAX_LENGTH) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 1~${PLACE_NAME_MAX_LENGTH}자여야 합니다.")
-        }
-        val address = MockAddressToken.decode(newPlace.addressId)
-        if (!address.hasCoordinate) {
-            throw TmtException(ErrorCode.ADDRESS_NOT_FOUND, "이 주소의 좌표를 확보하지 못했습니다.")
-        }
-        val categoryName =
-            newPlace.categoryId?.let {
-                ReviewFormRules.FOOD_CATEGORIES[it] ?: throw TmtException(ErrorCode.PLACE_CATEGORY_NOT_FOUND)
-            }
-        return PlaceSelection.New(name, address, categoryName)
-    }
-
-    private fun materialize(selection: PlaceSelection): String =
-        when (selection) {
-            is PlaceSelection.Existing -> selection.placeId
-            is PlaceSelection.New ->
-                mockPlaceStore
-                    .create { id ->
-                        MockPlace(
-                            placeId = id,
-                            name = selection.name,
-                            roadAddress = selection.address.roadAddress,
-                            regionName = selection.address.regionName,
-                            categoryName = selection.categoryName,
-                            latitude = selection.address.latitude,
-                            longitude = selection.address.longitude,
-                        )
-                    }.placeId
-        }
-
-    private sealed interface PlaceSelection {
-        data class Existing(
-            val placeId: String,
-        ) : PlaceSelection
-
-        data class New(
-            val name: String,
-            val address: MockAddress,
-            val categoryName: String?,
-        ) : PlaceSelection
-    }
-
     /** 리뷰 성립 판정 (C4) — 사진·동행 태그·좋은 점 태그·별점·본문(공백 제외 1자 이상)을 전부 충족해야 한다. */
     private fun satisfiesReviewCriteria(request: SaveRequest): Boolean =
         request.photoAssetIds.isNotEmpty() &&
@@ -374,9 +257,6 @@ class SaveMockController(
     /** 실구현 발급 assetId는 숫자 문자열이다. 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
     private fun parseAssetIds(assetIds: Collection<String>): List<Long> =
         assetIds.map { it.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED) }
-
-    private fun created(body: SaveResultResponse): ResponseEntity<SaveResultResponse> =
-        ResponseEntity.created(URI.create("/v1/saves/${body.saveId}")).body(body)
 
     private fun toResult(
         save: MockSave,
@@ -482,12 +362,7 @@ class SaveMockController(
     )
 
     companion object {
-        // place.name VARCHAR(100)
-        private const val PLACE_NAME_MAX_LENGTH = 100
-
         // 멱등 등록부 키의 endpoint 성분 (규약·DB PK가 (user_id, endpoint, idem_key))
-        private const val ENDPOINT_CREATE = "POST /v1/saves"
-
         private fun endpointUpdate(saveId: String) = "PUT /v1/saves/$saveId"
     }
 }
