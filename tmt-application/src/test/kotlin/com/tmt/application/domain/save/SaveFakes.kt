@@ -1,6 +1,8 @@
 package com.tmt.application.domain.save
 
 import com.tmt.application.port.output.persistence.GroupJoinTicketPort
+import com.tmt.application.port.output.persistence.NewPlaceRow
+import com.tmt.application.port.output.persistence.PlaceCommandPort
 import com.tmt.application.port.output.persistence.PlaceDetailRow
 import com.tmt.application.port.output.persistence.PlacePhotoRow
 import com.tmt.application.port.output.persistence.PlaceQueryPort
@@ -61,6 +63,17 @@ class FakeSaveCommandPort : SaveCommandPort {
         val id = nextReviewId++
         reviews += id
         return id
+    }
+}
+
+class FakePlaceCommandPort : PlaceCommandPort {
+    val inserted = mutableListOf<NewPlaceRow>()
+
+    private var nextPlaceId = 900L
+
+    override fun insertManualPlace(place: NewPlaceRow): Long {
+        inserted += place
+        return nextPlaceId++
     }
 }
 

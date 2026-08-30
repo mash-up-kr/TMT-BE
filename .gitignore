@@ -68,3 +68,6 @@ CLAUDE.local.md
 *.p12
 *.jks
 *.keystore
+
+# JVM 힙덤프 — OOM 시 작업 디렉터리에 떨어진다
+*.hprof

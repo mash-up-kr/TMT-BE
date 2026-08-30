@@ -4,6 +4,7 @@ import com.tmt.application.domain.aisummary.ReviewCommittedEvent
 import com.tmt.application.domain.media.FakeMediaAssetPort
 import com.tmt.application.domain.media.MediaAttachmentService
 import com.tmt.application.port.input.CreateSaveCommand
+import com.tmt.application.port.input.PlaceSelection
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.context.ApplicationEventPublisher
+import java.util.UUID
 
 class SaveCreationServiceTest {
     private val saveCommandPort = FakeSaveCommandPort()
@@ -20,12 +22,14 @@ class SaveCreationServiceTest {
     private val mediaAssetPort = FakeMediaAssetPort()
     private val ticketPort = FakeGroupJoinTicketPort()
     private val placeStatsPort = FakePlaceStatsPort()
+    private val placeCommandPort = FakePlaceCommandPort()
     private val published = mutableListOf<Any>()
 
     private val service =
         SaveCreationService(
             saveCommandPort = saveCommandPort,
             placeQueryPort = placeQueryPort,
+            placeCommandPort = placeCommandPort,
             reviewTagPort = reviewTagPort,
             attachMediaUseCase = MediaAttachmentService(mediaAssetPort, baseUrl = "https://media.tmt.example"),
             groupJoinTicketPort = ticketPort,
@@ -36,12 +40,13 @@ class SaveCreationServiceTest {
     private fun command(
         userId: Long = 1,
         placeId: Long = 1,
+        place: PlaceSelection = PlaceSelection.Existing(placeId),
         photoAssetIds: List<Long> = emptyList(),
         companionTagIds: List<String> = emptyList(),
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
-    ) = CreateSaveCommand(userId, placeId, photoAssetIds, companionTagIds, positivePointTagIds, rating, content)
+    ) = CreateSaveCommand(userId, place, photoAssetIds, companionTagIds, positivePointTagIds, rating, content)
 
     private fun completeCommand(userId: Long = 1): CreateSaveCommand {
         val assetId = mediaAssetPort.seed(ownerId = userId)
@@ -223,5 +228,101 @@ class SaveCreationServiceTest {
         service.create(command(companionTagIds = listOf("tag_couple"), positivePointTagIds = listOf("tag_kind")))
 
         assertEquals(listOf("tag_couple", "tag_kind"), saveCommandPort.tags.values.single())
+    }
+
+    private fun newPlace(
+        name: String = "한판승부",
+        regionName: String = "양천구 신정동",
+        categoryId: String? = null,
+    ) = PlaceSelection.New(
+        name = name,
+        roadAddress = "서울특별시 양천구 오목로32길 1",
+        jibunAddress = "서울특별시 양천구 신정동 948-1",
+        regionName = regionName,
+        categoryId = categoryId,
+        latitude = 37.5209,
+        longitude = 126.8641,
+    )
+
+    @Test
+    fun `매장 직접 등록은 Place를 만들고 그 ID로 저장이 붙는다 (P8)`() {
+        val result = service.create(command(place = newPlace(categoryId = "cat_western")))
+
+        val inserted = placeCommandPort.inserted.single()
+        assertEquals("한판승부", inserted.name)
+        assertEquals("cat_western", inserted.categoryId)
+        assertEquals(37.5209, inserted.latitude)
+        assertEquals(result.placeId, saveCommandPort.saves.single().placeId)
+    }
+
+    @Test
+    fun `직접 등록의 external_id는 요청마다 다른 UUID다`() {
+        service.create(command(place = newPlace()))
+        service.create(command(place = newPlace()))
+
+        val ids = placeCommandPort.inserted.map { it.externalId }
+        assertEquals(2, ids.toSet().size)
+        assertTrue(ids.all { runCatching { UUID.fromString(it) }.isSuccess })
+    }
+
+    @Test
+    fun `매장만 지정한 직접 등록도 Place는 생기고 집계는 그대로다 (C1)`() {
+        val result = service.create(command(place = newPlace()))
+
+        assertEquals(1, placeCommandPort.inserted.size)
+        assertNull(result.reviewId)
+        assertTrue(placeStatsPort.added.isEmpty())
+    }
+
+    @Test
+    fun `직접 등록도 완성이면 리뷰·티켓·집계가 함께 나간다 (TX-1)`() {
+        val assetId = mediaAssetPort.seed(ownerId = 1)
+        val result =
+            service.create(
+                command(
+                    place = newPlace(),
+                    photoAssetIds = listOf(assetId),
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "맛있어요",
+                ),
+            )
+
+        assertEquals(1, placeCommandPort.inserted.size)
+        assertEquals(listOf(result.placeId to 5), placeStatsPort.added)
+        assertEquals(1, saveCommandPort.reviews.size)
+        assertEquals(1, result.grantedCount)
+    }
+
+    @Test
+    fun `매장명이 비면 VALIDATION_FAILED고 Place가 생기지 않는다`() {
+        val ex = assertThrows<TmtException> { service.create(command(place = newPlace(name = ""))) }
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.errorCode)
+        assertTrue(placeCommandPort.inserted.isEmpty())
+    }
+
+    @Test
+    fun `매장명 100자 초과는 VALIDATION_FAILED다`() {
+        val ex = assertThrows<TmtException> { service.create(command(place = newPlace(name = "가".repeat(101)))) }
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.errorCode)
+    }
+
+    @Test
+    fun `region_name이 50자를 넘으면 INSERT 전에 끊는다 (F §7)`() {
+        val ex = assertThrows<TmtException> { service.create(command(place = newPlace(regionName = "가".repeat(51)))) }
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.errorCode)
+        assertTrue(placeCommandPort.inserted.isEmpty())
+    }
+
+    @Test
+    fun `목록에 없는 카테고리는 PLACE_CATEGORY_NOT_FOUND다 (E11)`() {
+        val ex = assertThrows<TmtException> { service.create(command(place = newPlace(categoryId = "cat_ghost"))) }
+
+        assertEquals(ErrorCode.PLACE_CATEGORY_NOT_FOUND, ex.errorCode)
+        assertTrue(placeCommandPort.inserted.isEmpty())
     }
 }

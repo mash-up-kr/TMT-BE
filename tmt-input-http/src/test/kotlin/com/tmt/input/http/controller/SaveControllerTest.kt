@@ -7,9 +7,17 @@ import com.tmt.application.domain.idempotency.IdempotencyService
 import com.tmt.application.domain.idempotency.IdempotentRequestTransaction
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.CreateSaveUseCase
+import com.tmt.application.port.input.PlaceSelection
+import com.tmt.application.port.input.ResolveAddressCoordinateUseCase
 import com.tmt.application.port.input.SaveResult
+import com.tmt.application.port.output.address.AddressCandidate
+import com.tmt.application.port.output.address.AddressCoordinateKey
 import com.tmt.application.port.output.persistence.IdempotencyPort
+import com.tmt.application.port.output.persistence.Wgs84Point
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserIdArgumentResolver
+import com.tmt.input.http.controller.address.AddressIdTokenCodec
 import com.tmt.input.http.exception.ExceptionAdvice
 import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,6 +35,22 @@ class SaveControllerTest {
     private val createSaveUseCase = RecordingCreateSaveUseCase()
     private val codec = IdempotencyPayloadCodec()
     private val idempotencyPort = InMemoryIdempotencyPort()
+    private val addressIdTokenCodec = AddressIdTokenCodec(secret = "test-secret")
+    private val coordinateUseCase = FakeCoordinateUseCase()
+
+    private val addressToken =
+        addressIdTokenCodec.encode(
+            AddressCandidate(
+                admCd = "1147010100",
+                rnMgtSn = "114703122009",
+                udrtYn = "0",
+                buldMnnm = "1",
+                buldSlno = "0",
+                roadAddress = "서울특별시 양천구 오목로32길 1",
+                jibunAddress = "서울특별시 양천구 신정동 948-1",
+                regionName = "양천구 신정동",
+            ),
+        )
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
@@ -39,6 +63,8 @@ class SaveControllerTest {
                             codec,
                             IdempotentRequestTransaction(idempotencyPort, codec),
                         ),
+                    addressIdTokenCodec = addressIdTokenCodec,
+                    resolveAddressCoordinateUseCase = coordinateUseCase,
                 ),
             ).setCustomArgumentResolvers(UserIdArgumentResolver(), IdempotencyKeyArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
@@ -117,10 +143,69 @@ class SaveControllerTest {
     }
 
     @Test
-    fun `매장 직접 등록은 아직 받지 않는다 (TMT-193)`() {
-        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "token" } }""")
+    fun `매장 직접 등록은 좌표를 확보해 Place 생성 커맨드로 넘어간다 (P8)`() {
+        postSave(
+            """{ "newPlace": { "name": "  한판승부  ", "addressId": "$addressToken", "categoryId": "cat_western" } }""",
+        ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.placeId").value("place_900"))
+
+        val place = createSaveUseCase.commands.single().place as PlaceSelection.New
+        assertEquals("한판승부", place.name)
+        assertEquals("서울특별시 양천구 오목로32길 1", place.roadAddress)
+        assertEquals("양천구 신정동", place.regionName)
+        assertEquals(37.5209, place.latitude)
+        assertEquals(1, coordinateUseCase.calls.size)
+    }
+
+    @Test
+    fun `placeId와 newPlace를 함께 보내면 VALIDATION_FAILED다`() {
+        postSave("""{ "placeId": "place_1", "newPlace": { "name": "한판승부", "addressId": "$addressToken" } }""")
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+
+        assertEquals(0, coordinateUseCase.calls.size)
+    }
+
+    @Test
+    fun `서명이 어긋난 addressId는 VALIDATION_FAILED다`() {
+        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "$addressToken-tampered" } }""")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+
+        assertEquals(0, coordinateUseCase.calls.size)
+    }
+
+    @Test
+    fun `좌표를 못 얻으면 저장이 시작되지 않는다 (F §4-1)`() {
+        coordinateUseCase.failure = TmtException(ErrorCode.ADDRESS_NOT_FOUND)
+
+        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "$addressToken" } }""")
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("ADDRESS_NOT_FOUND"))
+
+        assertEquals(0, createSaveUseCase.commands.size)
+    }
+
+    @Test
+    fun `좌표 공급자 장애는 502로 나가고 저장이 시작되지 않는다`() {
+        coordinateUseCase.failure = TmtException(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)
+
+        postSave("""{ "newPlace": { "name": "한판승부", "addressId": "$addressToken" } }""")
+            .andExpect(status().isBadGateway)
+            .andExpect(jsonPath("$.code").value("ADDRESS_PROVIDER_UNAVAILABLE"))
+
+        assertEquals(0, createSaveUseCase.commands.size)
+    }
+
+    @Test
+    fun `같은 키 재요청에 Place가 두 번 생기지 않는다`() {
+        val body = """{ "newPlace": { "name": "한판승부", "addressId": "$addressToken" } }"""
+        postSave(body).andExpect(status().isCreated).andExpect(jsonPath("$.placeId").value("place_900"))
+        postSave(body).andExpect(status().isCreated).andExpect(jsonPath("$.placeId").value("place_900"))
+
+        // 재요청은 최초 응답을 재현한다 — 좌표 조회도 Place 생성도 다시 돌지 않는다
+        assertEquals(1, createSaveUseCase.commands.size)
+        assertEquals(1, coordinateUseCase.calls.size)
     }
 
     @Test
@@ -146,10 +231,23 @@ class SaveControllerTest {
             return SaveResult(
                 saveId = commands.size.toLong(),
                 reviewId = if (reviewed) 100L else null,
-                placeId = command.placeId,
+                // 직접 등록이면 새 매장 ID가 나간다 — 어댑터가 INSERT ... RETURNING id로 받는 값이다
+                placeId = (command.place as? PlaceSelection.Existing)?.placeId ?: 900L,
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
             )
+        }
+    }
+
+    /** juso 승인키가 없어 실제 좌표 API는 부르지 않는다 — 포트를 페이크로 세운다. */
+    private class FakeCoordinateUseCase : ResolveAddressCoordinateUseCase {
+        val calls = mutableListOf<AddressCoordinateKey>()
+        var failure: RuntimeException? = null
+
+        override fun resolve(key: AddressCoordinateKey): Wgs84Point {
+            failure?.let { throw it }
+            calls += key
+            return Wgs84Point(latitude = 37.5209, longitude = 126.8641)
         }
     }
 
