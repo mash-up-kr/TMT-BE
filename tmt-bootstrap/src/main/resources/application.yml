@@ -34,6 +34,22 @@ tmt:
       model: gemini-2.5-flash
     batch-size: 100
     backfill-cron: "0 */10 * * * *"
+  address:
+    # 주소 검색 (TMT-187). 페이지 상한 — 외부 호출이 페이지당 1회라 무한 순회를 막는다.
+    # 상한에 닿으면 hasNext=false · truncated=true (F §2-2)
+    max-page: 5
+    juso:
+      # 행안부 도로명주소 승인키. **검색용과 좌표용이 다른 키다** (F §8 juso 1번).
+      # 정본은 SSM /tmt-prod/address/* -> 배포 .env. 키가 없으면 ADDRESS_PROVIDER_UNAVAILABLE로 끊는다
+      search-key: ${JUSO_SEARCH_KEY:}
+      coord-key: ${JUSO_COORD_KEY:}
+      circuit:
+        # 재시도 대신 차단기 — 차단 상태에서 계속 때리면 나빠지기만 한다 (F §2-3)
+        failure-threshold: 5
+        open-seconds: 60
+    token:
+      # addressId 서명 키(HMAC-SHA256). 시크릿이라 커밋하지 않는다 (TMT-191)
+      secret: ${ADDRESS_TOKEN_SECRET:}  # local은 application-local.yml, prod는 필수 (application-prod.yml)
   media:
     # TMT-201 버킷. 정본은 SSM /tmt-prod/media/* — 배포 시 .env로 내려온다 (로컬은 빈 값이면 발급 시점에 실패)
     bucket: ${MEDIA_BUCKET:}

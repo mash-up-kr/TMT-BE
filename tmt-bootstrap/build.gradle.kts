@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":tmt-input-http"))
     implementation(project(":tmt-output-persistence:postgres"))
     implementation(project(":tmt-output-llm"))
+    implementation(project(":tmt-output-address"))
     implementation(project(":tmt-output-storage:s3"))
 
     implementation(libs.bundles.bootstrap)

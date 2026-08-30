@@ -27,6 +27,8 @@ tmt-bootstrap                 ← Spring Boot 진입점, DI 조립 (모든 모�
 │   └── port/output/          ← Output Port 인터페이스
 │
 ├── tmt-output-persistence    ← PostgreSQL JPA + QueryDSL 어댑터
+├── tmt-output-llm            ← 리뷰 요약 LLM 프로바이더 어댑터
+├── tmt-output-address        ← 행안부 juso 주소 검색·좌표 어댑터
 └── tmt-common                ← 공통 예외 (TmtException, ExceptionCode)
 ```
 

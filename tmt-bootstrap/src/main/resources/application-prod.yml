@@ -12,3 +12,10 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+
+tmt:
+  address:
+    token:
+      # 기본값을 두지 않아 누락 시 기동 단계에서 바로 실패한다 — 코드에 박힌 키로
+      # 서명하면 클라이언트가 임의 좌표로 매장을 만들 수 있다 (TMT-191)
+      secret: ${ADDRESS_TOKEN_SECRET}
