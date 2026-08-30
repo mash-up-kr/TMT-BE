@@ -43,11 +43,6 @@ tmt:
     # 작성 중 이탈로 남은 STAGED 사진의 수명 (M4). 넘기면 S3 객체와 행을 함께 걷어낸다
     staged-ttl: P1D
     purge-cron: "0 40 4 * * *"
-  mock:
-    # UT2 한정 (TMT-250). 근처 탐색·가게 상세를 mock으로 되돌린다 — 매장은 DB(141k 적재),
-    # 리뷰·저장은 mock 인메모리라 placeId가 서로 다른 매장을 가리켜 화면이 어긋난다.
-    # 저장·리뷰 실구현(TMT-224·225)이 들어오면 false로 내리고 이 키를 지운다.
-    place-explore: true
   idempotency:
     # 이 기간이 지난 재시도는 멱등 기록이 없어 비즈니스 로직을 다시 탄다.
     ttl: P1D

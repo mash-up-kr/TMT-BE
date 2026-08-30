@@ -24,7 +24,6 @@ import java.time.Instant
 
 /**
  * 가게 상세 실구현의 어댑터 계약 — 응답 형태·ID 표기·찜 멱등이 mock과 같은지 지킨다.
- * UT2 동안 이 컨트롤러는 `tmt.mock.place-explore=true`로 내려가 있다 (TMT-250).
  */
 class PlaceDetailControllerTest {
     private val favorites = mutableSetOf<Pair<Long, Long>>()
