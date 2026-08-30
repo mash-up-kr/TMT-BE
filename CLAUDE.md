@@ -96,7 +96,8 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
   FE 병렬 개발을 위한 인메모리 구현이고(TMT-149), 실구현이 리소스별로 들어오면 **해당 컨트롤러와 빈만 지운다.**
   mock 코드가 `application`·`persistence` 모듈로 새지 않게 전부 `mock` 패키지 안에 가둔다
 - 인증은 카카오 로그인 전까지 `X-User-Id` 헤더 스텁이다. `@UserId Long`은 필수(없으면 401), `@UserId Long?`은 선택
-- mock 기간에는 **main 머지 시 자동 배포**된다 (TMT-155). 정식 규칙인 릴리즈 태그 기반 배포(BRANCHING §5)와 다르며,
-  실구현 전환 시 되돌린다. mock 서버: `https://3-39-38-23.sslip.io/api` (TMT-175, Caddy TLS 종단 — `docker/Caddyfile`)
+- **배포는 릴리즈 태그(vX.Y.Z) 발행 기준이다 — main 머지는 배포하지 않는다.** mock 기간 한정으로 켜 뒀던
+  main 자동 배포(TMT-155)는 UT2 뒤 되돌렸다. mock 서버: `https://3-39-38-23.sslip.io/api` (TMT-175,
+  Caddy TLS 종단 — `docker/Caddyfile`)
 - Jira는 `TMT` 프로젝트(ttalkkak.atlassian.net). 브랜치·PR 제목에 티켓 키가 들어간다
 - 이 문서는 Claude Code가 읽고, `AGENTS.md`는 여기로 향하는 심볼릭 링크다 — 다른 에이전트도 같은 규칙을 본다
