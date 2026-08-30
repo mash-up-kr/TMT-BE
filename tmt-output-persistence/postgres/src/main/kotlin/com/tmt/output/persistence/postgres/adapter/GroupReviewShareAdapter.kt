@@ -24,6 +24,10 @@ class GroupReviewShareAdapter(
         userId: Long,
     ): Int = groupReviewShareRepository.deleteByGroupIdAndUserId(groupId, userId)
 
+    @Transactional(readOnly = true)
+    override fun findSharedGroupIds(reviewId: Long): List<Long> =
+        groupReviewShareRepository.findGroupIdsByReviewId(reviewId)
+
     @Transactional
     override fun unshareByReview(reviewId: Long): Int = groupReviewShareRepository.deleteByReviewId(reviewId)
 }

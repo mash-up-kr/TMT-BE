@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.Instant
 
 interface SaveRepository : JpaRepository<SaveEntity, Long> {
     /** 이어쓰기의 본문·별점 교체. updated_at은 이어쓰기 목록의 정렬 키라 함께 올린다. */
@@ -33,9 +34,22 @@ interface SaveRepository : JpaRepository<SaveEntity, Long> {
     fun deleteRow(
         @Param("saveId") saveId: Long,
     ): Int
+
+    /** 이미 지워진 행의 시각을 덮어쓰지 않게 WHERE에서 막는다 (D6). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE SaveEntity s SET s.deletedAt = :now WHERE s.id = :saveId AND s.deletedAt IS NULL")
+    fun softDelete(
+        @Param("saveId") saveId: Long,
+        @Param("now") now: Instant,
+    ): Int
 }
 
 interface SavePhotoRepository : JpaRepository<SavePhotoEntity, Long> {
+    @Query("SELECT p.mediaAssetId FROM SavePhotoEntity p WHERE p.saveId = :saveId")
+    fun findMediaAssetIds(
+        @Param("saveId") saveId: Long,
+    ): List<Long>
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM SavePhotoEntity p WHERE p.saveId = :saveId")
     fun deleteBySaveId(
