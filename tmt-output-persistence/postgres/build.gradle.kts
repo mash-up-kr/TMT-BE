@@ -9,6 +9,8 @@ dependencies {
     // QueryDSL (Jakarta)
     implementation(variantOf(libs.querydsl.jpa) { classifier("jakarta") })
     kapt(variantOf(libs.querydsl.apt) { classifier("jakarta") })
+
+    testImplementation(libs.bundles.test.containers)
 }
 
 allOpen {
