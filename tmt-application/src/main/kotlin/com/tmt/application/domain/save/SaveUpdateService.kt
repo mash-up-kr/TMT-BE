@@ -104,20 +104,22 @@ class SaveUpdateService(
         findDraft(saveId, userId)
 
         val assetIds = saveQueryPort.findPhotoAssetIds(saveId)
+        // save 행을 지운다 (F·G·I §5-2). V1 FK에 ON DELETE CASCADE가 없어 자식을 먼저 지운다
         saveCommandPort.deletePhotos(saveId)
         saveCommandPort.deleteTags(saveId)
-        saveCommandPort.softDeleteSave(saveId)
+        saveCommandPort.deleteSave(saveId)
         // 사진은 지우지 않고 STAGED로 되돌린다 — 미부착 TTL이 정리한다 (M4)
         attachMediaUseCase.detach(assetIds)
     }
 
-    /** 소유자에게만 응답한다 (S8). */
+    /** 없는 저장과 남의 저장을 구분하지 않는다 — saveId가 순번이라 구분하면 존재 여부가 샌다 (S8). */
     private fun findDraft(
         saveId: Long,
         userId: Long,
     ): SaveRow {
-        val save = saveQueryPort.findSave(saveId) ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
-        if (save.userId != userId) throw TmtException(ErrorCode.FORBIDDEN)
+        val save =
+            saveQueryPort.findSave(saveId)?.takeIf { it.userId == userId }
+                ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
         if (save.reviewId != null) throw TmtException(ErrorCode.SAVE_ALREADY_REVIEWED)
         return save
     }

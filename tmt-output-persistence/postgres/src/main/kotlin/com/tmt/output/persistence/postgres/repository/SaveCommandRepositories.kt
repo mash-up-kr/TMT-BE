@@ -27,16 +27,10 @@ interface SaveRepository : JpaRepository<SaveEntity, Long> {
         @Param("content") content: String?,
     ): Int
 
-    /** 이미 지워진 저장은 시각을 덮어쓰지 않는다 (D6). */
+    /** 임시저장 버리기는 행을 지운다 (F·G·I §5-2). 자식 행은 호출부가 먼저 지운다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-        """
-        UPDATE SaveEntity s
-        SET s.deletedAt = CURRENT_TIMESTAMP, s.updatedAt = CURRENT_TIMESTAMP
-        WHERE s.id = :saveId AND s.deletedAt IS NULL
-        """,
-    )
-    fun softDelete(
+    @Query("DELETE FROM SaveEntity s WHERE s.id = :saveId")
+    fun deleteRow(
         @Param("saveId") saveId: Long,
     ): Int
 }

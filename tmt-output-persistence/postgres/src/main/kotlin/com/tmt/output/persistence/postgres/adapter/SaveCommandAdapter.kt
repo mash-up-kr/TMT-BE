@@ -71,7 +71,7 @@ class SaveCommandAdapter(
         saveTagRepository.deleteBySaveId(saveId)
     }
 
-    override fun softDeleteSave(saveId: Long): Int = saveRepository.softDelete(saveId)
+    override fun deleteSave(saveId: Long): Int = saveRepository.deleteRow(saveId)
 
     override fun insertReview(
         saveId: Long,

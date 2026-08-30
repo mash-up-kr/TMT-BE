@@ -37,11 +37,11 @@ class SaveQueryServiceTest {
     }
 
     @Test
-    fun `남의 저장 조회는 403이다 (S8)`() {
+    fun `남의 저장 조회는 없는 저장과 같게 404다 (S8)`() {
         val saveId = seed(userId = 1)
 
         assertEquals(
-            ErrorCode.FORBIDDEN,
+            ErrorCode.SAVE_NOT_FOUND,
             assertThrows<TmtException> { service.get(userId = 2, saveId = saveId) }.errorCode,
         )
     }

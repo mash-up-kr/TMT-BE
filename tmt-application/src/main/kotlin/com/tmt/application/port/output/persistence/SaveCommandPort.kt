@@ -38,6 +38,9 @@ interface SaveCommandPort {
 
     fun deleteTags(saveId: Long)
 
-    /** 조건부 UPDATE. 이미 지워진 저장이면 0 (D6). */
-    fun softDeleteSave(saveId: Long): Int
+    /**
+     * 임시저장 버리기는 행을 지운다 (F·G·I §5-2). 이미 없으면 0.
+     * V1 스키마의 save_photo·save_tag FK에 ON DELETE CASCADE가 없어 자식은 호출부가 먼저 지운다.
+     */
+    fun deleteSave(saveId: Long): Int
 }

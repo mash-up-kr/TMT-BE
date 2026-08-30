@@ -26,9 +26,10 @@ class SaveQueryService(
         userId: Long,
         saveId: Long,
     ): SaveDetailView {
-        val save = saveQueryPort.findSave(saveId) ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
-        // 소유자에게만 응답한다 (S8)
-        if (save.userId != userId) throw TmtException(ErrorCode.FORBIDDEN)
+        // 없는 저장과 남의 저장을 구분하지 않는다 — 구분하면 존재 여부가 샌다 (S8)
+        val save =
+            saveQueryPort.findSave(saveId)?.takeIf { it.userId == userId }
+                ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
 
         return SaveDetailView(
             saveId = save.saveId,
