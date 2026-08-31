@@ -14,10 +14,8 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
@@ -30,7 +28,6 @@ class GroupMembershipMockController(
     private val mockMediaUrls: MockMediaUrls,
     private val mockGroupStore: InMemoryStore<MockGroup>,
     private val mockSaveStore: InMemoryStore<MockSave>,
-    private val mockPlaceStore: InMemoryStore<MockPlace>,
     private val mockMembershipStore: MockMembershipStore,
     private val mockReviewShareStore: MockReviewShareStore,
     private val mockTicketLedger: MockTicketLedger,
@@ -161,80 +158,8 @@ class GroupMembershipMockController(
         mockReviewShareStore.removeUser(groupId, userId)
     }
 
-    @Operation(summary = "리뷰 공유 목록", description = "내 리뷰 전체를 공유 여부와 함께 내린다 — PUT이 전체 교체라 현재 상태를 전부 알아야 한다.")
-    @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
-    @GetMapping("/review-shares")
-    fun listReviewShares(
-        @UserId userId: Long,
-        @PathVariable groupId: String,
-        @RequestParam(required = false) cursor: String?,
-        @RequestParam(required = false) limit: Int?,
-    ): ReviewSharesResponse {
-        findGroup(groupId)
-        val shared = mockReviewShareStore.userShares(groupId, userId)
-        val myReviews =
-            mockSaveStore
-                .findAll()
-                .filter { it.ownerId == userId && it.reviewId != null }
-                .sortedWith(compareByDescending<MockSave> { it.createdAt }.thenByDescending { it.reviewId })
-
-        val page =
-            MockCursor.paginate(myReviews, cursor, limit) { save ->
-                ReviewSharesResponse.Item(
-                    reviewId = save.reviewId!!,
-                    placeName = placeNameOf(save.placeId),
-                    thumbnailUrl = save.photoAssetIds.first().let(mockMediaUrls::urlOf),
-                    contentPreview = save.content.orEmpty(),
-                    isShared = save.reviewId in shared,
-                    createdAt = save.createdAt.toString(),
-                )
-            }
-        return ReviewSharesResponse(
-            items = page.items,
-            sharedCount = shared.size,
-            nextCursor = page.nextCursor,
-            hasNext = page.hasNext,
-        )
-    }
-
-    @Operation(
-        summary = "리뷰 공유 (전체 교체)",
-        description = "보낸 reviewIds가 이 그룹에 공유된 내 리뷰의 최종 집합이 된다. 멱등이라 Idempotency-Key가 필요 없다.",
-    )
-    @ApiErrorCodes(
-        ErrorCode.GROUP_MEMBERSHIP_REQUIRED,
-        ErrorCode.GROUP_NOT_FOUND,
-        ErrorCode.REVIEW_NOT_FOUND,
-    )
-    @PutMapping("/review-shares")
-    fun replaceReviewShares(
-        @UserId userId: Long,
-        @PathVariable groupId: String,
-        @RequestBody request: ReplaceSharesRequest,
-    ): ReplaceSharesResponse {
-        findGroup(groupId)
-        if (!mockMembershipStore.isMember(groupId, userId)) {
-            throw TmtException(ErrorCode.GROUP_MEMBERSHIP_REQUIRED)
-        }
-        val myReviewIds =
-            mockSaveStore
-                .findAll()
-                .filter { it.ownerId == userId }
-                .mapNotNull { it.reviewId }
-                .toSet()
-        request.reviewIds.firstOrNull { it !in myReviewIds }?.let {
-            throw TmtException(ErrorCode.REVIEW_NOT_FOUND, it)
-        }
-
-        mockReviewShareStore.replace(groupId, userId, request.reviewIds)
-        val shared = mockReviewShareStore.userShares(groupId, userId)
-        return ReplaceSharesResponse(groupId = groupId, sharedReviewIds = shared.toList(), sharedCount = shared.size)
-    }
-
     private fun findGroup(groupId: String): MockGroup =
         mockGroupStore.findById(groupId) ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
-
-    private fun placeNameOf(placeId: String): String = mockPlaceStore.findById(placeId)?.name ?: "(삭제된 매장)"
 
     data class JoinRequest(
         @field:Schema(deprecated = true, description = "단수 공유 — sourceReviewIds로 대체됐다. 둘 다 오면 합집합 (TMT-241)")
@@ -268,32 +193,6 @@ class GroupMembershipMockController(
             val availableCount: Int,
         )
     }
-
-    data class ReviewSharesResponse(
-        val items: List<Item>,
-        val sharedCount: Int,
-        val nextCursor: String?,
-        val hasNext: Boolean,
-    ) {
-        data class Item(
-            val reviewId: String,
-            val placeName: String,
-            val thumbnailUrl: String,
-            val contentPreview: String,
-            val isShared: Boolean,
-            val createdAt: String,
-        )
-    }
-
-    data class ReplaceSharesRequest(
-        val reviewIds: List<String>,
-    )
-
-    data class ReplaceSharesResponse(
-        val groupId: String,
-        val sharedReviewIds: List<String>,
-        val sharedCount: Int,
-    )
 
     companion object {
         private const val REQUIRED_TICKETS = 1

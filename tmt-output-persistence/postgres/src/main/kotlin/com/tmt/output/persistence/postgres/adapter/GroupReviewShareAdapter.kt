@@ -26,4 +26,15 @@ class GroupReviewShareAdapter(
 
     @Transactional
     override fun unshareByReview(reviewId: Long): Int = groupReviewShareRepository.deleteByReviewId(reviewId)
+
+    /** 삭제·삽입 둘 다 멱등이라(NOT IN + ON CONFLICT DO NOTHING) 재시도가 안전하다. */
+    @Transactional
+    override fun replaceUserShares(
+        groupId: Long,
+        userId: Long,
+        reviewIds: List<Long>,
+    ) {
+        groupReviewShareRepository.deleteUserSharesNotIn(groupId, userId, reviewIds.toTypedArray())
+        reviewIds.forEach { groupReviewShareRepository.share(groupId = groupId, reviewId = it, userId = userId) }
+    }
 }

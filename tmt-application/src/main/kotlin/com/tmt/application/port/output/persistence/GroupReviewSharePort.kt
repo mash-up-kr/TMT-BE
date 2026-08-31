@@ -21,4 +21,14 @@ interface GroupReviewSharePort {
 
     /** 리뷰가 삭제되면 공유된 모든 그룹에서 내린다. 내린 건수를 돌려준다. */
     fun unshareByReview(reviewId: Long): Int
+
+    /**
+     * 이 그룹에 대한 그 사용자의 공유를 [reviewIds]로 통째로 맞춘다 (H §3-2, TX-4).
+     * 빠진 것은 해제하고 없는 것은 공유한다 — 부분 갱신이 아니다.
+     */
+    fun replaceUserShares(
+        groupId: Long,
+        userId: Long,
+        reviewIds: List<Long>,
+    )
 }
