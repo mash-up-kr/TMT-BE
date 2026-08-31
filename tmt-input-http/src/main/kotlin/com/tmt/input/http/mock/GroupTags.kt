@@ -1,6 +1,11 @@
 package com.tmt.input.http.mock
 
-/** 그룹 태그 풀 (D_02 §2-1) — 음식 14종(E11) + 지역 26종(서울 전체 + 25개 구, E10). 서버 상수라 페이징하지 않는다. */
+import com.tmt.application.domain.group.GroupTagCatalog
+
+/**
+ * 그룹 태그 풀 (D_02 §2-1) — 정본은 [GroupTagCatalog]다 (TMT-220 실구현).
+ * 남은 mock(그룹 생성·상세 등)이 검증·라벨 변환에 쓰는 동안만 위임 형태로 남는다.
+ */
 object GroupTags {
     data class FoodCategory(
         val categoryId: String,
@@ -12,50 +17,19 @@ object GroupTags {
         val label: String,
     )
 
-    val FOOD_CATEGORIES: List<FoodCategory> =
-        ReviewFormRules.FOOD_CATEGORIES.map { (id, label) ->
-            FoodCategory(
-                id,
-                label,
-            )
-        }
+    val FOOD_CATEGORIES: List<FoodCategory> = GroupTagCatalog.FOOD_CATEGORIES.map { FoodCategory(it.id, it.label) }
 
-    val REGION_TAGS: List<RegionTag> =
-        listOf(
-            RegionTag("region_seoul_all", "서울 전체"),
-            RegionTag("region_gangnam", "강남구"),
-            RegionTag("region_gangdong", "강동구"),
-            RegionTag("region_gangbuk", "강북구"),
-            RegionTag("region_gangseo", "강서구"),
-            RegionTag("region_gwanak", "관악구"),
-            RegionTag("region_gwangjin", "광진구"),
-            RegionTag("region_guro", "구로구"),
-            RegionTag("region_geumcheon", "금천구"),
-            RegionTag("region_nowon", "노원구"),
-            RegionTag("region_dobong", "도봉구"),
-            RegionTag("region_dongdaemun", "동대문구"),
-            RegionTag("region_dongjak", "동작구"),
-            RegionTag("region_mapo", "마포구"),
-            RegionTag("region_seodaemun", "서대문구"),
-            RegionTag("region_seocho", "서초구"),
-            RegionTag("region_seongdong", "성동구"),
-            RegionTag("region_seongbuk", "성북구"),
-            RegionTag("region_songpa", "송파구"),
-            RegionTag("region_yangcheon", "양천구"),
-            RegionTag("region_yeongdeungpo", "영등포구"),
-            RegionTag("region_yongsan", "용산구"),
-            RegionTag("region_eunpyeong", "은평구"),
-            RegionTag("region_jongno", "종로구"),
-            RegionTag("region_jung", "중구"),
-            RegionTag("region_jungnang", "중랑구"),
-        )
+    val REGION_TAGS: List<RegionTag> = GroupTagCatalog.REGION_TAGS.map { RegionTag(it.id, it.label) }
 
-    val FOOD_CATEGORY_IDS = FOOD_CATEGORIES.map { it.categoryId }.toSet()
-    val REGION_TAG_IDS = REGION_TAGS.map { it.regionTagId }.toSet()
+    val FOOD_CATEGORY_IDS = GroupTagCatalog.FOOD_CATEGORY_IDS
+
+    val REGION_TAG_IDS = GroupTagCatalog.REGION_TAG_IDS
 
     private val REGION_LABELS = REGION_TAGS.associateBy({ it.regionTagId }, { it.label })
 
-    fun foodLabelOf(categoryId: String): String = ReviewFormRules.FOOD_CATEGORIES.getValue(categoryId)
+    private val FOOD_LABELS = FOOD_CATEGORIES.associateBy({ it.categoryId }, { it.label })
+
+    fun foodLabelOf(categoryId: String): String = FOOD_LABELS.getValue(categoryId)
 
     fun regionLabelOf(regionTagId: String): String = REGION_LABELS.getValue(regionTagId)
 }

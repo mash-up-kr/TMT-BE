@@ -15,6 +15,8 @@ object PublicIds {
 
     fun user(id: Long) = "user_$id"
 
+    fun group(id: Long) = "group_$id"
+
     fun save(id: Long) = "save_$id"
 
     fun savePhoto(id: Long) = "sp_$id"
