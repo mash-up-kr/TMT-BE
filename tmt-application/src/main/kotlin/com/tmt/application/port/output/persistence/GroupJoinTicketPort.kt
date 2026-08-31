@@ -9,4 +9,7 @@ interface GroupJoinTicketPort {
         userId: Long,
         reviewId: Long,
     )
+
+    /** 가입 보상 1장 (T2). 같은 사용자로 두 번 부르면 UNIQUE 제약이 막는다 (T8). */
+    fun grantForSignup(userId: Long)
 }

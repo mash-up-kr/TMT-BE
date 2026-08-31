@@ -3,6 +3,7 @@ package com.tmt.application.domain.auth
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.output.auth.KakaoAuthPort
 import com.tmt.application.port.output.auth.KakaoProfile
+import com.tmt.application.port.output.persistence.GroupJoinTicketPort
 import com.tmt.application.port.output.persistence.UserAccount
 import com.tmt.application.port.output.persistence.UserAccountPort
 import org.junit.jupiter.api.Test
@@ -13,7 +14,8 @@ import kotlin.test.assertTrue
 class KakaoLoginServiceTest {
     private val authPort = FakeKakaoAuthPort()
     private val userPort = FakeUserAccountPort()
-    private val service = KakaoLoginService(authPort, userPort)
+    private val ticketPort = FakeGroupJoinTicketPort()
+    private val service = KakaoLoginService(authPort, userPort, UserRegistrationService(userPort, ticketPort))
 
     @Test
     fun `처음 온 카카오 계정이면 사용자를 만들고 isNewUser=true다`() {
@@ -25,6 +27,8 @@ class KakaoLoginServiceTest {
         assertEquals("준형이", result.nickname)
         assertEquals("https://img", result.profileImageUrl)
         assertEquals(12345L, userPort.accounts.single().kakaoId)
+        // 가입 보상 티켓 1장 (T2)
+        assertEquals(listOf(userPort.accounts.single().id), ticketPort.signupGrants)
     }
 
     @Test
@@ -84,6 +88,21 @@ class KakaoLoginServiceTest {
     }
 
     private fun command() = KakaoLoginCommand(code = "auth-code", redirectUri = "http://localhost:3000/cb")
+
+    private class FakeGroupJoinTicketPort : GroupJoinTicketPort {
+        val signupGrants = mutableListOf<Long>()
+
+        override fun countAvailable(userId: Long): Int = signupGrants.count { it == userId }
+
+        override fun grantForReview(
+            userId: Long,
+            reviewId: Long,
+        ) = error("이 테스트에서 쓰지 않는다")
+
+        override fun grantForSignup(userId: Long) {
+            signupGrants += userId
+        }
+    }
 
     private class FakeKakaoAuthPort : KakaoAuthPort {
         var profile = KakaoProfile(kakaoId = 1L, nickname = null, profileImageUrl = null)

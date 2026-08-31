@@ -15,12 +15,13 @@ private val logger = KotlinLogging.logger {}
 
 /**
  * 카카오 로그인 (TMT-271) — 인가 코드로 프로필을 확보하고 kakao_id로 사용자를 찾거나 만든다.
- * 세션·토큰 발급은 TMT-272에서 붙는다.
+ * 신규면 가입 처리([UserRegistrationService])를 거친다. 토큰 발급은 컨트롤러 계층 몫이다 (TMT-272).
  */
 @Service
 class KakaoLoginService(
     private val kakaoAuthPort: KakaoAuthPort,
     private val userAccountPort: UserAccountPort,
+    private val userRegistrationService: UserRegistrationService,
 ) : LoginWithKakaoUseCase {
     override fun login(command: KakaoLoginCommand): KakaoLoginResult {
         val profile = kakaoAuthPort.fetchProfile(command.code, command.redirectUri)
@@ -28,7 +29,7 @@ class KakaoLoginService(
         userAccountPort.findByKakaoId(profile.kakaoId)?.let { return it.toResult(isNewUser = false) }
 
         val created =
-            userAccountPort.create(
+            userRegistrationService.register(
                 kakaoId = profile.kakaoId,
                 nickname = normalizeNickname(profile.nickname),
                 profileImageUrl = profile.profileImageUrl,

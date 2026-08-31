@@ -142,6 +142,10 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
     ) {
         counts[userId] = counts.getOrDefault(userId, 0) + 1
     }
+
+    override fun grantForSignup(userId: Long) {
+        counts[userId] = counts.getOrDefault(userId, 0) + 1
+    }
 }
 
 class FakePlaceStatsPort : PlaceStatsPort {

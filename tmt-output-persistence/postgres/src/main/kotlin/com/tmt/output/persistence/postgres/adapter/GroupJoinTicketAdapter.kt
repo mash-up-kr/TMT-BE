@@ -22,13 +22,25 @@ class GroupJoinTicketAdapter(
         userId: Long,
         reviewId: Long,
     ) {
+        grant(userId, RewardSourceType.REVIEW, sourceId = reviewId)
+    }
+
+    override fun grantForSignup(userId: Long) {
+        grant(userId, RewardSourceType.SIGNUP, sourceId = userId)
+    }
+
+    private fun grant(
+        userId: Long,
+        sourceType: RewardSourceType,
+        sourceId: Long,
+    ) {
         val grant =
             rewardGrantRepository.save(
                 RewardGrantEntity(
                     userId = userId,
                     rewardType = RewardType.GROUP_JOIN_TICKET,
-                    sourceType = RewardSourceType.REVIEW,
-                    sourceId = reviewId,
+                    sourceType = sourceType,
+                    sourceId = sourceId,
                 ),
             )
         groupJoinTicketRepository.save(GroupJoinTicketEntity(userId = userId, rewardGrantId = grant.id))
