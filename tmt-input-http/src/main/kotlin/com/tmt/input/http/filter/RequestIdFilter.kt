@@ -4,10 +4,14 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.MDC
+import org.springframework.core.Ordered
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.util.UUID
 
+/** 가장 먼저 걸린다 — 뒤의 필터(인증 등)가 쓰는 requestId를 만들어야 한다 (TMT-272) */
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Component
 class RequestIdFilter : OncePerRequestFilter() {
     override fun doFilterInternal(

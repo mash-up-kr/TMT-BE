@@ -47,8 +47,8 @@ class WebConfigCorsTest {
 
     @Test
     fun `프론트가 붙이는 헤더를 제한하지 않는다`() {
-        assertThat(config.checkHeaders(listOf("Content-Type", "X-User-Id", "Idempotency-Key")))
-            .containsExactly("Content-Type", "X-User-Id", "Idempotency-Key")
+        assertThat(config.checkHeaders(listOf("Content-Type", "Authorization", "Idempotency-Key")))
+            .containsExactly("Content-Type", "Authorization", "Idempotency-Key")
     }
 
     @Test

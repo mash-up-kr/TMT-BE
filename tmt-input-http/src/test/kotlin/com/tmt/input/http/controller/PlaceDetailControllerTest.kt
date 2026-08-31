@@ -88,7 +88,7 @@ class PlaceDetailControllerTest {
     @Test
     fun `상세가 mock과 같은 필드로 나간다`() {
         mockMvc
-            .perform(get("/v1/places/place_5").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/places/place_5").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.placeId").value("place_5"))
             .andExpect(jsonPath("$.name").value("큰집"))
@@ -109,7 +109,7 @@ class PlaceDetailControllerTest {
     @Test
     fun `접두가 어긋난 placeId는 PLACE_NOT_FOUND다`() {
         mockMvc
-            .perform(get("/v1/places/place_abc").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/places/place_abc").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("PLACE_NOT_FOUND"))
     }
@@ -118,18 +118,19 @@ class PlaceDetailControllerTest {
     fun `찜은 두 번 눌러도 200이다 (F2)`() {
         repeat(2) {
             mockMvc
-                .perform(put("/v1/places/place_5/favorite").header(UserIdArgumentResolver.HEADER, "1"))
+                .perform(put("/v1/places/place_5/favorite").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.isFavorite").value(true))
         }
         mockMvc
-            .perform(get("/v1/places/place_5").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/places/place_5").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(jsonPath("$.isFavorite").value(true))
 
         repeat(2) {
             mockMvc
-                .perform(delete("/v1/places/place_5/favorite").header(UserIdArgumentResolver.HEADER, "1"))
-                .andExpect(status().isOk)
+                .perform(
+                    delete("/v1/places/place_5/favorite").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+                ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.isFavorite").value(false))
         }
     }
@@ -147,7 +148,7 @@ class PlaceDetailControllerTest {
 
         val cursor =
             mockMvc
-                .perform(get("/v1/places/place_5/reviews").header(UserIdArgumentResolver.HEADER, "1"))
+                .perform(get("/v1/places/place_5/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.items[0].reviewId").value("rv_7"))
                 .andReturn()
@@ -156,13 +157,19 @@ class PlaceDetailControllerTest {
                 .let { Regex("\"nextCursor\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
 
         mockMvc
-            .perform(get("/v1/places/place_5/reviews?cursor=$cursor").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/places/place_5/reviews?cursor=$cursor",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
         assertEquals(7L, lastReviewsRequest?.after?.reviewId)
 
         mockMvc
-            .perform(get("/v1/places/place_9/reviews?cursor=$cursor").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isBadRequest)
+            .perform(
+                get(
+                    "/v1/places/place_9/reviews?cursor=$cursor",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
@@ -171,7 +178,7 @@ class PlaceDetailControllerTest {
         mockMvc
             .perform(
                 get("/v1/places/place_5/reviews?latitude=37.4857&longitude=126.8887")
-                    .header(UserIdArgumentResolver.HEADER, "1"),
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isOk)
 
         assertEquals(37.4857, lastReviewsRequest?.viewerLatitude)

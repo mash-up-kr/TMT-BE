@@ -94,7 +94,7 @@ class SaveMockControllerTest {
         idempotencyKey: String = "put-1",
     ) = mockMvc.perform(
         put("/v1/saves/$saveId")
-            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, userId)
             .header(IdempotencyKeyArgumentResolver.HEADER, idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
             .content(body),
@@ -195,7 +195,7 @@ class SaveMockControllerTest {
         seedSave(ownerId = 2, updatedAt = Instant.parse("2026-08-28T00:00:00Z"))
 
         mockMvc
-            .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/saves").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
             .andExpect(jsonPath("$.items[0].saveId").value("save_3"))
@@ -209,7 +209,7 @@ class SaveMockControllerTest {
         seedSave()
 
         mockMvc
-            .perform(get("/v1/saves/save_1").header(UserIdArgumentResolver.HEADER, "2"))
+            .perform(get("/v1/saves/save_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("SAVE_NOT_FOUND"))
     }
@@ -222,7 +222,7 @@ class SaveMockControllerTest {
 
         // 요약은 리뷰 커밋 이후 별도로 생성된다 — 작성 직후 조회는 항상 null이다
         mockMvc
-            .perform(get("/v1/saves/save_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/saves/save_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.reviewId").value("review_1"))
             .andExpect(jsonPath("$.aiSummary").doesNotExist())
@@ -236,7 +236,7 @@ class SaveMockControllerTest {
         aiSummaryStore.put("review_1", pros = "분위기가 좋아요", cons = "웨이팅이 많아요")
 
         mockMvc
-            .perform(get("/v1/saves/save_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/saves/save_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.reviewId").value("review_1"))
             .andExpect(jsonPath("$.place.categoryName").value("양식"))

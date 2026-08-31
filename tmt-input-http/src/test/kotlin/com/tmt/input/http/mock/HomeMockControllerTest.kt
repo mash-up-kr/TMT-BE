@@ -63,7 +63,7 @@ class HomeMockControllerTest {
         seedGroup("나는야 초밥왕")
 
         mockMvc
-            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.nickname").value("미식가1"))
             .andExpect(jsonPath("$.myGroups").isEmpty)
@@ -79,7 +79,7 @@ class HomeMockControllerTest {
         membershipStore.join(first.groupId, 1, Instant.parse("2026-08-12T00:00:00Z"))
 
         mockMvc
-            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.myGroups.length()").value(2))
             .andExpect(jsonPath("$.myGroups[0].groupId").value(second.groupId))
@@ -95,7 +95,7 @@ class HomeMockControllerTest {
         membershipStore.join(only.groupId, 1, Instant.parse("2026-08-11T00:00:00Z"))
 
         mockMvc
-            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.recommendedGroups").isEmpty)
     }
@@ -126,10 +126,8 @@ class HomeMockControllerTest {
             .perform(
                 get(
                     "/v1/home/feed",
-                ).header(
-                    UserIdArgumentResolver.HEADER,
-                    "1",
-                ).param("latitude", "37.5399")
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("latitude", "37.5399")
                     .param("longitude", "126.9515"),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
@@ -152,7 +150,7 @@ class HomeMockControllerTest {
         mockMvc
             .perform(
                 get("/v1/home/feed")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("latitude", "37.5399")
                     .param("longitude", "126.9515"),
             ).andExpect(status().isOk)
@@ -167,10 +165,8 @@ class HomeMockControllerTest {
             .perform(
                 get(
                     "/v1/home/feed",
-                ).header(
-                    UserIdArgumentResolver.HEADER,
-                    "1",
-                ).param("latitude", "37.5399")
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("latitude", "37.5399")
                     .param("longitude", "126.9515"),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items").isEmpty)
@@ -188,10 +184,8 @@ class HomeMockControllerTest {
             .perform(
                 get(
                     "/v1/home/feed",
-                ).header(
-                    UserIdArgumentResolver.HEADER,
-                    "1",
-                ).param("latitude", "37.5399")
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("latitude", "37.5399")
                     .param("longitude", "126.9515"),
             ).andExpect(jsonPath("$.items").isEmpty)
     }
@@ -199,7 +193,7 @@ class HomeMockControllerTest {
     @Test
     fun `피드는 좌표가 없으면 VALIDATION_FAILED다 — 근처보기와 같은 규칙`() {
         mockMvc
-            .perform(get("/v1/home/feed").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home/feed").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
