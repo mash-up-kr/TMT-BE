@@ -30,6 +30,12 @@ tmt:
       # 키가 없으면 AUTH_KAKAO_UNAVAILABLE로 끊는다 — juso 키와 같은 방식
       rest-api-key: ${KAKAO_REST_API_KEY:}
       client-secret: ${KAKAO_CLIENT_SECRET:}
+    token:
+      # 세션·토큰 (TMT-272). HS256 서명 키 — 32바이트 이상이어야 한다.
+      # local은 application-local.yml의 개발 기본값, prod는 SSM /tmt-prod/auth/* (application-prod.yml)
+      secret: ${JWT_SECRET:}
+      access-ttl: PT1H
+      refresh-ttl: P30D
   ai-summary:
     # 리뷰 요약 LLM (TMT-232). 키는 SSM /tmt-prod/ai/* -> 배포 .env. 키가 없으면 해당 프로바이더는 건너뛴다
     groq:

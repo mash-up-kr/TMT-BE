@@ -15,3 +15,7 @@ tmt:
     token:
       # 로컬 전용 서명 키. 운영 값은 SSM에서 주입된다 (application-prod.yml)
       secret: ${ADDRESS_TOKEN_SECRET:local-dev-address-token-secret}
+  auth:
+    token:
+      # 로컬 전용 서명 키(32바이트 이상). 운영 값은 SSM에서 주입된다 (application-prod.yml)
+      secret: ${JWT_SECRET:local-dev-jwt-secret-32-bytes-minimum!}
