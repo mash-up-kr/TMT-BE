@@ -19,8 +19,15 @@ object PublicIds {
 
     fun savePhoto(id: Long) = "sp_$id"
 
+    fun group(id: Long) = "group_$id"
+
     /** 접두·형식이 어긋나면 없는 자원과 같다 — 존재 여부를 새지 않게 NOT_FOUND 계열로 던진다. */
     fun parsePlaceId(publicId: String): Long =
         publicId.removePrefix("place_").toLongOrNull()
             ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
+
+    /** 표기(`user_7`)와 숫자(`7`) 둘 다 받는다 — FE가 카드의 `author.userId`를 그대로 경로에 넣는다. */
+    fun parseUserId(publicId: String): Long =
+        publicId.removePrefix("user_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
 }
