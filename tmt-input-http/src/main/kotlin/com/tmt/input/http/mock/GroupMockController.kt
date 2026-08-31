@@ -1,6 +1,5 @@
 package com.tmt.input.http.mock
 
-import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
@@ -8,71 +7,21 @@ import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.net.URI
-import java.time.Instant
 
 @Tag(name = "그룹 (mock)", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
 @RestController
 @RequestMapping("/v1/groups")
 class GroupMockController(
     private val mockGroupStore: InMemoryStore<MockGroup>,
-    private val attachMediaUseCase: AttachMediaUseCase,
     private val mockMembershipStore: MockMembershipStore,
     private val groupAssembler: GroupAssembler,
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
-    @Operation(summary = "그룹 만들기", description = "4단계 입력을 한 번에 보낸다. 요청자가 자동으로 그룹장이 되고 소유권은 이전되지 않는다 (G13).")
-    @ApiErrorCodes(
-        ErrorCode.GROUP_TAG_NOT_FOUND,
-        ErrorCode.MEDIA_NOT_OWNED,
-        ErrorCode.GROUP_NAME_DUPLICATED,
-        ErrorCode.MEDIA_ALREADY_ATTACHED,
-    )
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    fun createGroup(
-        @UserId userId: Long,
-        @RequestBody request: GroupRequest,
-    ): ResponseEntity<GroupAssembler.GroupDetailResponse> {
-        validate(request, requesterId = userId)
-        if (mockGroupStore.findAll().any { it.name == request.name }) {
-            throw TmtException(ErrorCode.GROUP_NAME_DUPLICATED)
-        }
-
-        val group =
-            mockGroupStore.create { id ->
-                MockGroup(
-                    groupId = id,
-                    name = request.name,
-                    oneLineDescription = request.oneLineDescription,
-                    description = request.description,
-                    imageAssetId = request.imageAssetId,
-                    foodCategoryId = request.foodCategoryId,
-                    regionTagIds = request.regionTagIds,
-                    ownerId = userId,
-                    createdAt = Instant.now(),
-                )
-            }
-        // 그룹장은 탈퇴할 수 없다(G11) = 생성자는 멤버다. 자기 그룹 가입에 티켓은 들지 않는다
-        mockMembershipStore.join(group.groupId, userId, group.createdAt)
-        attachImage(newAssetId = group.imageAssetId, previousAssetId = null)
-
-        return ResponseEntity
-            .created(URI.create("/v1/groups/${group.groupId}"))
-            .body(groupAssembler.detail(group, userId))
-    }
-
     @Operation(summary = "그룹 상세")
     @ApiErrorCodes(ErrorCode.GROUP_NOT_FOUND)
     @GetMapping("/{groupId}")
@@ -118,108 +67,8 @@ class GroupMockController(
         )
     }
 
-    @Operation(summary = "그룹 편집", description = "생성자만 호출할 수 있다 (G13). 전체 교체라 바꾸지 않는 필드도 현재 값을 실어 보내야 한다.")
-    @ApiErrorCodes(
-        ErrorCode.GROUP_TAG_NOT_FOUND,
-        ErrorCode.MEDIA_NOT_OWNED,
-        ErrorCode.GROUP_OWNER_REQUIRED,
-        ErrorCode.GROUP_NOT_FOUND,
-        ErrorCode.GROUP_NAME_DUPLICATED,
-        ErrorCode.MEDIA_ALREADY_ATTACHED,
-    )
-    @PutMapping("/{groupId}")
-    fun updateGroup(
-        @UserId userId: Long,
-        @PathVariable groupId: String,
-        @RequestBody request: GroupRequest,
-    ): GroupAssembler.GroupDetailResponse {
-        val group = findGroup(groupId)
-        if (group.ownerId != userId) {
-            throw TmtException(ErrorCode.GROUP_OWNER_REQUIRED)
-        }
-        validate(request, requesterId = userId, currentImageAssetId = group.imageAssetId)
-        if (mockGroupStore.findAll().any { it.name == request.name && it.groupId != groupId }) {
-            throw TmtException(ErrorCode.GROUP_NAME_DUPLICATED)
-        }
-
-        val updated =
-            mockGroupStore.update(groupId) {
-                it.copy(
-                    name = request.name,
-                    oneLineDescription = request.oneLineDescription,
-                    description = request.description,
-                    imageAssetId = request.imageAssetId,
-                    foodCategoryId = request.foodCategoryId,
-                    regionTagIds = request.regionTagIds,
-                )
-            } ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
-        attachImage(newAssetId = updated.imageAssetId, previousAssetId = group.imageAssetId)
-        return groupAssembler.detail(updated, userId)
-    }
-
     private fun findGroup(groupId: String): MockGroup =
         mockGroupStore.findById(groupId) ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
-
-    private fun validate(
-        request: GroupRequest,
-        requesterId: Long,
-        currentImageAssetId: String? = null,
-    ) {
-        if (request.name.isBlank() || request.oneLineDescription.isBlank()) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "name과 oneLineDescription은 필수입니다.")
-        }
-        if (request.regionTagIds.isEmpty()) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "regionTagIds는 최소 1개입니다.")
-        }
-        if ((request.description?.length ?: 0) > DESCRIPTION_MAX_LENGTH) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "description은 최대 ${DESCRIPTION_MAX_LENGTH}자입니다.")
-        }
-        if (request.foodCategoryId !in GroupTags.FOOD_CATEGORY_IDS) {
-            throw TmtException(ErrorCode.GROUP_TAG_NOT_FOUND, request.foodCategoryId)
-        }
-        request.regionTagIds.forEach {
-            if (it !in
-                GroupTags.REGION_TAG_IDS
-            ) {
-                throw TmtException(ErrorCode.GROUP_TAG_NOT_FOUND, it)
-            }
-        }
-        request.imageAssetId?.let { assetId ->
-            attachMediaUseCase.verifyAttachable(
-                ownerId = requesterId,
-                assetIds = listOf(parseAssetId(assetId)),
-                // 이미지를 그대로 둔 편집이면 이미 ATTACHED라 재부착을 허용해야 한다
-                reattachableIds = setOfNotNull(currentImageAssetId?.let(::parseAssetId)),
-            )
-        }
-    }
-
-    /**
-     * 그룹 대표 이미지도 리뷰 사진과 같은 업로드 경로를 쓰므로(M7) 붙일 때 ATTACHED로 전이시켜야
-     * 한다 — STAGED로 남으면 TTL 정리(M4)가 사용 중인 그룹 이미지를 지운다.
-     * 이미지를 교체하면 이전 asset은 STAGED로 되돌려 TTL 정리 대상이 되게 한다.
-     */
-    private fun attachImage(
-        newAssetId: String?,
-        previousAssetId: String?,
-    ) {
-        if (newAssetId == previousAssetId) return
-        previousAssetId?.let { attachMediaUseCase.detach(listOf(parseAssetId(it))) }
-        newAssetId?.let { attachMediaUseCase.attach(listOf(parseAssetId(it))) }
-    }
-
-    /** 실구현 발급 assetId는 숫자 문자열이다. 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
-    private fun parseAssetId(assetId: String): Long =
-        assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
-
-    data class GroupRequest(
-        val name: String,
-        val oneLineDescription: String,
-        val foodCategoryId: String,
-        val regionTagIds: List<String>,
-        val imageAssetId: String? = null,
-        val description: String? = null,
-    )
 
     data class GatedReviewsResponse(
         val items: List<ReviewCardResponse>,
