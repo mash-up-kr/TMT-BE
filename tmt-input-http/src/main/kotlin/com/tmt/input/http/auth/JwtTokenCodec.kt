@@ -32,7 +32,7 @@ enum class TokenUse { ACCESS, REFRESH }
 class JwtTokenCodec(
     @param:Value("\${tmt.auth.token.secret}") secret: String,
     @param:Value("\${tmt.auth.token.access-ttl:PT1H}") private val accessTtl: Duration,
-    @param:Value("\${tmt.auth.token.refresh-ttl:P30D}") private val refreshTtl: Duration,
+    @param:Value("\${tmt.auth.token.refresh-ttl:P7D}") private val refreshTtl: Duration,
 ) {
     // 키가 비면 기동을 막는다 — 코드에 박힌 기본값으로 서명하면 위조 방지가 무의미해진다 (TMT-191과 같은 이유)
     private val key: SecretKey =

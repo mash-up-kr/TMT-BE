@@ -67,6 +67,7 @@ class AuthController(
     fun refreshToken(
         @Valid @RequestBody request: TokenRefreshRequest,
     ): TokenRefreshResponse {
+        // stateless라 서명 검증뿐이다 — 탈퇴·계정 차단이 생기면 여기서 사용자 존재·상태 확인을 추가해야 한다
         val userId = tokenCodec.parseUserId(request.refreshToken, TokenUse.REFRESH)
         val tokens = tokenCodec.issue(userId)
         return TokenRefreshResponse(
