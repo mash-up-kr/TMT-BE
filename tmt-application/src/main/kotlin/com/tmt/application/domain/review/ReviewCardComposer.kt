@@ -1,10 +1,10 @@
 package com.tmt.application.domain.review
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.place.FoodCategories
 import com.tmt.application.port.input.ReviewCardView
 import com.tmt.application.port.output.persistence.ReviewCardLookupPort
 import com.tmt.application.port.output.persistence.ReviewCardRow
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
 /**
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReviewCardComposer(
     private val reviewCardLookupPort: ReviewCardLookupPort,
-    @param:Value("\${tmt.media.base-url:}") private val mediaBaseUrl: String,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) {
     fun compose(rows: List<ReviewCardRow>): List<ReviewCardView> {
         if (rows.isEmpty()) return emptyList()
@@ -54,5 +54,5 @@ class ReviewCardComposer(
         }
     }
 
-    fun mediaUrl(s3Key: String): String = "${mediaBaseUrl.trimEnd('/')}/$s3Key"
+    fun mediaUrl(s3Key: String): String = mediaUrlResolver.urlOf(s3Key)
 }

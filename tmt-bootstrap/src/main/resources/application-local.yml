@@ -15,3 +15,7 @@ tmt:
     token:
       # 로컬 전용 서명 키. 운영 값은 SSM에서 주입된다 (application-prod.yml)
       secret: ${ADDRESS_TOKEN_SECRET:local-dev-address-token-secret}
+  media:
+    # 공개 조회 base URL — 시크릿이 아니다 (버킷은 공개 읽기, TMT-201). MediaUrlResolver가
+    # 빈 값이면 기동을 막으므로 로컬 기본값을 여기 둔다. 업로드(버킷·자격증명)는 별개로 비워둔다
+    base-url: https://ttalkkak-tmt-media.s3.ap-northeast-2.amazonaws.com
