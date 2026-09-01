@@ -46,7 +46,11 @@ class SaveWriteSupport(
             }
         }
         content?.let {
-            if (it.length > SaveRules.CONTENT_MAX_LENGTH) throw TmtException(ErrorCode.REVIEW_CONTENT_TOO_LONG)
+            // 코드포인트로 센다 — String.length는 UTF-16 코드 유닛이라 이모지 한 자가 2로 잡힌다.
+            // 화면 카운터가 세는 글자 수(명세 500자)와 맞추지 않으면 480자에서 거부되는 일이 생긴다
+            if (it.codePointCount(0, it.length) > SaveRules.CONTENT_MAX_LENGTH) {
+                throw TmtException(ErrorCode.REVIEW_CONTENT_TOO_LONG)
+            }
         }
     }
 
