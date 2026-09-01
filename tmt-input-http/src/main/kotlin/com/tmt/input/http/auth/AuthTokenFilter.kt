@@ -17,7 +17,7 @@ import java.time.Instant
 /**
  * `Authorization: Bearer` 액세스 토큰을 검증해 사용자 ID를 요청 속성에 싣는다 (TMT-272).
  * 헤더가 없으면 그냥 통과시킨다 — 필수 여부는 [UserIdArgumentResolver]가 `@UserId` 선언으로 판단한다.
- * 로그인·재발급(`/v1/auth` 하위)은 토큰 없이 접근하는 경로라 검증하지 않는다.
+ * 로그인·재발급만 [PUBLIC_PATHS] 정확 일치로 건너뛴다 — 접두 매칭이면 공개 경로가 소리 없이 늘어난다.
  */
 @Order(AuthTokenFilter.ORDER)
 @Component
@@ -27,7 +27,7 @@ class AuthTokenFilter(
     private val mapper = JsonMapper.builder().build()
 
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
-        request.requestURI.removePrefix(request.contextPath).startsWith(PUBLIC_PATH_PREFIX)
+        request.requestURI.removePrefix(request.contextPath) in PUBLIC_PATHS
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -40,14 +40,14 @@ class AuthTokenFilter(
             return
         }
 
-        val token = header.removePrefix(BEARER_PREFIX)
-        if (token == header) {
+        // auth scheme은 대소문자를 구분하지 않는다 (RFC 7235) — bearer로 보내는 클라이언트도 받는다
+        if (!header.regionMatches(0, BEARER_PREFIX, 0, BEARER_PREFIX.length, ignoreCase = true)) {
             write401(response, ErrorCode.AUTH_TOKEN_INVALID)
             return
         }
         val userId =
             try {
-                tokenCodec.parseUserId(token.trim(), TokenUse.ACCESS)
+                tokenCodec.parseUserId(header.substring(BEARER_PREFIX.length).trim(), TokenUse.ACCESS)
             } catch (e: TmtException) {
                 write401(response, e.errorCode)
                 return
@@ -80,6 +80,8 @@ class AuthTokenFilter(
         /** [RequestIdFilter](HIGHEST_PRECEDENCE) 다음 — 401 본문에 requestId가 실려야 한다 */
         const val ORDER = Int.MIN_VALUE + 10
         private const val BEARER_PREFIX = "Bearer "
-        private const val PUBLIC_PATH_PREFIX = "/v1/auth/"
+
+        /** 토큰 없이 접근하는 경로. 새 공개 경로는 여기에 명시적으로 추가한다 */
+        private val PUBLIC_PATHS = setOf("/v1/auth/login/kakao", "/v1/auth/token/refresh")
     }
 }

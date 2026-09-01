@@ -90,6 +90,30 @@ class AuthTokenFilterTest {
         assertNotNull(chain.request)
     }
 
+    @Test
+    fun `화이트리스트에 없는 auth 하위 경로는 검증한다`() {
+        val request = request(authorization = "Bearer garbage", path = "/v1/auth/logout")
+        val response = MockHttpServletResponse()
+        val chain = MockFilterChain()
+
+        filter.doFilter(request, response, chain)
+
+        assertEquals(401, response.status)
+        assertNull(chain.request)
+    }
+
+    @Test
+    fun `소문자 bearer 스킴도 받는다 - RFC 7235는 대소문자를 구분하지 않는다`() {
+        val request = request(authorization = "bearer ${codec.issue(42L).accessToken}")
+        val response = MockHttpServletResponse()
+        val chain = MockFilterChain()
+
+        filter.doFilter(request, response, chain)
+
+        assertEquals(42L, request.getAttribute(UserIdArgumentResolver.USER_ID_ATTRIBUTE))
+        assertNotNull(chain.request)
+    }
+
     private fun request(
         authorization: String?,
         path: String = "/v1/saves",
