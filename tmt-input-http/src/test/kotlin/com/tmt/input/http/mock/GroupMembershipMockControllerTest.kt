@@ -65,7 +65,7 @@ class GroupMembershipMockControllerTest {
         key: String = "join-1",
     ) = mockMvc.perform(
         post("/v1/groups/${group.groupId}/memberships")
-            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, userId)
             .header(IdempotencyKeyArgumentResolver.HEADER, key)
             .contentType(MediaType.APPLICATION_JSON)
             .apply { body?.let { content(it) } },
@@ -74,8 +74,11 @@ class GroupMembershipMockControllerTest {
     @Test
     fun `가입 팝업 — 티켓이 있으면 joinable이다`() {
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/join-preview").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/groups/${group.groupId}/join-preview",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.group.name").value("성수 커피 탐험대"))
             .andExpect(jsonPath("$.availableTicketCount").value(1))
             .andExpect(jsonPath("$.requiredTicketCount").value(1))
@@ -87,13 +90,19 @@ class GroupMembershipMockControllerTest {
     fun `가입 팝업 — 티켓이 없으면 TICKET_REQUIRED, 이미 가입이면 ALREADY_MEMBER`() {
         ticketLedger.tryConsume(1, TicketEntryType.GROUP_JOIN)
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/join-preview").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(jsonPath("$.joinable").value(false))
+            .perform(
+                get(
+                    "/v1/groups/${group.groupId}/join-preview",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(jsonPath("$.joinable").value(false))
             .andExpect(jsonPath("$.blockedReason").value("TICKET_REQUIRED"))
 
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/join-preview").header(UserIdArgumentResolver.HEADER, "999"))
-            .andExpect(jsonPath("$.blockedReason").value("ALREADY_MEMBER"))
+            .perform(
+                get(
+                    "/v1/groups/${group.groupId}/join-preview",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L),
+            ).andExpect(jsonPath("$.blockedReason").value("ALREADY_MEMBER"))
     }
 
     @Test
@@ -176,8 +185,11 @@ class GroupMembershipMockControllerTest {
         shareStore.replace(group.groupId, 1, listOf("review_1"))
 
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/review-shares").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/groups/${group.groupId}/review-shares",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(2))
             .andExpect(jsonPath("$.sharedCount").value(1))
             .andExpect(jsonPath("$.items[?(@.reviewId == 'review_1')].isShared").value(true))
@@ -194,7 +206,7 @@ class GroupMembershipMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}/review-shares")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{ "reviewIds": ["review_2"] }"""),
             ).andExpect(status().isOk)
@@ -209,7 +221,7 @@ class GroupMembershipMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}/review-shares")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{ "reviewIds": [] }"""),
             ).andExpect(status().isForbidden)
@@ -222,8 +234,11 @@ class GroupMembershipMockControllerTest {
         join(body = """{ "sourceReviewId": "review_1" }""").andExpect(status().isCreated)
 
         mockMvc
-            .perform(delete("/v1/groups/${group.groupId}/memberships/me").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isNoContent)
+            .perform(
+                delete(
+                    "/v1/groups/${group.groupId}/memberships/me",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isNoContent)
 
         assertEquals(false, membershipStore.isMember(group.groupId, 1))
         assertEquals(emptySet<String>(), shareStore.userShares(group.groupId, 1))
@@ -234,8 +249,11 @@ class GroupMembershipMockControllerTest {
     @Test
     fun `그룹장은 탈퇴할 수 없다 (G11)`() {
         mockMvc
-            .perform(delete("/v1/groups/${group.groupId}/memberships/me").header(UserIdArgumentResolver.HEADER, "999"))
-            .andExpect(status().isUnprocessableEntity)
+            .perform(
+                delete(
+                    "/v1/groups/${group.groupId}/memberships/me",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L),
+            ).andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("GROUP_OWNER_CANNOT_LEAVE"))
     }
 }

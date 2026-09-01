@@ -32,15 +32,15 @@ class UserIdArgumentResolverTest {
             .build()
 
     @Test
-    fun `헤더가 있으면 사용자 ID로 해석한다`() {
+    fun `인증 필터가 실은 요청 속성을 사용자 ID로 해석한다`() {
         mockMvc
-            .perform(get("/required").header(UserIdArgumentResolver.HEADER, "42"))
+            .perform(get("/required").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 42L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.userId").value(42))
     }
 
     @Test
-    fun `필수 파라미터인데 헤더가 없으면 401 UNAUTHORIZED다`() {
+    fun `필수 파라미터인데 인증 주체가 없으면 401 UNAUTHORIZED다`() {
         mockMvc
             .perform(get("/required"))
             .andExpect(status().isUnauthorized)
@@ -48,7 +48,7 @@ class UserIdArgumentResolverTest {
     }
 
     @Test
-    fun `선택 파라미터는 헤더가 없으면 null이다`() {
+    fun `선택 파라미터는 인증 주체가 없으면 null이다`() {
         mockMvc
             .perform(get("/optional"))
             .andExpect(status().isOk)
@@ -56,10 +56,10 @@ class UserIdArgumentResolverTest {
     }
 
     @Test
-    fun `헤더가 숫자가 아니면 400 VALIDATION_FAILED다`() {
+    fun `X-User-Id 헤더는 더 이상 해석하지 않는다`() {
         mockMvc
-            .perform(get("/required").header(UserIdArgumentResolver.HEADER, "abc"))
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+            .perform(get("/required").header("X-User-Id", "42"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
     }
 }

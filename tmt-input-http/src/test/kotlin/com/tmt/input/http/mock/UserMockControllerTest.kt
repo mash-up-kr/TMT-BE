@@ -93,7 +93,7 @@ class UserMockControllerTest {
         favoriteStore.add(1, place.placeId)
 
         mockMvc
-            .perform(get("/v1/users/me").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/users/me").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.userId").value("user_1"))
             .andExpect(jsonPath("$.nickname").value("조용한 미식가"))
@@ -131,7 +131,7 @@ class UserMockControllerTest {
         }
 
         mockMvc
-            .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(1))
             .andExpect(jsonPath("$.items[0].saveId").isNotEmpty)
@@ -226,7 +226,7 @@ class UserMockControllerTest {
         membershipStore.join(first.groupId, 1, Instant.parse("2026-08-10T00:00:00Z"))
 
         mockMvc
-            .perform(get("/v1/users/me/groups").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/users/me/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].name").value("먼저 가입"))
             .andExpect(jsonPath("$.items[1].name").value("나중 가입"))
@@ -240,7 +240,7 @@ class UserMockControllerTest {
         favoriteStore.add(1, recent.placeId, Instant.parse("2026-08-20T00:00:00Z"))
 
         mockMvc
-            .perform(get("/v1/users/me/favorites").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/users/me/favorites").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].name").value("오즈 커피"))
             .andExpect(jsonPath("$.items[0].isFavorite").value(true))
@@ -271,7 +271,7 @@ class UserMockControllerTest {
         }
 
         mockMvc
-            .perform(get("/v1/users/me/tickets").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/users/me/tickets").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.availableCount").value(1))
             .andExpect(jsonPath("$.items.length()").value(4))

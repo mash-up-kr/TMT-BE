@@ -5,6 +5,7 @@ import io.swagger.v3.core.converter.ModelConverters
 import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Info
+import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springdoc.core.customizers.OperationCustomizer
@@ -27,8 +28,15 @@ class OpenApiConfiguration {
                 .url("http://localhost:8080/api")
                 .description("Local")
 
+        // 로그인 응답의 accessToken을 Authorize 버튼에 넣으면 @UserId 엔드포인트를 호출할 수 있다 (TMT-272)
+        val bearerAuth =
+            SecurityScheme()
+                .type(SecurityScheme.Type.HTTP)
+                .scheme("bearer")
+                .bearerFormat("JWT")
+
         return OpenAPI()
-            .components(Components())
+            .components(Components().addSecuritySchemes(UserIdSecurityCustomizer.SECURITY_SCHEME, bearerAuth))
             .info(info)
             .servers(listOf(local))
     }
@@ -41,7 +49,7 @@ class OpenApiConfiguration {
     fun errorResponses(): OperationCustomizer = ErrorResponseCustomizer()
 
     @Bean
-    fun userIdHeader(): OperationCustomizer = UserIdHeaderCustomizer()
+    fun userIdSecurity(): OperationCustomizer = UserIdSecurityCustomizer()
 
     @Bean
     fun idempotencyKeyHeader(): OperationCustomizer = IdempotencyKeyHeaderCustomizer()

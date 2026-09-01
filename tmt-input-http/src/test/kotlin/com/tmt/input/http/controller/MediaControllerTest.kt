@@ -56,7 +56,7 @@ class MediaControllerTest {
 
     private fun request(body: String) =
         post("/v1/media/upload-intents")
-            .header(UserIdArgumentResolver.HEADER, "1")
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
             .contentType(MediaType.APPLICATION_JSON)
             .content(body)
 

@@ -51,7 +51,7 @@ class ReviewMockControllerTest {
             .andExpect(jsonPath("$.isMine").value(false))
 
         mockMvc
-            .perform(get("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/reviews/review_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(jsonPath("$.isMine").value(true))
     }
 
@@ -76,7 +76,7 @@ class ReviewMockControllerTest {
         assertEquals(1, ticketLedger.availableCount(1))
 
         mockMvc
-            .perform(delete("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/reviews/review_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isNoContent)
 
         assertNull(saveStore.findById("save_1"))
@@ -90,7 +90,7 @@ class ReviewMockControllerTest {
         ticketLedger.tryConsume(1, TicketEntryType.GROUP_JOIN) // 잔고 0으로
 
         mockMvc
-            .perform(delete("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/reviews/review_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("REVIEW_DELETE_TICKET_REQUIRED"))
             .andExpect(jsonPath("$.title").value("리뷰를 삭제하려면 티켓 1장이 필요합니다."))
@@ -104,7 +104,7 @@ class ReviewMockControllerTest {
         MockFixtures.review(saveStore, place.placeId, ownerId = 7, reviewId = "review_1")
 
         mockMvc
-            .perform(delete("/v1/reviews/review_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/reviews/review_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("REVIEW_NOT_FOUND"))
     }

@@ -76,7 +76,7 @@ class SaveControllerTest {
         idempotencyKey: String? = "key-1",
     ) = mockMvc.perform(
         post("/v1/saves")
-            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, userId)
             .apply { idempotencyKey?.let { header(IdempotencyKeyArgumentResolver.HEADER, it) } }
             .contentType(MediaType.APPLICATION_JSON)
             .content(body),

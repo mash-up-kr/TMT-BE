@@ -43,10 +43,12 @@ data "aws_iam_policy_document" "db_secret_read" {
       # /media/*   미디어 버킷·조회 base URL (TMT-201)
       # /address/* juso 승인키·addressId 서명키 (TMT-187)
       # /ai/*      Groq·Gemini 요약 키 (TMT-232) — 키 등록 완료로 이번에 연다
+      # /auth/*    카카오 로그인 키·JWT 서명 키 (TMT-271·TMT-272)
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/db/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/media/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/address/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/ai/*",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/auth/*",
     ]
   }
 

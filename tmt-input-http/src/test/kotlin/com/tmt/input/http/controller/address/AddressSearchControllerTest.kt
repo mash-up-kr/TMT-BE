@@ -121,7 +121,8 @@ class AddressSearchControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
-    private fun search(query: String) = get("/v1/addresses/search").header("X-User-Id", "1").param("query", query)
+    private fun search(query: String) =
+        get("/v1/addresses/search").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L).param("query", query)
 
     private class StubSearchAddressesUseCase : SearchAddressesUseCase {
         val calls = mutableListOf<AddressSearchRequest>()

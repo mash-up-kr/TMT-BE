@@ -81,7 +81,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody),
             ).andExpect(status().isCreated)
@@ -102,7 +102,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody),
             ).andExpect(status().isConflict)
@@ -114,7 +114,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.replace("""["region_seoul_all"]""", "[]")),
             ).andExpect(status().isBadRequest)
@@ -126,7 +126,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.replace("cat_japanese", "cat_ghost")),
             ).andExpect(status().isBadRequest)
@@ -140,7 +140,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 get("/v1/groups/name-availability")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("name", "성수 커피 탐험대"),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.available").value(false))
@@ -148,7 +148,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 get("/v1/groups/name-availability")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("name", "새 그룹"),
             ).andExpect(jsonPath("$.available").value(true))
     }
@@ -203,7 +203,7 @@ class GroupMockControllerTest {
         }
 
         mockMvc
-            .perform(get("/v1/groups").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].groupId").value(sushi.groupId))
             .andExpect(jsonPath("$.items[0].matchedSavedPlaceCount").value(1))
@@ -221,8 +221,11 @@ class GroupMockControllerTest {
 
         // 미가입 (user 1) — 개수 제한이 없고 커서도 회원과 같게 채운다
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/reviews?limit=3").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get(
+                    "/v1/groups/${group.groupId}/reviews?limit=3",
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items.length()").value(3))
             .andExpect(jsonPath("$.gate.gated").value(true))
             .andExpect(jsonPath("$.gate.reason").value("MEMBERSHIP_REQUIRED"))
@@ -231,8 +234,9 @@ class GroupMockControllerTest {
 
         // 가입자 (owner 999)
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "999"))
-            .andExpect(jsonPath("$.items.length()").value(5))
+            .perform(
+                get("/v1/groups/${group.groupId}/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L),
+            ).andExpect(jsonPath("$.items.length()").value(5))
             .andExpect(jsonPath("$.gate.gated").value(false))
             .andExpect(jsonPath("$.gate.reason").value(nullValue()))
     }
@@ -247,8 +251,9 @@ class GroupMockControllerTest {
 
         // 미가입 — content는 null이고 길이만 남는다
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups/${group.groupId}/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].content").value(nullValue()))
             .andExpect(jsonPath("$.items[0].contentLength").value(4))
             .andExpect(jsonPath("$.items[0].aiSummary.cons").value(nullValue()))
@@ -258,8 +263,9 @@ class GroupMockControllerTest {
 
         // 가입자 — 그대로 보이고 contentLength는 같은 값이다
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "999"))
-            .andExpect(jsonPath("$.items[0].content").value("맛있어요"))
+            .perform(
+                get("/v1/groups/${group.groupId}/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L),
+            ).andExpect(jsonPath("$.items[0].content").value("맛있어요"))
             .andExpect(jsonPath("$.items[0].contentLength").value(4))
             .andExpect(jsonPath("$.items[0].aiSummary.cons").value("웨이팅이 길어요"))
     }
@@ -288,8 +294,9 @@ class GroupMockControllerTest {
         shareStore.add(group.groupId, 999, review.reviewId!!)
 
         mockMvc
-            .perform(get("/v1/groups/${group.groupId}/reviews").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups/${group.groupId}/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].contentLength").value(7))
     }
 
@@ -300,7 +307,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody),
             ).andExpect(status().isForbidden)
@@ -309,7 +316,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
-                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody),
             ).andExpect(status().isOk)
@@ -323,7 +330,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "$assetId" }"""),
             ).andExpect(status().isCreated)
@@ -339,7 +346,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "43" }"""),
             ).andExpect(status().isForbidden)
@@ -351,7 +358,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "asset_1" }"""),
             ).andExpect(status().isForbidden)
@@ -366,7 +373,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "44" }"""),
             ).andExpect(status().isConflict)
@@ -384,7 +391,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
-                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "46" }"""),
             ).andExpect(status().isOk)
@@ -404,7 +411,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
-                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody),
             ).andExpect(status().isOk)
@@ -424,7 +431,7 @@ class GroupMockControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/${group.groupId}")
-                    .header(UserIdArgumentResolver.HEADER, "999")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 999L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(createBody.dropLast(1) + ""","imageAssetId": "47" }"""),
             ).andExpect(status().isOk)

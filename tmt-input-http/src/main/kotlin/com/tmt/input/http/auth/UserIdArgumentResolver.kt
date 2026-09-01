@@ -5,12 +5,14 @@ import com.tmt.common.exception.TmtException
 import org.springframework.core.MethodParameter
 import org.springframework.web.bind.support.WebDataBinderFactory
 import org.springframework.web.context.request.NativeWebRequest
+import org.springframework.web.context.request.RequestAttributes
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.method.support.ModelAndViewContainer
 
 /**
- * 카카오 로그인 도입 전까지 쓰는 인증 스텁 — X-User-Id 헤더 값을 사용자 ID로 신뢰한다.
- * 실인증이 들어오면 이 리졸버의 해석부만 토큰 검증으로 교체하고 컨트롤러는 그대로 둔다.
+ * `@UserId`를 인증 주체로 해석한다 — [AuthTokenFilter]가 검증한 토큰의 사용자 ID를
+ * 요청 속성에서 읽는다 (TMT-272). X-User-Id 헤더 스텁(TMT-150)은 제거됐다.
+ * `@UserId Long`(필수)인데 속성이 없으면 401, `@UserId Long?`(선택)이면 null이다.
  */
 class UserIdArgumentResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean =
@@ -22,19 +24,13 @@ class UserIdArgumentResolver : HandlerMethodArgumentResolver {
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
     ): Long? {
-        val raw =
-            webRequest.getHeader(HEADER)
-                ?: return if (parameter.isOptional) {
-                    null
-                } else {
-                    throw TmtException(ErrorCode.UNAUTHORIZED)
-                }
-
-        return raw.toLongOrNull()
-            ?: throw TmtException(ErrorCode.VALIDATION_FAILED, "$HEADER 헤더는 숫자여야 합니다.")
+        val userId = webRequest.getAttribute(USER_ID_ATTRIBUTE, RequestAttributes.SCOPE_REQUEST) as? Long
+        if (userId == null && !parameter.isOptional) throw TmtException(ErrorCode.UNAUTHORIZED)
+        return userId
     }
 
     companion object {
-        const val HEADER = "X-User-Id"
+        /** [AuthTokenFilter]가 검증 후 싣는다 */
+        const val USER_ID_ATTRIBUTE = "tmt.auth.userId"
     }
 }

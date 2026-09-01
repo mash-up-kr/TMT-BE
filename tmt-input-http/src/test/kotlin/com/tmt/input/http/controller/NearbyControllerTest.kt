@@ -60,7 +60,7 @@ class NearbyControllerTest {
             .perform(
                 get(
                     "/v1/nearby/reviews?latitude=37.4857&longitude=126.8887",
-                ).header(UserIdArgumentResolver.HEADER, "1"),
+                ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_7"))
             .andExpect(jsonPath("$.items[0].author.userId").value("user_901"))
@@ -75,7 +75,7 @@ class NearbyControllerTest {
     @Test
     fun `좌표가 없으면 400이다`() {
         mockMvc
-            .perform(get("/v1/nearby/reviews").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/nearby/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
@@ -89,7 +89,7 @@ class NearbyControllerTest {
                 .perform(
                     get(
                         "/v1/nearby/reviews?latitude=37.4857&longitude=126.8887",
-                    ).header(UserIdArgumentResolver.HEADER, "1"),
+                    ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
                 ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn()
@@ -100,7 +100,7 @@ class NearbyControllerTest {
         mockMvc
             .perform(
                 get("/v1/nearby/reviews?latitude=37.4857&longitude=126.8887&cursor=$cursor")
-                    .header(UserIdArgumentResolver.HEADER, "1"),
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isOk)
 
         assertEquals(120, lastReviewsRequest?.after?.distanceMeters)
@@ -115,7 +115,7 @@ class NearbyControllerTest {
                 .perform(
                     get(
                         "/v1/nearby/reviews?latitude=37.4857&longitude=126.8887",
-                    ).header(UserIdArgumentResolver.HEADER, "1"),
+                    ).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
                 ).andReturn()
                 .response
                 .contentAsString
@@ -124,7 +124,7 @@ class NearbyControllerTest {
         mockMvc
             .perform(
                 get("/v1/nearby/reviews?latitude=37.5000&longitude=126.9000&cursor=$cursor")
-                    .header(UserIdArgumentResolver.HEADER, "1"),
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
