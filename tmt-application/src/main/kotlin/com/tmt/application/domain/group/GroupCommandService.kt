@@ -75,10 +75,19 @@ class GroupCommandService(
         if (command.name.isBlank() || command.oneLineDescription.isBlank()) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "name과 oneLineDescription은 필수입니다.")
         }
+        // 상한은 컬럼 폭(V1: name 50·one_line 100)이다. 여기서 안 막으면 INSERT가
+        // DataIntegrityViolationException으로 실패해 "이미 있는 그룹명"으로 잘못 나간다 (PR #80 리뷰).
+        // 코드 포인트 기준 — DB char_length와 같은 단위라 이모지가 든 이름에서 어긋나지 않는다
+        if (command.name.codePointCount() > NAME_MAX_LENGTH) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 최대 ${NAME_MAX_LENGTH}자입니다.")
+        }
+        if (command.oneLineDescription.codePointCount() > ONE_LINE_MAX_LENGTH) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "oneLineDescription은 최대 ${ONE_LINE_MAX_LENGTH}자입니다.")
+        }
         if (command.regionTagIds.isEmpty()) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "regionTagIds는 최소 1개입니다.")
         }
-        if ((command.description?.length ?: 0) > DESCRIPTION_MAX_LENGTH) {
+        if ((command.description?.codePointCount() ?: 0) > DESCRIPTION_MAX_LENGTH) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "description은 최대 ${DESCRIPTION_MAX_LENGTH}자입니다.")
         }
         if (command.foodCategoryId !in GroupTagCatalog.FOOD_CATEGORY_IDS) {
@@ -98,6 +107,10 @@ class GroupCommandService(
     }
 
     companion object {
+        private const val NAME_MAX_LENGTH = 50
+        private const val ONE_LINE_MAX_LENGTH = 100
         private const val DESCRIPTION_MAX_LENGTH = 200
+
+        private fun String.codePointCount(): Int = codePointCount(0, length)
     }
 }

@@ -70,3 +70,52 @@ interface PlaceFavoriteUseCase {
         placeId: Long,
     )
 }
+
+/**
+ * 매장 검색 (B §2-2 · F §2-1) — 근처보기 검색·칩과 리뷰 작성 1단계가 공유한다.
+ *
+ * 정렬 키는 `(sortValue, placeId)` 2개다. 좌표가 오면 거리 오름차순(미터 정수),
+ * 없으면 매장명 유사도 내림차순(similarity×1000 정수)이고 마지막 키인 placeId가
+ * tie-breaker다 — 유사도 점수만으로는 경계 중복·누락을 막지 못한다 (TMT-195).
+ */
+interface SearchPlacesUseCase {
+    fun search(request: PlaceSearchRequest): PlaceSearchResult
+}
+
+data class PlaceSearchRequest(
+    val viewerId: Long?,
+    val query: String?,
+    val curationTagId: String?,
+    val latitude: Double?,
+    val longitude: Double?,
+    /** 기본 false — 리뷰 작성 1단계는 서울 전역에서 찾는다 (P2) */
+    val nearbyOnly: Boolean = false,
+    val after: PlaceSearchKey? = null,
+    val limit: Int,
+)
+
+data class PlaceSearchKey(
+    val sortValue: Int,
+    val placeId: Long,
+)
+
+data class PlaceSearchResult(
+    val items: List<PlaceCardView>,
+    val hasNext: Boolean,
+    /** 다음 커서의 재료 — 마지막 행의 정렬 키 */
+    val lastKey: PlaceSearchKey?,
+)
+
+/** PlaceCard (B §1-2) — 검색 결과·근처 가게 목록이 같은 카드를 쓴다. */
+data class PlaceCardView(
+    val placeId: Long,
+    val name: String,
+    val roadAddress: String,
+    val regionName: String,
+    val categoryName: String?,
+    val averageRating: Double?,
+    val reviewCount: Int,
+    val thumbnailUrl: String?,
+    val distanceMeters: Int?,
+    val isFavorite: Boolean,
+)

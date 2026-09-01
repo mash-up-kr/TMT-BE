@@ -50,8 +50,10 @@ fun GroupDetailView.toResponse(): GroupDetailResponse =
         memberCount = memberCount,
         reviewCount = reviewCount,
         placeCount = placeCount,
-        foodCategory = GroupDetailResponse.FoodCategory(foodCategoryId, FOOD_LABELS.getValue(foodCategoryId)),
-        regionTags = regionTagIds.map { GroupDetailResponse.RegionTag(it, REGION_LABELS.getValue(it)) },
+        // 카탈로그에 없는 값이 DB에 있어도(시드 직삽입, 태그 폐기) 상세가 500이 되면 안 된다 —
+        // 라벨만 id 그대로 못생기게 나가고 화면은 뜬다 (PR #80 리뷰)
+        foodCategory = GroupDetailResponse.FoodCategory(foodCategoryId, FOOD_LABELS[foodCategoryId] ?: foodCategoryId),
+        regionTags = regionTagIds.map { GroupDetailResponse.RegionTag(it, REGION_LABELS[it] ?: it) },
         matchedSavedPlaceCount = matchedSavedPlaceCount,
         isMember = isMember,
         isOwner = isOwner,

@@ -1,5 +1,6 @@
 package com.tmt.application.domain.group
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.GroupCommand
 import com.tmt.application.port.output.persistence.GroupCommandPort
@@ -92,7 +93,11 @@ class GroupCommandServiceTest {
         }
 
     private val service =
-        GroupCommandService(commandPort, attachMedia, GroupDetailComposer(detailPort, "https://media.example.com"))
+        GroupCommandService(
+            commandPort,
+            attachMedia,
+            GroupDetailComposer(detailPort, MediaUrlResolver("https://media.example.com")),
+        )
 
     @Test
     fun `생성하면 요청자가 소유자이고 이미지는 ATTACHED로 전이된다 (G13·M7)`() {

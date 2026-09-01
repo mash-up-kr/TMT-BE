@@ -1,5 +1,6 @@
 package com.tmt.application.domain.group
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.GroupSort
 import com.tmt.application.port.input.GroupsRequest
 import com.tmt.application.port.output.persistence.GroupCardRow
@@ -29,7 +30,7 @@ class GroupExploreServiceTest {
             override fun existsByName(name: String) = nameExists
         }
 
-    private val service = GroupExploreService(port, "https://media.example.com/")
+    private val service = GroupExploreService(port, MediaUrlResolver("https://media.example.com/"))
 
     @Test
     fun `정의되지 않은 태그는 GROUP_TAG_NOT_FOUND다`() {
