@@ -5,8 +5,6 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
-import com.tmt.input.http.controller.dto.response.CursorPage
-import com.tmt.input.http.controller.dto.response.GroupCardResponse
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -34,84 +32,6 @@ class GroupMockController(
     private val groupAssembler: GroupAssembler,
     private val reviewCardAssembler: ReviewCardAssembler,
 ) {
-    @Operation(summary = "그룹 탐색", description = "검색·필터·정렬이 모두 한 목록에 걸린다. 파라미터 없이 부르면 추천순 전체 목록.")
-    @ApiErrorCodes(ErrorCode.GROUP_TAG_NOT_FOUND)
-    @GetMapping
-    fun listGroups(
-        @UserId userId: Long?,
-        @RequestParam(required = false) query: String?,
-        @RequestParam(required = false) foodCategoryId: String?,
-        @RequestParam(required = false) regionTagIds: List<String>?,
-        @RequestParam(required = false) sort: String?,
-        @RequestParam(required = false) cursor: String?,
-        @RequestParam(required = false) limit: Int?,
-    ): CursorPage<GroupCardResponse> {
-        foodCategoryId?.let {
-            if (it !in
-                GroupTags.FOOD_CATEGORY_IDS
-            ) {
-                throw TmtException(ErrorCode.GROUP_TAG_NOT_FOUND, it)
-            }
-        }
-        regionTagIds?.forEach {
-            if (it !in
-                GroupTags.REGION_TAG_IDS
-            ) {
-                throw TmtException(ErrorCode.GROUP_TAG_NOT_FOUND, it)
-            }
-        }
-
-        var groups = mockGroupStore.findAll()
-        query?.takeIf { it.isNotBlank() }?.let { q ->
-            // 검색 대상은 그룹명·한줄 소개·그룹 태그다. 공유된 매장명은 대상이 아니다 (G18)
-            groups =
-                groups.filter { g ->
-                    g.name.contains(q, ignoreCase = true) ||
-                        g.oneLineDescription.contains(q, ignoreCase = true) ||
-                        GroupTags.foodLabelOf(g.foodCategoryId).contains(q) ||
-                        g.regionTagIds.any { GroupTags.regionLabelOf(it).contains(q) }
-                }
-        }
-        foodCategoryId?.let { groups = groups.filter { g -> g.foodCategoryId == it } }
-        regionTagIds?.takeIf { it.isNotEmpty() }?.let { regions ->
-            groups = groups.filter { g -> g.regionTagIds.any { it in regions } }
-        }
-
-        val cards = groups.map { groupAssembler.card(it, userId) }
-        val sorted =
-            when (sort ?: SORT_RECOMMENDED) {
-                SORT_RECOMMENDED -> cards.sortedWith(GroupAssembler.RECOMMENDED_ORDER)
-
-                SORT_MEMBER_COUNT ->
-                    cards.sortedWith(
-                        compareByDescending<GroupCardResponse> { it.memberCount }
-                            .thenByDescending { groupSeq(it.groupId) },
-                    )
-
-                SORT_REVIEW_COUNT ->
-                    cards.sortedWith(
-                        compareByDescending<GroupCardResponse> { it.reviewCount }
-                            .thenByDescending { groupSeq(it.groupId) },
-                    )
-
-                else -> throw TmtException(ErrorCode.VALIDATION_FAILED, "지원하지 않는 sort 값: $sort")
-            }
-
-        return MockCursor.paginate(sorted, cursor, limit) { it }
-    }
-
-    @Operation(summary = "그룹 이름 중복 확인", description = "참고값이다 — 생성이 유일성을 다시 검증하고 GROUP_NAME_DUPLICATED로 거절한다.")
-    @GetMapping("/name-availability")
-    fun nameAvailability(
-        @UserId userId: Long,
-        @RequestParam(required = false) name: String?,
-    ): NameAvailabilityResponse {
-        if (name.isNullOrBlank()) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 필수입니다.")
-        }
-        return NameAvailabilityResponse(name = name, available = mockGroupStore.findAll().none { it.name == name })
-    }
-
     @Operation(summary = "그룹 만들기", description = "4단계 입력을 한 번에 보낸다. 요청자가 자동으로 그룹장이 되고 소유권은 이전되지 않는다 (G13).")
     @ApiErrorCodes(
         ErrorCode.GROUP_TAG_NOT_FOUND,
@@ -301,11 +221,6 @@ class GroupMockController(
         val description: String? = null,
     )
 
-    data class NameAvailabilityResponse(
-        val name: String,
-        val available: Boolean,
-    )
-
     data class GatedReviewsResponse(
         val items: List<ReviewCardResponse>,
         val gate: Gate,
@@ -319,12 +234,6 @@ class GroupMockController(
     }
 
     companion object {
-        const val SORT_RECOMMENDED = "RECOMMENDED"
-        const val SORT_MEMBER_COUNT = "MEMBER_COUNT"
-        const val SORT_REVIEW_COUNT = "REVIEW_COUNT"
-
         private const val DESCRIPTION_MAX_LENGTH = 200
-
-        private fun groupSeq(groupId: String): Long = groupId.substringAfterLast('_').toLongOrNull() ?: 0
     }
 }
