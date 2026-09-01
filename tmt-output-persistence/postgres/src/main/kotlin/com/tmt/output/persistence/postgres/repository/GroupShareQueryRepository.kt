@@ -82,9 +82,11 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
         @Param("reviewIds") reviewIds: Array<Long>,
     ): List<Long>
 
+    /** PUT 응답용 — countSharedByUser와 같은 기준(deleted_at 제외)이어야 GET과 값이 안 어긋난다 (PR #82 리뷰). */
     @Query(
         value = """
             SELECT s.review_id FROM group_review_share s
+            JOIN review r ON r.id = s.review_id AND r.deleted_at IS NULL
             WHERE s.group_id = :groupId AND s.user_id = :userId
             ORDER BY s.review_id
         """,

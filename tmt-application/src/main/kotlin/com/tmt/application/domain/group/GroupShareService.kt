@@ -1,5 +1,6 @@
 package com.tmt.application.domain.group
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.GetReviewSharesUseCase
 import com.tmt.application.port.input.ReplaceReviewSharesUseCase
 import com.tmt.application.port.input.ReplaceSharesResult
@@ -12,7 +13,6 @@ import com.tmt.application.port.output.persistence.GroupShareQueryPort
 import com.tmt.application.port.output.persistence.GroupStatsPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -23,7 +23,7 @@ class GroupShareService(
     private val groupReviewQueryPort: GroupReviewQueryPort,
     private val groupReviewSharePort: GroupReviewSharePort,
     private val groupStatsPort: GroupStatsPort,
-    @param:Value("\${tmt.media.base-url:}") private val mediaBaseUrl: String,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) : GetReviewSharesUseCase,
     ReplaceReviewSharesUseCase {
     @Transactional(readOnly = true)
@@ -44,7 +44,7 @@ class GroupShareService(
                     ReviewShareItemView(
                         reviewId = it.reviewId,
                         placeName = it.placeName,
-                        thumbnailUrl = "${mediaBaseUrl.trimEnd('/')}/${it.thumbnailS3Key}",
+                        thumbnailUrl = mediaUrlResolver.urlOf(it.thumbnailS3Key),
                         contentPreview = it.content,
                         isShared = it.isShared,
                         createdAt = it.createdAt,
