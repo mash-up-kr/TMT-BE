@@ -43,6 +43,8 @@ class GroupCommandAdapter(
                     ),
                 )
             }
+        // 위 saveAndFlush가 던지면 여기 못 온다. 여기 온 뒤 아래가 던져도 태그·멤버십은
+        // GroupCommandService.create의 @Transactional 롤백으로 함께 되돌아간다 — 이 전제(전파 속성)를 바꾸면 깨진다
         regionTagRepository.saveAll(regionTagIds.map { GroupRegionTagEntity(GroupRegionTagId(group.id, it)) })
         // 그룹장은 탈퇴할 수 없다(G11) = 생성자는 멤버다. member_count 기본값 1이 생성자 몫이다
         membershipRepository.save(GroupMembershipEntity(groupId = group.id, userId = ownerId))
@@ -80,6 +82,16 @@ class GroupCommandAdapter(
         try {
             block()
         } catch (e: DataIntegrityViolationException) {
-            throw TmtException(ErrorCode.GROUP_NAME_DUPLICATED)
+            // 이름 UNIQUE만 409로 바꾼다 — image_asset_id·owner_id FK 위반 등 다른 무결성 오류까지
+            // "이미 있는 그룹명"으로 내리면 진짜 원인이 숨는다 (PR #80 리뷰)
+            if (e.mostSpecificCause.message?.contains(NAME_UNIQUE_CONSTRAINT) == true) {
+                throw TmtException(ErrorCode.GROUP_NAME_DUPLICATED)
+            }
+            throw e
         }
+
+    companion object {
+        /** V1의 `name VARCHAR(50) NOT NULL UNIQUE`가 받는 Postgres 기본 제약명 */
+        private const val NAME_UNIQUE_CONSTRAINT = "groups_name_key"
+    }
 }
