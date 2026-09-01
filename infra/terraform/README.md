@@ -10,11 +10,11 @@
       ┌───┴────┐  IGW
       │  VPC 10.0.0.0/16  (ap-northeast-2a 단일 AZ)
       │
-      ├── 10.0.1.0/24  was  ── EC2 t3.small  [EIP]  :8080
+      ├── 10.0.1.0/24  was  ── EC2 t3.micro  [EIP]  :8080
       │                            │
       │                            │ 5432 (SG 참조로만 허용)
       │                            ▼
-      └── 10.0.2.0/24  db   ── EC2 t3.small
+      └── 10.0.2.0/24  db   ── EC2 t3.micro
                                    └── EBS gp3 20GiB  /mnt/pgdata  (prevent_destroy)
                                         └── docker: postgis/postgis:16-3.4
 ```
@@ -25,15 +25,15 @@
 
 ## 사전 준비
 
-1. AWS 자격증명 (`aws configure` 또는 `AWS_PROFILE`)
-2. state 버킷 최초 1회 생성:
-   ```bash
-   cd bootstrap && terraform init && terraform apply
-   ```
-3. 변수 파일:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars   # ssh_public_key 필수
-   ```
+**AWS 자격증명만 있으면 된다** (`aws configure` 또는 `AWS_PROFILE`). state는 S3에 있고 변수는
+기본값이 채워져 있어서, 받아서 바로 `init` → `plan`이 된다.
+
+```bash
+aws sts get-caller-identity   # 393286882141 계정인지 확인
+```
+
+state 버킷(`ttalkkak-tmt-tfstate`)은 이미 만들어져 있다. `bootstrap/`은 **최초 1회용이라 다시
+실행하지 않는다** — 이미 있는 버킷에 대고 돌리면 안 된다.
 
 ## 실행
 
@@ -42,6 +42,34 @@ terraform init
 terraform plan     # 리뷰 후
 terraform apply
 ```
+
+**`plan`이 `No changes`로 나오는 것이 정상이다.** 뭔가 잡히면 둘 중 하나다 — 내가 방금 코드를
+고쳤거나, **콘솔에서 직접 바꾼 것이 코드에 안 들어와 있거나**(drift). 후자면 코드부터 맞춘 뒤에
+apply한다. 자기 변경이 아닌 것이 plan에 섞여 있으면 그대로 나가므로 반드시 전부 읽는다.
+
+## 여럿이 함께 쓸 때
+
+state는 S3 원격 백엔드에 있고 **락이 걸린다**(`use_lockfile = true`). 누군가 apply 중이면
+다른 사람은 락 대기로 막히므로, 동시에 두 명이 밀어 넣는 사고는 나지 않는다.
+
+- **누가 언제 바꿨는지**는 버킷 버저닝으로 남는다 (`prod/infra.tfstate`)
+- 락이 안 풀린 채 프로세스가 죽었다면 `terraform force-unlock <ID>` — **상대가 실제로 안 돌리는 것을
+  확인한 뒤에만** 쓴다
+- 인프라 변경은 코드 리뷰를 거친다. `apply`는 머지 전후 어느 쪽이든 좋지만, **apply한 사람이 PR에
+  plan 결과를 남긴다** (TMT-252에서 "1 to change"로 적힌 것이 실제로는 5건이었던 적이 있다)
+
+### 변수는 코드가 정본이다 — tfvars 파일을 만들지 않는다
+
+state가 하나뿐이라 "개인 override"라는 것이 성립하지 않는다 — 누가 apply하든 결과는 같은 운영
+인프라다. **임시 변경은 `terraform plan -var 'key=value'`로, 영구 변경은 `variables.tf`의 기본값
+수정 PR로** 한다. `.gitignore`의 `terraform.tfvars`는 파일을 쓰라는 뜻이 아니라, Terraform이 이
+파일을 자동으로 읽는 것을 끌 방법이 없어서 누가 만들어도 커밋만은 막아주는 안전망이다.
+
+> 기본값에 들어 있는 `ssh_public_key`는 **공개키라 시크릿이 아니다.** 예전에는 이 값이 개인
+> tfvars에만 있어서, 그 파일을 가진 사람만 apply할 수 있었고 실제 구성이 코드에 안 남아 있었다.
+> 이 값을 덮어 apply하면 키페어 리소스가 교체될 뿐(`public_key`는 ForceNew), 이미 떠 있는
+> 인스턴스의 `authorized_keys`는 바뀌지 않는다 — cloud-init ssh 모듈은 인스턴스 최초 부팅에만
+> 돈다. 즉 **키 교체는 인스턴스 교체와 함께 계획해야 한다.**
 
 ## 접속
 
