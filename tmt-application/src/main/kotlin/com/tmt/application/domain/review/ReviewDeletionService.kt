@@ -67,6 +67,8 @@ class ReviewDeletionService(
         // 예외로 트랜잭션 전체(티켓 회수·집계 차감)를 되돌린다 — 안 그러면 집계가 두 번 깎이고
         // 티켓이 한 장 더 회수된다. 조회 시점의 존재 여부로는 이 경합을 못 막는다
         if (reviewCommandPort.softDeleteReview(reviewId) == 0) throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
+        // save도 함께 내린다. review만 내리면 그 save가 이어쓰기 목록(GET /v1/saves)에 다시 나타나고,
+        // PUT으로 재완성하면 티켓이 또 발급돼 R6(삭제 시 티켓 회수)를 우회한다
         reviewCommandPort.softDeleteSave(review.saveId)
 
         // S3는 커밋 후에 지운다. 먼저 지우고 트랜잭션이 깨지면 살아 있는 리뷰의 사진이 사라진다 —
