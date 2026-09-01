@@ -40,6 +40,11 @@ class HomeService(
     override fun get(request: HomeFeedRequest): HomeFeedResult {
         val latitude = request.latitude
         val longitude = request.longitude
+        // 좌표는 둘 다이거나 둘 다 없거나다 (A 명세 §3). 반쪽을 조용히 최신순으로 떨어뜨리면
+        // 클라이언트 버그가 정렬이 바뀐 채로 묻힌다 — 근처 탐색도 같은 상황에서 400이다
+        if ((latitude == null) != (longitude == null)) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "latitude·longitude는 함께 보내야 합니다.")
+        }
         val sortedByDistance = latitude != null && longitude != null
         if (sortedByDistance && (latitude !in -90.0..90.0 || longitude !in -180.0..180.0)) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "latitude·longitude는 위경도 범위 안이어야 합니다.")

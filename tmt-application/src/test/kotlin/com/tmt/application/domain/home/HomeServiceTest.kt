@@ -11,6 +11,7 @@ import com.tmt.application.port.output.persistence.ReviewCardLookupPort
 import com.tmt.application.port.output.persistence.ReviewCardRow
 import com.tmt.application.port.output.persistence.SummaryRow
 import com.tmt.application.port.output.persistence.TagRow
+import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -82,6 +83,22 @@ class HomeServiceTest {
         assertEquals("distance", queryPort.lastFeedMode)
         assertEquals(120, result.lastKey?.distanceMeters)
         assertEquals(7L, result.lastKey?.reviewId)
+    }
+
+    @Test
+    fun `좌표를 반쪽만 보내면 VALIDATION_FAILED다`() {
+        // 조용히 최신순으로 떨어지면 클라이언트 버그가 정렬이 바뀐 채 묻힌다
+        val onlyLat =
+            assertThrows<TmtException> {
+                service.get(HomeFeedRequest(viewerId = 1, latitude = 37.4, longitude = null, limit = 20))
+            }
+        val onlyLng =
+            assertThrows<TmtException> {
+                service.get(HomeFeedRequest(viewerId = 1, latitude = null, longitude = 127.0, limit = 20))
+            }
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, onlyLat.errorCode)
+        assertEquals(ErrorCode.VALIDATION_FAILED, onlyLng.errorCode)
     }
 
     @Test
