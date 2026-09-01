@@ -32,6 +32,11 @@ services:
       - JUSO_SEARCH_KEY=${JUSO_SEARCH_KEY}
       - JUSO_COORD_KEY=${JUSO_COORD_KEY}
       - ADDRESS_TOKEN_SECRET=${ADDRESS_TOKEN_SECRET}
+      # 카카오 로그인 키 (TMT-271)·JWT 서명 키 (TMT-272). 정본은 SSM /tmt-prod/auth/*.
+      # JWT_SECRET이 비면 앱이 기동하지 않는다 (application-prod.yml fail-fast)
+      - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
+      - KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 

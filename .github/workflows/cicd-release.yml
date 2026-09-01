@@ -27,6 +27,7 @@ env:
   SSM_MEDIA_PREFIX: /tmt-prod/media
   SSM_AI_PREFIX: /tmt-prod/ai
   SSM_ADDRESS_PREFIX: /tmt-prod/address
+  SSM_AUTH_PREFIX: /tmt-prod/auth
 
 jobs:
   build-and-deploy:
@@ -139,13 +140,19 @@ jobs:
           JUSO_COORD_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-coord-key --with-decryption --query Parameter.Value --output text)
           # addressId 서명 키 (TMT-191). 외부 발급이 아니라 우리가 만든 HMAC 시크릿이다
           ADDRESS_TOKEN_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/token-secret --with-decryption --query Parameter.Value --output text)
+          # 카카오 로그인 키 (TMT-271)·JWT 서명 키 (TMT-272). JWT_SECRET은 prod에 기본값이
+          # 없어(application-prod.yml) 비면 앱 기동 자체가 실패한다 — 빈 값 폴백을 두지 않는다
+          KAKAO_REST_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/kakao-rest-api-key --with-decryption --query Parameter.Value --output text)
+          KAKAO_CLIENT_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/kakao-client-secret --with-decryption --query Parameter.Value --output text)
+          JWT_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/jwt-secret --with-decryption --query Parameter.Value --output text)
 
           # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
           # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252).
           # 주소 키는 조용히 죽지도 않는다 — 없으면 앱이 기동에 실패하는데, 그때는 이미
           # 기존 컨테이너를 내린 뒤라 서비스가 함께 내려간다. 여기서 먼저 끊는다 (TMT-191)
           for v in "\$DB_HOST" "\$DB_NAME" "\$DB_USER" "\$DB_PASSWORD" "\$MEDIA_BUCKET" "\$MEDIA_BASE_URL" \
-                   "\$JUSO_SEARCH_KEY" "\$JUSO_COORD_KEY" "\$ADDRESS_TOKEN_SECRET"; do
+                   "\$JUSO_SEARCH_KEY" "\$JUSO_COORD_KEY" "\$ADDRESS_TOKEN_SECRET" \
+                   "\$KAKAO_REST_API_KEY" "\$KAKAO_CLIENT_SECRET" "\$JWT_SECRET"; do
             [ -n "\$v" ] && continue
             echo "필수 설정을 SSM에서 읽지 못했다 — 인스턴스 역할의 ssm:GetParameter 범위를 확인하라 (infra/terraform/iam.tf)" >&2
             exit 1
@@ -173,6 +180,9 @@ jobs:
           JUSO_SEARCH_KEY=\$JUSO_SEARCH_KEY
           JUSO_COORD_KEY=\$JUSO_COORD_KEY
           ADDRESS_TOKEN_SECRET=\$ADDRESS_TOKEN_SECRET
+          KAKAO_REST_API_KEY=\$KAKAO_REST_API_KEY
+          KAKAO_CLIENT_SECRET=\$KAKAO_CLIENT_SECRET
+          JWT_SECRET=\$JWT_SECRET
           ENV
 
           cd "\$DEPLOY_DIR"
