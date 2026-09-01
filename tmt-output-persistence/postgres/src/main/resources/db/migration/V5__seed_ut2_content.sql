@@ -276,6 +276,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 901, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '묵은지 조합과 야장 분위기가 좋아요', '가격이 높은 편이에요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (901, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -338,6 +340,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 902, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '곱창이 부드럽고 떡 추가가 맛있어요', '매장과 테이블에 기름기가 많아요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (902, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -358,6 +362,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 0);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 901, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '회가 두툼하고 점심 구성이 알차요', '양이 적게 느껴질 수 있어요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (901, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -400,6 +406,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 0);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 901, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '로컬화되지 않은 진한 커리 맛이에요', '매장이 작고 늦으면 자리가 없어요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (901, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -462,6 +470,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 902, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '계절마다 바뀌는 한식 다이닝 코스가 인상적이에요', '단품은 양이 아쉬울 수 있어요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (902, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -528,6 +538,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 903, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '생삼겹이 특히 맛있어요', '매장 시설이 오래됐어요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (903, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -591,6 +603,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 903, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '자가제면 메밀면이 고소해요', '면 외 메뉴는 선택지가 좁아요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (903, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -616,6 +630,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 1);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 902, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '곱창 맛은 잠실 최고 수준이에요', '사람이 많고 서비스가 아쉬워요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (902, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -673,6 +689,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 1);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 901, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '도가니 쌀국수가 훌륭하고 친절해요', '웨이팅이 심한 편이에요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (901, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -735,6 +753,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 2);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 903, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '안주가 다양하고 가격이 합리적이에요', '소주가 없고 매장이 작아요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (903, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
@@ -831,6 +851,8 @@ BEGIN
   INSERT INTO save_photo (save_id, media_asset_id, photo_order) VALUES (v_save, v_asset, 0);
   INSERT INTO review (save_id, user_id, place_id, created_at)
   VALUES (v_save, 901, v_place, v_at) RETURNING id INTO v_review;
+  INSERT INTO review_ai_summary (review_id, pros, cons, model, created_at)
+  VALUES (v_review, '점심특선 양이 넉넉해요', '매장이 낡고 위생이 아쉬워요', 'seed-human', v_at);
   INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
   VALUES (901, 'GROUP_JOIN_TICKET', 'REVIEW', v_review, v_at) RETURNING id INTO v_grant;
   INSERT INTO group_join_ticket (user_id, reward_grant_id, status, created_at)
