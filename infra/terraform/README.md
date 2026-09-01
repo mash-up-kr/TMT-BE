@@ -10,11 +10,11 @@
       ┌───┴────┐  IGW
       │  VPC 10.0.0.0/16  (ap-northeast-2a 단일 AZ)
       │
-      ├── 10.0.1.0/24  was  ── EC2 t3.small  [EIP]  :8080
+      ├── 10.0.1.0/24  was  ── EC2 t3.micro  [EIP]  :8080
       │                            │
       │                            │ 5432 (SG 참조로만 허용)
       │                            ▼
-      └── 10.0.2.0/24  db   ── EC2 t3.small
+      └── 10.0.2.0/24  db   ── EC2 t3.micro
                                    └── EBS gp3 20GiB  /mnt/pgdata  (prevent_destroy)
                                         └── docker: postgis/postgis:16-3.4
 ```
@@ -58,16 +58,18 @@ state는 S3 원격 백엔드에 있고 **락이 걸린다**(`use_lockfile = true
 - 인프라 변경은 코드 리뷰를 거친다. `apply`는 머지 전후 어느 쪽이든 좋지만, **apply한 사람이 PR에
   plan 결과를 남긴다** (TMT-252에서 "1 to change"로 적힌 것이 실제로는 5건이었던 적이 있다)
 
-### 변수를 개인적으로 덮고 싶다면
+### 변수는 코드가 정본이다 — tfvars 파일을 만들지 않는다
 
-`terraform.tfvars`는 `.gitignore` 대상이고 **없어도 동작한다**. 기본값과 다르게 쓰고 싶을 때만 만든다.
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
-```
+state가 하나뿐이라 "개인 override"라는 것이 성립하지 않는다 — 누가 apply하든 결과는 같은 운영
+인프라다. **임시 변경은 `terraform plan -var 'key=value'`로, 영구 변경은 `variables.tf`의 기본값
+수정 PR로** 한다. `.gitignore`의 `terraform.tfvars`는 파일을 쓰라는 뜻이 아니라, Terraform이 이
+파일을 자동으로 읽는 것을 끌 방법이 없어서 누가 만들어도 커밋만은 막아주는 안전망이다.
 
 > 기본값에 들어 있는 `ssh_public_key`는 **공개키라 시크릿이 아니다.** 예전에는 이 값이 개인
 > tfvars에만 있어서, 그 파일을 가진 사람만 apply할 수 있었고 실제 구성이 코드에 안 남아 있었다.
+> 이 값을 덮어 apply하면 키페어 리소스가 교체될 뿐(`public_key`는 ForceNew), 이미 떠 있는
+> 인스턴스의 `authorized_keys`는 바뀌지 않는다 — cloud-init ssh 모듈은 인스턴스 최초 부팅에만
+> 돈다. 즉 **키 교체는 인스턴스 교체와 함께 계획해야 한다.**
 
 ## 접속
 
