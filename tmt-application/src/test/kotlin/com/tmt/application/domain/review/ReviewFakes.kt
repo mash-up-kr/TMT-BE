@@ -54,7 +54,9 @@ class FakeReviewCommandPort(
         return assetIdsBySave[saveId].orEmpty()
     }
 
+    /** 이미 지워진 행이면 0 — 조건부 UPDATE의 실제 동작과 같다 (D6) */
     override fun softDeleteReview(reviewId: Long): Int {
+        if (reviewId in softDeletedReviews) return 0
         softDeletedReviews += reviewId
         return 1
     }

@@ -63,7 +63,10 @@ class ReviewDeletionService(
         val s3Keys = mediaAssetPort.findByIds(assetIds).map { it.s3Key }
         mediaAssetPort.deleteByIds(assetIds)
 
-        reviewCommandPort.softDeleteReview(reviewId)
+        // 갱신 행 수가 이 삭제의 정본이다. 0이면 그사이 다른 요청이 이미 지운 것이라
+        // 예외로 트랜잭션 전체(티켓 회수·집계 차감)를 되돌린다 — 안 그러면 집계가 두 번 깎이고
+        // 티켓이 한 장 더 회수된다. 조회 시점의 존재 여부로는 이 경합을 못 막는다
+        if (reviewCommandPort.softDeleteReview(reviewId) == 0) throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
         reviewCommandPort.softDeleteSave(review.saveId)
 
         // S3는 커밋 후에 지운다. 먼저 지우고 트랜잭션이 깨지면 살아 있는 리뷰의 사진이 사라진다 —

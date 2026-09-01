@@ -99,6 +99,20 @@ class ReviewDeletionServiceTest {
     }
 
     @Test
+    fun `이미 지워진 리뷰를 다시 지우면 REVIEW_NOT_FOUND다`() {
+        // 티켓 2장 — 이 리뷰가 발급한 장이 이미 회수됐어도 회수는 다른 장으로 성공한다.
+        // 그래서 갱신 행 수를 안 보면 두 번째 삭제가 끝까지 진행돼 집계가 두 번 깎인다
+        tickets.seed(ownerId, 2)
+        service.delete(ownerId, reviewId)
+
+        val e = assertThrows<TmtException> { service.delete(ownerId, reviewId) }
+
+        assertEquals(ErrorCode.REVIEW_NOT_FOUND, e.errorCode)
+        // 되돌림이 실제로 무효가 되는 것은 트랜잭션 롤백이라 여기서는 확인할 수 없다 —
+        // Fake는 롤백이 없어 호출이 그대로 남는다. 경합·롤백 검증은 TMT-295 통합 테스트로 간다
+    }
+
+    @Test
     fun `타인의 리뷰와 없는 리뷰는 둘 다 REVIEW_NOT_FOUND다`() {
         tickets.seed(ownerId, 1)
         tickets.seed(2L, 1)
