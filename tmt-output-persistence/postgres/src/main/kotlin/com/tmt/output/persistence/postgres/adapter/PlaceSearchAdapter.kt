@@ -14,7 +14,7 @@ class PlaceSearchAdapter(
     private val placeSearchRepository: PlaceSearchRepository,
 ) : PlaceSearchPort {
     override fun search(criteria: PlaceSearchCriteria): PlaceSearchRows {
-        // 빈 목록이면 어떤 category_id와도 일치하지 않는 CSV가 된다 ('' 단일 원소)
+        // 빈 목록이면 빈 문자열이 되고 string_to_array('', ',')는 빈 배열이라 ANY가 아무것도 못 고른다
         val queryCategoryCsv = criteria.queryCategoryIds.joinToString(",")
         val rows =
             if (criteria.sortByDistance) {
