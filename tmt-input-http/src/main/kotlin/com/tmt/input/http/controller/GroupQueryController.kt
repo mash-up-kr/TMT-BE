@@ -5,10 +5,10 @@ import com.tmt.application.port.input.GetGroupReviewsUseCase
 import com.tmt.application.port.input.GroupReviewKey
 import com.tmt.application.port.input.GroupReviewsRequest
 import com.tmt.common.exception.ErrorCode
-import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.GroupDetailResponse
+import com.tmt.input.http.controller.dto.response.PublicIds
 import com.tmt.input.http.controller.dto.response.ReviewCardResponse
 import com.tmt.input.http.controller.dto.response.toResponse
 import com.tmt.input.http.controller.paging.CursorCodec
@@ -27,7 +27,7 @@ import java.time.Instant
 /**
  * 그룹 상세·리뷰 목록 실구현 (TMT-222). 응답 형태·ID 표기(`group_`)는 mock과 같다.
  */
-@Tag(name = "그룹 (mock)", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
+@Tag(name = "그룹", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
 @RestController
 @RequestMapping("/v1/groups/{groupId}")
 class GroupQueryController(
@@ -40,7 +40,7 @@ class GroupQueryController(
     fun groupDetail(
         @UserId userId: Long?,
         @PathVariable groupId: String,
-    ): GroupDetailResponse = getGroupDetailUseCase.get(parseGroupId(groupId), userId).toResponse()
+    ): GroupDetailResponse = getGroupDetailUseCase.get(PublicIds.parseGroupId(groupId), userId).toResponse()
 
     @Operation(
         summary = "그룹 상세 리뷰 목록",
@@ -56,7 +56,7 @@ class GroupQueryController(
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): GatedReviewsResponse {
-        val id = parseGroupId(groupId)
+        val id = PublicIds.parseGroupId(groupId)
         // 좌표가 바뀌면 거리 값이 바뀔 뿐 정렬은 최신순 그대로라 조건에 넣지 않는다 (B §3-2와 동일)
         val condition = CursorCondition.of("GROUP_REVIEWS", id)
         val after = CursorCodec.decode(GroupReviewCursorSpec, cursor, condition)
@@ -89,10 +89,6 @@ class GroupQueryController(
             hasNext = result.hasNext,
         )
     }
-
-    /** 접두·형식이 어긋나면 없는 자원과 같다 — 존재 여부를 새지 않게 NOT_FOUND 계열로 던진다. */
-    private fun parseGroupId(publicId: String): Long =
-        publicId.removePrefix("group_").toLongOrNull() ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
 
     data class GatedReviewsResponse(
         val items: List<ReviewCardResponse>,

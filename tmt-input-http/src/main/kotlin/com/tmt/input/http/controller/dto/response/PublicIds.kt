@@ -25,4 +25,8 @@ object PublicIds {
     fun parsePlaceId(publicId: String): Long =
         publicId.removePrefix("place_").toLongOrNull()
             ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
+
+    fun parseGroupId(publicId: String): Long =
+        publicId.removePrefix("group_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
 }

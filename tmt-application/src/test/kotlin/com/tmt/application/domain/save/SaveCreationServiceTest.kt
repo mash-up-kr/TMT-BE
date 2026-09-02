@@ -3,6 +3,7 @@ package com.tmt.application.domain.save
 import com.tmt.application.domain.aisummary.ReviewCommittedEvent
 import com.tmt.application.domain.media.FakeMediaAssetPort
 import com.tmt.application.domain.media.MediaAttachmentService
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.common.exception.ErrorCode
@@ -31,7 +32,7 @@ class SaveCreationServiceTest {
             placeQueryPort = placeQueryPort,
             placeCommandPort = placeCommandPort,
             reviewTagPort = reviewTagPort,
-            attachMediaUseCase = MediaAttachmentService(mediaAssetPort, baseUrl = "https://media.tmt.example"),
+            attachMediaUseCase = MediaAttachmentService(mediaAssetPort, MediaUrlResolver("https://media.tmt.example")),
             groupJoinTicketPort = ticketPort,
             placeStatsPort = placeStatsPort,
             eventPublisher = ApplicationEventPublisher { event -> published += event },

@@ -27,7 +27,7 @@ import java.time.Instant
 /**
  * 리뷰 공유 집합 실구현 (TMT-223). 응답 형태·ID 표기(`rv_`)는 mock과 같다.
  */
-@Tag(name = "그룹 가입·리뷰 공유 (mock)", description = "명세 v2 — H. 그룹 게시(공유)")
+@Tag(name = "그룹 가입·리뷰 공유", description = "명세 v2 — H. 그룹 게시(공유)")
 @RestController
 @RequestMapping("/v1/groups/{groupId}/review-shares")
 class GroupShareController(
@@ -43,7 +43,7 @@ class GroupShareController(
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): ReviewSharesResponse {
-        val id = parseGroupId(groupId)
+        val id = PublicIds.parseGroupId(groupId)
         val condition = CursorCondition.of("REVIEW_SHARES", id, userId)
         val after = CursorCodec.decode(ShareCursorSpec, cursor, condition)
 
@@ -90,7 +90,7 @@ class GroupShareController(
         @PathVariable groupId: String,
         @RequestBody request: ReplaceSharesRequest,
     ): ReplaceSharesResponse {
-        val id = parseGroupId(groupId)
+        val id = PublicIds.parseGroupId(groupId)
         val result = replaceReviewSharesUseCase.replace(id, userId, request.reviewIds.map(::parseReviewId))
         return ReplaceSharesResponse(
             groupId = PublicIds.group(id),
@@ -98,10 +98,6 @@ class GroupShareController(
             sharedCount = result.sharedCount,
         )
     }
-
-    /** 접두·형식이 어긋나면 없는 자원과 같다 — 존재 여부를 새지 않게 NOT_FOUND 계열로 던진다. */
-    private fun parseGroupId(publicId: String): Long =
-        publicId.removePrefix("group_").toLongOrNull() ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
 
     private fun parseReviewId(publicId: String): Long =
         publicId.removePrefix("rv_").toLongOrNull() ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND, publicId)

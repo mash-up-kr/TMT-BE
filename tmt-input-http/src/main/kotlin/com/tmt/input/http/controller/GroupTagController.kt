@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /** 그룹 태그 풀 실구현 (TMT-220) — 서버 상수라 저장소가 없다 (D4). */
-@Tag(name = "그룹 태그 (mock)", description = "명세 v2 — D_02 §2-1")
+@Tag(name = "그룹 태그", description = "명세 v2 — D_02 §2-1")
 @RestController
 @RequestMapping("/v1/group-tags")
 class GroupTagController {
