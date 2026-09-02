@@ -114,6 +114,35 @@ aws ssm put-parameter --name /tmt-prod/db/password --type SecureString \
 
 **DB 서브넷은 퍼블릭이다.** NAT Gateway를 안 쓰기로 한 이상 아웃바운드 경로는 IGW뿐이다. VPC 인터페이스 엔드포인트라는 선택지도 있지만, 필요한 것만 세도 ECR 2개 + SSM 3개 + KMS 1개로 6개이고 엔드포인트당 시간 과금이 붙어 월 $45 정도가 된다. NAT Gateway와 비슷한 금액이라 실익이 없어서 쓰지 않는다. 인바운드는 보안그룹에서 WAS 보안그룹 소스의 5432만 허용하므로 외부에서 DB에 직접 닿을 수는 없다. 나중에 NAT를 도입하면 `db` 서브넷의 라우팅 테이블만 갈아끼우면 된다 — 그러라고 서브넷을 갈라뒀다.
 
+## 스왑 관측 (TMT-303)
+
+스왑 2GiB(TMT-298)는 메모리 스파이크를 "동결"에서 "느린 채 살아 있음"으로 바꾼다. 그 대신 **열화를 아무도
+모르는 상태**가 생길 수 있어, 두 인스턴스가 5분마다 CloudWatch `TMT/Memory`에 지표를 올린다
+(`user_data`의 `tmt-swap-metrics.timer`). 커스텀 지표 4개·알람 2개는 무료 한도 안이고 API 호출은 월 $0.2 미만이다.
+
+| 지표 | 뜻 |
+|---|---|
+| `SwapUsedPercent` | 스왑 사용률. 한 번 밀려나고 안 쓰이는 페이지는 사용량만 높고 무해하다 |
+| `SwapInPages` · `SwapOutPages` | 직전 5분 동안의 스왑 in/out 페이지 수. **실제 열화에 가까운 지표** |
+| `MemAvailableMB` | `MemAvailable` — 스왑 없이 쓸 수 있는 여유 |
+
+**판단 기준** (PR #83 리뷰에서 정한 값):
+
+- **관측**: `SwapUsedPercent >= 25%`(≈512MB)가 5분 지속 — 알람 `tmt-prod-{was,db}-swap-used-25pct`가 ALARM으로 바뀐다 (알림 액션은 없다, 콘솔에서 본다)
+- **교체 판단**: 상시 트래픽에서 swap in/out이 **주 2회 이상 반복**되면 인스턴스 상향(TMT-298 재론). 배포·시드 적재처럼
+  예정된 순간의 일시 스왑은 근거에서 뺀다 — 반복성이 기준이다
+
+확인:
+
+```bash
+# 최근 24시간 WAS 스왑 out 합계 (5분 버킷)
+aws cloudwatch get-metric-statistics --namespace TMT/Memory --metric-name SwapOutPages \
+  --dimensions Name=Role,Value=was --statistics Sum --period 300 \
+  --start-time "$(date -u -v-24H +%FT%TZ)" --end-time "$(date -u +%FT%TZ)" \
+  --query 'sort_by(Datapoints,&Timestamp)[?Sum>`0`].[Timestamp,Sum]' --output table
+aws cloudwatch describe-alarms --alarm-name-prefix tmt-prod- --query 'MetricAlarms[].[AlarmName,StateValue]' --output table
+```
+
 ## 백업 · 복구
 
 RDS 자동 스냅샷이 없으므로 `pg_dump`를 직접 돌린다. EBS 분리(`prevent_destroy`)는 인스턴스 교체를 견디게 해줄 뿐이고, 볼륨이 깨지거나 데이터를 잘못 지운 경우의 복구 수단은 이 덤프뿐이다.
