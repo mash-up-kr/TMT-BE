@@ -51,18 +51,6 @@ data class MyGroupRow(
     val imageS3Key: String?,
 )
 
-/** GroupCard 한 장의 행 — 커버는 공유 리뷰 사진에서 파생된다 (G16). */
-data class GroupCardRow(
-    val groupId: Long,
-    val name: String,
-    val oneLineDescription: String,
-    val coverS3Key: String?,
-    val memberCount: Int,
-    val reviewCount: Int,
-    val placeCount: Int,
-    val matchedSavedPlaceCount: Int,
-)
-
 data class HomeFeedRows(
     val rows: List<ReviewCardRow>,
     val hasNext: Boolean,

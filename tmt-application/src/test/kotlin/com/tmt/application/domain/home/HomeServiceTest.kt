@@ -1,5 +1,6 @@
 package com.tmt.application.domain.home
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.HomeFeedRequest
 import com.tmt.application.port.output.persistence.GroupCardRow
@@ -141,7 +142,7 @@ class HomeServiceTest {
 
                 override fun findSummaryRows(reviewIds: Collection<Long>): List<SummaryRow> = emptyList()
             },
-            mediaBaseUrl = "https://cdn.example",
+            MediaUrlResolver("https://cdn.example"),
         )
 
     private fun groupCardRow(id: Long) =

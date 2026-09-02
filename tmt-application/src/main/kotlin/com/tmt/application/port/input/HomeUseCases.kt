@@ -19,18 +19,6 @@ data class HomeResult(
     )
 }
 
-/** GroupCard(D_01 §2)의 읽기 모델 — 그룹 목록·홈 추천 캐러셀이 같은 카드를 쓴다 (TMT-180). */
-data class GroupCardView(
-    val groupId: Long,
-    val name: String,
-    val oneLineDescription: String,
-    val coverImageUrl: String?,
-    val memberCount: Int,
-    val reviewCount: Int,
-    val placeCount: Int,
-    val matchedSavedPlaceCount: Int,
-)
-
 /**
  * 홈 피드 (A §3) — 가입한 그룹들에 공유된 리뷰를 하나로 합쳐 내린다 (G19).
  * 좌표가 오면 거리순, 없으면 최신순이다.

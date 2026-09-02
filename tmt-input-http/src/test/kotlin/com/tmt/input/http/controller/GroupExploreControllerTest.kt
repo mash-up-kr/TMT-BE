@@ -3,6 +3,7 @@ package com.tmt.input.http.controller
 import com.tmt.application.port.input.CheckGroupNameUseCase
 import com.tmt.application.port.input.GetGroupsUseCase
 import com.tmt.application.port.input.GroupCardView
+import com.tmt.application.port.input.GroupListKey
 import com.tmt.application.port.input.GroupsRequest
 import com.tmt.application.port.input.GroupsResult
 import com.tmt.input.http.auth.UserIdArgumentResolver
@@ -61,7 +62,12 @@ class GroupExploreControllerTest {
 
     @Test
     fun `다음 페이지가 있으면 커서를 발급하고 같은 조건에서 되읽는다`() {
-        result = GroupsResult(items = listOf(card(groupId = 5, k1 = 2, k2 = 9)), hasNext = true)
+        result =
+            GroupsResult(
+                items = listOf(card(groupId = 5)),
+                hasNext = true,
+                lastKey = GroupListKey(k1 = 2, k2 = 9, groupId = 5),
+            )
 
         val body =
             mockMvc
@@ -85,7 +91,12 @@ class GroupExploreControllerTest {
 
     @Test
     fun `조건이 바뀌면 이전 커서는 무효다`() {
-        result = GroupsResult(items = listOf(card(groupId = 5)), hasNext = true)
+        result =
+            GroupsResult(
+                items = listOf(card(groupId = 5)),
+                hasNext = true,
+                lastKey = GroupListKey(k1 = 2, k2 = 9, groupId = 5),
+            )
         val body =
             mockMvc
                 .perform(get("/v1/groups").header("X-User-Id", "1"))
@@ -124,20 +135,15 @@ class GroupExploreControllerTest {
             .andExpect(status().isBadRequest)
     }
 
-    private fun card(
-        groupId: Long,
-        k1: Long = 0,
-        k2: Long = 0,
-    ) = GroupCardView(
-        groupId = groupId,
-        name = "그룹$groupId",
-        oneLineDescription = "한줄",
-        coverImageUrl = null,
-        memberCount = 4,
-        reviewCount = 3,
-        placeCount = 2,
-        matchedSavedPlaceCount = 2,
-        sortKey1 = k1,
-        sortKey2 = k2,
-    )
+    private fun card(groupId: Long) =
+        GroupCardView(
+            groupId = groupId,
+            name = "그룹$groupId",
+            oneLineDescription = "한줄",
+            coverImageUrl = null,
+            memberCount = 4,
+            reviewCount = 3,
+            placeCount = 2,
+            matchedSavedPlaceCount = 2,
+        )
 }
