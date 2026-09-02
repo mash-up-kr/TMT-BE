@@ -41,9 +41,9 @@ data class GroupListKey(
 data class GroupsResult(
     val items: List<GroupCardView>,
     val hasNext: Boolean,
-) {
-    val lastKey: GroupListKey? get() = items.lastOrNull()?.let { GroupListKey(it.sortKey1, it.sortKey2, it.groupId) }
-}
+    /** 마지막 행의 정렬 키. 다음 페이지가 없으면 null이다. */
+    val lastKey: GroupListKey? = null,
+)
 
 /** GroupCard (D_01 §2) 읽기 모델 — 그룹 목록·홈 추천 그룹이 같은 카드를 쓴다. */
 data class GroupCardView(
@@ -57,6 +57,4 @@ data class GroupCardView(
     val placeCount: Int,
     /** 내가 저장한 가게와의 일치 수 (G12) — 저장 기준이지 찜이 아니다. 비로그인이면 0. */
     val matchedSavedPlaceCount: Int,
-    val sortKey1: Long,
-    val sortKey2: Long,
 )

@@ -1,6 +1,7 @@
 package com.tmt.application.domain.group
 
 import com.tmt.application.domain.media.MediaUrlResolver
+import com.tmt.application.port.input.GroupListKey
 import com.tmt.application.port.input.GroupSort
 import com.tmt.application.port.input.GroupsRequest
 import com.tmt.application.port.output.persistence.GroupCardRow
@@ -78,7 +79,12 @@ class GroupExploreServiceTest {
 
     @Test
     fun `마지막 키는 정렬 키 그대로다 — 커서 발급의 원천 (TMT-178)`() {
-        slice = GroupCardsSlice(rows = listOf(row(groupId = 7, k1 = 3, k2 = 12)), hasNext = true)
+        slice =
+            GroupCardsSlice(
+                rows = listOf(row(groupId = 7)),
+                hasNext = true,
+                lastKey = GroupListKey(k1 = 3, k2 = 12, groupId = 7),
+            )
 
         val result = service.get(request())
 
@@ -113,8 +119,6 @@ class GroupExploreServiceTest {
     private fun row(
         groupId: Long,
         coverS3Key: String? = null,
-        k1: Long = 0,
-        k2: Long = 0,
     ) = GroupCardRow(
         groupId = groupId,
         name = "그룹$groupId",
@@ -124,7 +128,5 @@ class GroupExploreServiceTest {
         reviewCount = 0,
         placeCount = 0,
         matchedSavedPlaceCount = 0,
-        sortKey1 = k1,
-        sortKey2 = k2,
     )
 }

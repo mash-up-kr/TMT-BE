@@ -32,15 +32,18 @@ object FoodCategories {
  */
 object CurationPresets {
     data class Preset(
+        /** 화면 노출 문구. 목록 응답의 label이자 검색 조건 프리셋의 이름이다 */
+        val label: String,
         val categoryId: String? = null,
         val regionPrefix: String? = null,
     )
 
+    /** 목록 응답의 순서이기도 하다 — 화면 칩 배열이 이 순서다 */
     val BY_ID: Map<String, Preset> =
-        mapOf(
-            "curation_euljiro_yajang" to Preset(regionPrefix = "중구"),
-            "curation_ganmaek" to Preset(categoryId = "cat_pub"),
-            "curation_butteotteok" to Preset(categoryId = "cat_cafe"),
-            "curation_lamb" to Preset(categoryId = "cat_meat"),
+        linkedMapOf(
+            "curation_euljiro_yajang" to Preset(label = "을지로 야장", regionPrefix = "중구"),
+            "curation_ganmaek" to Preset(label = "간맥집", categoryId = "cat_pub"),
+            "curation_butteotteok" to Preset(label = "버터떡 카페", categoryId = "cat_cafe"),
+            "curation_lamb" to Preset(label = "양갈비", categoryId = "cat_meat"),
         )
 }
