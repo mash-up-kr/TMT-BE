@@ -8,6 +8,7 @@ import com.tmt.application.port.input.PlaceSelection
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -77,9 +78,26 @@ class SaveCreationServiceTest {
 
     @Test
     fun `미충족 요청은 매장 집계를 건드리지 않는다 (P9·E6)`() {
-        service.create(command(rating = 4, content = "본문만 있고 사진이 없다"))
+        service.create(command(rating = 4, content = "태그를 안 골라 미충족이다"))
 
         assertTrue(placeStatsPort.added.isEmpty())
+    }
+
+    @Test
+    fun `사진 없이 나머지를 채우면 리뷰·티켓이 나간다 (C4-1)`() {
+        val result =
+            service.create(
+                command(
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "사진은 못 찍었지만 맛있었다",
+                ),
+            )
+
+        assertNotNull(result.reviewId)
+        assertEquals(1, result.grantedCount)
+        assertEquals(1, placeStatsPort.added.size)
     }
 
     @Test

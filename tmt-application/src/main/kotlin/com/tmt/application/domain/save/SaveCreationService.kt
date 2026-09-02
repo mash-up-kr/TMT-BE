@@ -70,7 +70,6 @@ class SaveCreationService(
 
         val completed =
             SaveRules.satisfiesReviewCriteria(
-                photoCount = command.photoAssetIds.size,
                 companionTagCount = command.companionTagIds.size,
                 positivePointTagCount = command.positivePointTagIds.size,
                 rating = command.rating,
