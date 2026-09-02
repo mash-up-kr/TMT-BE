@@ -2,6 +2,7 @@ package com.tmt.input.http.exception
 
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.ErrorType
+import com.tmt.common.exception.TicketShortageException
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.filter.RequestIdFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,6 +26,22 @@ class ExceptionAdvice {
             logger.warn { "TmtException 발생 - ${e.errorCode.name}: ${e.detailMessage ?: e.errorCode.defaultMessage}" }
         }
         return problemDetail(e.errorCode, e.detailMessage)
+    }
+
+    /** 티켓이 걸린 409는 화면 갱신용 티켓 상태를 함께 싣는다 (공통 규약 §3-2, I §6-4). */
+    @ExceptionHandler(TicketShortageException::class)
+    fun handleTicketShortage(e: TicketShortageException): ProblemDetail {
+        logger.warn { "티켓 부족 - ${e.errorCode.name}: available=${e.availableCount}" }
+        return problemDetail(e.errorCode, detail = null).apply {
+            setProperty(
+                "ticket",
+                mapOf(
+                    "requiredCount" to e.requiredCount,
+                    "availableCount" to e.availableCount,
+                    "shortageCount" to e.shortageCount,
+                ),
+            )
+        }
     }
 
     @ExceptionHandler(

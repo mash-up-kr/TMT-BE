@@ -250,6 +250,17 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
     ) {
         counts[userId] = counts.getOrDefault(userId, 0) + 1
     }
+
+    /** 회수는 잔고가 있을 때만 성공한다 — 0장이면 삭제가 거절되는 자리다 (R7). */
+    override fun revokeOneForReview(
+        userId: Long,
+        reviewId: Long,
+    ): Boolean {
+        val available = counts.getOrDefault(userId, 0)
+        if (available <= 0) return false
+        counts[userId] = available - 1
+        return true
+    }
 }
 
 class FakePlaceStatsPort : PlaceStatsPort {

@@ -19,6 +19,9 @@ interface GroupReviewSharePort {
         userId: Long,
     ): Int
 
+    /** 이 리뷰가 공유돼 있는 그룹들 — 집계를 다시 맞출 대상이라 내리기 **전에** 조회한다. */
+    fun findSharedGroupIds(reviewId: Long): List<Long>
+
     /** 리뷰가 삭제되면 공유된 모든 그룹에서 내린다. 내린 건수를 돌려준다. */
     fun unshareByReview(reviewId: Long): Int
 }

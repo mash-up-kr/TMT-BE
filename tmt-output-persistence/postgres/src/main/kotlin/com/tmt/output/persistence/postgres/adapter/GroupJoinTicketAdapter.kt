@@ -33,4 +33,9 @@ class GroupJoinTicketAdapter(
             )
         groupJoinTicketRepository.save(GroupJoinTicketEntity(userId = userId, rewardGrantId = grant.id))
     }
+
+    override fun revokeOneForReview(
+        userId: Long,
+        reviewId: Long,
+    ): Boolean = groupJoinTicketRepository.revokeOneForReview(userId, reviewId) > 0
 }
