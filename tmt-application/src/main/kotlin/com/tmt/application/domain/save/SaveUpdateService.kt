@@ -49,7 +49,11 @@ class SaveUpdateService(
             reattachableIds = existingAssetIds.toSet(),
         )
 
-        saveCommandPort.updateSave(command.saveId, command.rating, command.content)
+        // 조회와 이 UPDATE 사이에 동시 삭제가 끼면 0행이다. 그대로 진행하면 사라진 save_id로
+        // insertPhotos가 FK를 위반해 500이 된다 — 여기서 404로 끊는다 (TMT-301)
+        if (saveCommandPort.updateSave(command.saveId, command.rating, command.content) == 0) {
+            throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+        }
         // 전체 교체다 — 남은 save_photo 행이 있으면 media_asset_id UNIQUE가 재부착을 막는다
         saveCommandPort.deletePhotos(command.saveId)
         saveCommandPort.insertPhotos(command.saveId, command.photoAssetIds)
@@ -106,7 +110,10 @@ class SaveUpdateService(
         // save 행을 지운다 (F·G·I §5-2). V1 FK에 ON DELETE CASCADE가 없어 자식을 먼저 지운다
         saveCommandPort.deletePhotos(saveId)
         saveCommandPort.deleteTags(saveId)
-        saveCommandPort.deleteSave(saveId)
+        // 동시 삭제에 밀리면 0행이다 — 이미 지운 것을 다시 지워도 404다 (F·G·I §5-2)
+        if (saveCommandPort.deleteSave(saveId) == 0) {
+            throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+        }
         // 사진은 지우지 않고 STAGED로 되돌린다 — 미부착 TTL이 정리한다 (M4)
         attachMediaUseCase.detach(assetIds)
     }
