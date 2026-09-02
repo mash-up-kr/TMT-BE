@@ -24,10 +24,11 @@ class PlaceDetailServiceTest {
     private fun detailRow(
         ratingSum: Long,
         reviewCount: Int,
+        categoryId: String? = "cat_korean",
     ) = PlaceDetailRow(
         placeId = 1,
         name = "우래옥",
-        categoryId = "cat_korean",
+        categoryId = categoryId,
         ratingSum = ratingSum,
         reviewCount = reviewCount,
         roadAddress = "서울 중구",
@@ -65,9 +66,24 @@ class PlaceDetailServiceTest {
 
         val detail = service.get(9, 1)
 
+        // 아이콘 키는 DB 값 그대로, 노출명은 라벨로 (TMT-239)
+        assertEquals("cat_korean", detail.categoryId)
         assertEquals("한식", detail.categoryName)
         assertEquals("https://media.example/review/a.jpg", detail.photos.single().url)
         assertEquals(3, detail.photos.single().reviewId)
+    }
+
+    @Test
+    fun `카테고리 매핑에 실패한 매장은 아이콘 키와 노출명이 둘 다 null이다`() {
+        // 적재분의 약 1%는 데이터 한계로 매핑이 안 된다 (E11). 임의 카테고리로 채우면 틀린 아이콘이 나간다
+        every { queryPort.findPlaceDetail(1, null) } returns
+            detailRow(ratingSum = 0, reviewCount = 0, categoryId = null)
+        every { queryPort.findRecentPlacePhotos(1, any()) } returns emptyList()
+
+        val detail = service.get(null, 1)
+
+        assertNull(detail.categoryId)
+        assertNull(detail.categoryName)
     }
 
     @Test

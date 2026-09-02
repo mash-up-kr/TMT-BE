@@ -168,6 +168,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         value = """
             SELECT p.id AS placeId, p.name AS name,
                    ST_Y(p.location::geometry) AS latitude, ST_X(p.location::geometry) AS longitude,
+                   p.category_id AS categoryId,
                    p.review_count AS reviewCount
             FROM place p
             WHERE p.review_count > 0
@@ -211,6 +212,8 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         fun getLatitude(): Double
 
         fun getLongitude(): Double
+
+        fun getCategoryId(): String?
 
         fun getReviewCount(): Int
     }

@@ -138,7 +138,7 @@ class NearbyControllerTest {
 
         placesResult =
             NearbyPlacesResult(
-                pins = listOf(NearbyPlacesResult.Pin(5, "큰집", 37.4857, 126.8887, 3)),
+                pins = listOf(NearbyPlacesResult.Pin(5, "큰집", 37.4857, 126.8887, "cat_korean", 3)),
                 truncated = true,
             )
 
@@ -146,6 +146,7 @@ class NearbyControllerTest {
             .perform(get("/v1/nearby/places?north=37.50&south=37.47&east=126.91&west=126.87&query=큰집"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].placeId").value("place_5"))
+            .andExpect(jsonPath("$.items[0].categoryId").value("cat_korean"))
             .andExpect(jsonPath("$.items[0].reviewCount").value(3))
             .andExpect(jsonPath("$.truncated").value(true))
             .andExpect(jsonPath("$.nextCursor").doesNotExist())

@@ -49,6 +49,7 @@ class PlaceDetailController(
         return PlaceDetailResponse(
             placeId = PublicIds.place(detail.placeId),
             name = detail.name,
+            categoryId = detail.categoryId,
             categoryName = detail.categoryName,
             averageRating = detail.averageRating,
             reviewCount = detail.reviewCount,
@@ -131,6 +132,8 @@ class PlaceDetailController(
     data class PlaceDetailResponse(
         val placeId: String,
         val name: String,
+        /** 카테고리 아이콘 키 (E11). 14종 매핑에 실패하면 null */
+        val categoryId: String?,
         val categoryName: String?,
         val averageRating: Double?,
         val reviewCount: Int,
