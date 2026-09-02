@@ -59,9 +59,9 @@ interface GroupExploreRepository : JpaRepository<GroupEntity, Long> {
                           SELECT 1 FROM group_region_tag t
                           WHERE t.group_id = g.id AND t.region_tag_id = ANY(string_to_array(:regionCsv, ','))
                       ))
-                  AND (CAST(:query AS text) IS NULL
-                       OR g.name ILIKE '%' || :query || '%'
-                       OR g.one_line_description ILIKE '%' || :query || '%'
+                  AND (CAST(:queryPattern AS text) IS NULL
+                       OR g.name ILIKE :queryPattern ESCAPE '\'
+                       OR g.one_line_description ILIKE :queryPattern ESCAPE '\'
                        OR (CAST(:queryFoodCsv AS text) IS NOT NULL
                            AND g.food_category_id = ANY(string_to_array(:queryFoodCsv, ',')))
                        OR (CAST(:queryRegionCsv AS text) IS NOT NULL AND EXISTS (
@@ -79,7 +79,8 @@ interface GroupExploreRepository : JpaRepository<GroupEntity, Long> {
     )
     fun findGroupCards(
         @Param("viewerId") viewerId: Long?,
-        @Param("query") query: String?,
+        /** LikePatterns.contains로 이스케이프된 부분 일치 패턴. null이면 검색 없음. */
+        @Param("queryPattern") queryPattern: String?,
         @Param("queryFoodCsv") queryFoodCsv: String?,
         @Param("queryRegionCsv") queryRegionCsv: String?,
         @Param("foodCategoryId") foodCategoryId: String?,
