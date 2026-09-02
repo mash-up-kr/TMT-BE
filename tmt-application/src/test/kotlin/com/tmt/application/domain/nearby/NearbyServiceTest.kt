@@ -1,5 +1,6 @@
 package com.tmt.application.domain.nearby
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyReviewsRequest
@@ -28,7 +29,7 @@ class NearbyServiceTest {
             every { findTagRows(any()) } returns emptyList()
             every { findSummaryRows(any()) } returns emptyList()
         }
-    private val service = NearbyService(port, ReviewCardComposer(lookup, mediaBaseUrl = "https://media.example/"))
+    private val service = NearbyService(port, ReviewCardComposer(lookup, MediaUrlResolver("https://media.example/")))
 
     private fun row(
         reviewId: Long,

@@ -1,5 +1,6 @@
 package com.tmt.application.domain.group
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CheckGroupNameUseCase
 import com.tmt.application.port.input.GetGroupsUseCase
 import com.tmt.application.port.input.GroupCardView
@@ -9,7 +10,6 @@ import com.tmt.application.port.output.persistence.GroupCardsQuery
 import com.tmt.application.port.output.persistence.GroupExplorePort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class GroupExploreService(
     private val groupExplorePort: GroupExplorePort,
-    @param:Value("\${tmt.media.base-url:}") private val mediaBaseUrl: String,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) : GetGroupsUseCase,
     CheckGroupNameUseCase {
     override fun get(request: GroupsRequest): GroupsResult {
@@ -53,7 +53,7 @@ class GroupExploreService(
                         name = row.name,
                         oneLineDescription = row.oneLineDescription,
                         // 공개 읽기 버킷 (TMT-201) — base-url + s3_key가 곧 조회 URL이다
-                        coverImageUrl = row.coverS3Key?.let { "${mediaBaseUrl.trimEnd('/')}/$it" },
+                        coverImageUrl = row.coverS3Key?.let(mediaUrlResolver::urlOf),
                         memberCount = row.memberCount,
                         reviewCount = row.reviewCount,
                         placeCount = row.placeCount,
