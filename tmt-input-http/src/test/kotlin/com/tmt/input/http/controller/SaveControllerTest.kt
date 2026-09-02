@@ -7,9 +7,18 @@ import com.tmt.application.domain.idempotency.IdempotencyService
 import com.tmt.application.domain.idempotency.IdempotentRequestTransaction
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.CreateSaveUseCase
+import com.tmt.application.port.input.DeleteSaveUseCase
+import com.tmt.application.port.input.GetSaveUseCase
+import com.tmt.application.port.input.ListMySavesUseCase
+import com.tmt.application.port.input.MySaveView
+import com.tmt.application.port.input.MySavesRequest
+import com.tmt.application.port.input.MySavesResult
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.ResolveAddressCoordinateUseCase
+import com.tmt.application.port.input.SaveDetailView
 import com.tmt.application.port.input.SaveResult
+import com.tmt.application.port.input.UpdateSaveCommand
+import com.tmt.application.port.input.UpdateSaveUseCase
 import com.tmt.application.port.output.address.AddressCandidate
 import com.tmt.application.port.output.address.AddressCoordinateKey
 import com.tmt.application.port.output.persistence.IdempotencyPort
@@ -24,7 +33,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -33,6 +45,10 @@ import java.time.Instant
 
 class SaveControllerTest {
     private val createSaveUseCase = RecordingCreateSaveUseCase()
+    private val updateSaveUseCase = RecordingUpdateSaveUseCase()
+    private val deleteSaveUseCase = RecordingDeleteSaveUseCase()
+    private val getSaveUseCase = StubGetSaveUseCase()
+    private val listMySavesUseCase = InMemoryListMySavesUseCase()
     private val codec = IdempotencyPayloadCodec()
     private val idempotencyPort = InMemoryIdempotencyPort()
     private val addressIdTokenCodec = AddressIdTokenCodec(secret = "test-secret")
@@ -57,6 +73,10 @@ class SaveControllerTest {
             .standaloneSetup(
                 SaveController(
                     createSaveUseCase = createSaveUseCase,
+                    updateSaveUseCase = updateSaveUseCase,
+                    deleteSaveUseCase = deleteSaveUseCase,
+                    getSaveUseCase = getSaveUseCase,
+                    listMySavesUseCase = listMySavesUseCase,
                     idempotentRequestUseCase =
                         IdempotencyService(
                             idempotencyPort,
@@ -220,6 +240,240 @@ class SaveControllerTest {
         postSave("""{ "placeId": "place_1", "photoAssetIds": ["asset_1"] }""")
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("MEDIA_NOT_OWNED"))
+    }
+
+    private fun putSave(
+        saveId: String,
+        body: String,
+        userId: Long = 1,
+        idempotencyKey: String = "key-put",
+    ) = mockMvc.perform(
+        put("/v1/saves/$saveId")
+            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .header(IdempotencyKeyArgumentResolver.HEADER, idempotencyKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body),
+    )
+
+    @Test
+    fun `이어쓰기는 200과 판정 결과를 준다`() {
+        updateSaveUseCase.reviewed = true
+
+        putSave("save_9", """{ "placeId": "place_1", "photoAssetIds": ["7"], "rating": 5, "content": "맛있어요" }""")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.saveId").value("save_9"))
+            .andExpect(jsonPath("$.reviewId").value("rv_100"))
+            .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+
+        val command = updateSaveUseCase.commands.single()
+        assertEquals(9L, command.saveId)
+        assertEquals(1L, command.placeId)
+        assertEquals(listOf(7L), command.photoAssetIds)
+    }
+
+    @Test
+    fun `이미 리뷰가 된 저장의 이어쓰기는 거부된다 (S4)`() {
+        updateSaveUseCase.error = ErrorCode.SAVE_ALREADY_REVIEWED
+
+        putSave("save_9", """{ "placeId": "place_1" }""")
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("SAVE_ALREADY_REVIEWED"))
+    }
+
+    @Test
+    fun `매장 변경 시도는 SAVE_PLACE_IMMUTABLE이다 (S6)`() {
+        updateSaveUseCase.error = ErrorCode.SAVE_PLACE_IMMUTABLE
+
+        putSave("save_9", """{ "placeId": "place_2" }""")
+            .andExpect(status().isUnprocessableEntity)
+            .andExpect(jsonPath("$.code").value("SAVE_PLACE_IMMUTABLE"))
+    }
+
+    @Test
+    fun `이어쓰기도 같은 키 재요청에 두 번 실행되지 않는다 (규약 §9)`() {
+        val body = """{ "placeId": "place_1", "rating": 4 }"""
+        putSave("save_9", body).andExpect(status().isOk)
+        putSave("save_9", body).andExpect(status().isOk)
+
+        assertEquals(1, updateSaveUseCase.commands.size)
+    }
+
+    @Test
+    fun `임시저장 버리기는 204다`() {
+        mockMvc
+            .perform(delete("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isNoContent)
+
+        assertEquals(listOf(1L to 9L), deleteSaveUseCase.deleted)
+    }
+
+    @Test
+    fun `리뷰가 된 저장은 이 경로로 지울 수 없다`() {
+        deleteSaveUseCase.error = ErrorCode.SAVE_ALREADY_REVIEWED
+
+        mockMvc
+            .perform(delete("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("SAVE_ALREADY_REVIEWED"))
+    }
+
+    @Test
+    fun `본인 상세는 mock과 같은 형태로 내려간다`() {
+        mockMvc
+            .perform(get("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.saveId").value("save_9"))
+            .andExpect(jsonPath("$.place.placeId").value("place_1"))
+            .andExpect(jsonPath("$.place.categoryName").value("한식"))
+            .andExpect(jsonPath("$.photos[0].photoId").value("sp_5"))
+            .andExpect(jsonPath("$.photos[0].url").value("https://media.tmt.example/photos/5.jpg"))
+            .andExpect(jsonPath("$.tags[0].tagId").value("tag_couple"))
+            .andExpect(jsonPath("$.rating").value(4))
+            .andExpect(jsonPath("$.aiSummary").doesNotExist())
+    }
+
+    @Test
+    fun `남의 저장 조회는 없는 저장과 같게 404다 (S8)`() {
+        mockMvc
+            .perform(get("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "2"))
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("SAVE_NOT_FOUND"))
+    }
+
+    @Test
+    fun `이어쓰기 목록은 커서로 중복·누락 없이 끝까지 이어진다`() {
+        listMySavesUseCase.seed(count = 5)
+
+        val collected = mutableListOf<String>()
+        var cursor: String? = null
+        do {
+            val body =
+                mockMvc
+                    .perform(
+                        get("/v1/saves")
+                            .header(UserIdArgumentResolver.HEADER, "1")
+                            .param("limit", "2")
+                            .apply { cursor?.let { param("cursor", it) } },
+                    ).andExpect(status().isOk)
+                    .andReturn()
+                    .response
+                    .contentAsString
+            collected += Regex("\"saveId\":\"([^\"]+)\"").findAll(body).map { it.groupValues[1] }
+            cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+        } while (cursor != null)
+
+        assertEquals(listOf("save_5", "save_4", "save_3", "save_2", "save_1"), collected)
+    }
+
+    @Test
+    fun `다른 사용자의 커서는 INVALID_CURSOR다`() {
+        listMySavesUseCase.seed(count = 5)
+        val cursor =
+            mockMvc
+                .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "1").param("limit", "2"))
+                .andReturn()
+                .response
+                .contentAsString
+                .let { Regex("\"nextCursor\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
+
+        mockMvc
+            .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "2").param("cursor", cursor))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
+    }
+
+    private class RecordingUpdateSaveUseCase : UpdateSaveUseCase {
+        val commands = mutableListOf<UpdateSaveCommand>()
+        var reviewed = false
+        var error: ErrorCode? = null
+
+        override fun update(command: UpdateSaveCommand): SaveResult {
+            error?.let { throw TmtException(it) }
+            commands += command
+            return SaveResult(
+                saveId = command.saveId,
+                reviewId = if (reviewed) 100L else null,
+                placeId = command.placeId ?: 1L,
+                grantedCount = if (reviewed) 1 else 0,
+                availableCount = if (reviewed) 2 else 1,
+            )
+        }
+    }
+
+    private class RecordingDeleteSaveUseCase : DeleteSaveUseCase {
+        val deleted = mutableListOf<Pair<Long, Long>>()
+        var error: ErrorCode? = null
+
+        override fun delete(
+            userId: Long,
+            saveId: Long,
+        ) {
+            error?.let { throw TmtException(it) }
+            deleted += userId to saveId
+        }
+    }
+
+    /** 소유자는 1번 사용자다 — 그 밖의 조회는 FORBIDDEN. */
+    private class StubGetSaveUseCase : GetSaveUseCase {
+        override fun get(
+            userId: Long,
+            saveId: Long,
+        ): SaveDetailView {
+            if (userId != 1L) throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+            return SaveDetailView(
+                saveId = saveId,
+                reviewId = null,
+                place =
+                    SaveDetailView.Place(
+                        placeId = 1,
+                        name = "한판승부",
+                        roadAddress = "서울 마포구 도화동 1",
+                        categoryName = "한식",
+                    ),
+                photos =
+                    listOf(
+                        SaveDetailView.Photo(photoId = 5, url = "https://media.tmt.example/photos/5.jpg", order = 0),
+                    ),
+                tags = listOf(SaveDetailView.Tag("tag_couple", "연인")),
+                rating = 4,
+                content = "맛있어요",
+                aiSummary = null,
+                createdAt = Instant.parse("2026-08-27T00:00:00Z"),
+            )
+        }
+    }
+
+    /** 실제 어댑터와 같이 키셋으로 자른다 — 커서 왕복의 중복·누락을 볼 수 있어야 한다. */
+    private class InMemoryListMySavesUseCase : ListMySavesUseCase {
+        private var rows = emptyList<MySaveView>()
+
+        fun seed(count: Int) {
+            rows =
+                (count downTo 1).map {
+                    MySaveView(
+                        saveId = it.toLong(),
+                        placeId = 1,
+                        placeName = "한판승부",
+                        placeRoadAddress = "서울 마포구 도화동 1",
+                        thumbnailUrl = null,
+                        updatedAt = Instant.parse("2026-08-27T00:00:00Z").plusSeconds(it.toLong()),
+                    )
+                }
+        }
+
+        override fun list(request: MySavesRequest): MySavesResult {
+            val after = request.after
+            val remaining =
+                rows.filter {
+                    after == null ||
+                        it.updatedAt < after.updatedAt ||
+                        (it.updatedAt == after.updatedAt && it.saveId < after.saveId)
+                }
+            return MySavesResult(
+                items = remaining.take(request.limit),
+                hasNext = remaining.size > request.limit,
+            )
+        }
     }
 
     private class RecordingCreateSaveUseCase : CreateSaveUseCase {
