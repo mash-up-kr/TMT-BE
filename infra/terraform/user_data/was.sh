@@ -36,9 +36,10 @@ mkdir -p "$(dirname "$STATE")"
 TOKEN=$(curl -sS -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
 REGION=$(curl -sS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
 
-read -r _ swap_total < <(grep '^SwapTotal:' /proc/meminfo)
-read -r _ swap_free  < <(grep '^SwapFree:'  /proc/meminfo)
-read -r _ mem_avail  < <(grep '^MemAvailable:' /proc/meminfo)
+# /proc/meminfo는 "SwapTotal:  2097148 kB" 꼴 — 숫자 필드만 뽑는다 (read로 받으면 "kB"가 붙어 정수 비교가 깨진다)
+swap_total=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo)
+swap_free=$(awk '/^SwapFree:/ {print $2}' /proc/meminfo)
+mem_avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
 pswpin=$(awk '/^pswpin/ {print $2}' /proc/vmstat)
 pswpout=$(awk '/^pswpout/ {print $2}' /proc/vmstat)
 
