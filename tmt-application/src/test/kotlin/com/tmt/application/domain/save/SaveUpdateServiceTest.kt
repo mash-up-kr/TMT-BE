@@ -120,6 +120,27 @@ class SaveUpdateServiceTest {
     }
 
     @Test
+    fun `사진 없이 이어써도 리뷰·티켓이 나간다 (C4-1)`() {
+        val saveId = seedDraft()
+
+        val result =
+            service.update(
+                updateCommand(
+                    saveId = saveId,
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "사진은 못 찍었지만 맛있었다",
+                ),
+            )
+
+        assertNotNull(result.reviewId)
+        assertEquals(1, result.grantedCount)
+        assertEquals(listOf(1L to 5), placeStatsPort.added)
+        assertTrue(published.any { it is ReviewCommittedEvent })
+    }
+
+    @Test
     fun `판정을 못 채우면 리뷰도 티켓도 집계도 없다 (C4)`() {
         val saveId = seedDraft()
 
