@@ -178,6 +178,35 @@ class PersistenceFixtures(
         jdbcTemplate.update("DELETE FROM place_favorite WHERE user_id = ? AND place_id = ?", userId, placeId)
     }
 
+    /** 그룹. `name`이 UNIQUE(G6)라 유일값을 넣는다. `member_count`는 생성자 포함 1에서 시작한다 */
+    fun newGroup(
+        ownerId: Long,
+        foodCategoryId: String = "cat_korean",
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO groups (name, one_line_description, food_category_id, owner_id)
+            VALUES (?, '한 줄 소개', ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            "테스트그룹${nextSequence()}",
+            foodCategoryId,
+            ownerId,
+        )
+
+    /** 공유는 `(group_id, review_id)`가 UNIQUE라 같은 리뷰를 한 그룹에 두 번 넣을 수 없다 (share_uq) */
+    fun shareReview(
+        groupId: Long,
+        reviewId: Long,
+        userId: Long,
+    ): Long =
+        insertReturningId(
+            "INSERT INTO group_review_share (group_id, review_id, user_id) VALUES (?, ?, ?) RETURNING id",
+            groupId,
+            reviewId,
+            userId,
+        )
+
     private fun insertReturningId(
         sql: String,
         vararg args: Any?,
