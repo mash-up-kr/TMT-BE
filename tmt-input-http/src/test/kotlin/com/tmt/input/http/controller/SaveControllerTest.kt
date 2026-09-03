@@ -299,6 +299,17 @@ class SaveControllerTest {
     }
 
     @Test
+    fun `경로 표기가 달라도 같은 저장이면 한 멱등 공간이다 (TMT-301)`() {
+        val body = """{ "placeId": "place_1", "rating": 4 }"""
+
+        // 멱등 키의 endpoint 성분이 경로 원문이면 save_9와 9가 다른 공간이 되어 두 번 실행된다
+        putSave("save_9", body).andExpect(status().isOk)
+        putSave("9", body).andExpect(status().isOk)
+
+        assertEquals(1, updateSaveUseCase.commands.size)
+    }
+
+    @Test
     fun `임시저장 버리기는 204다`() {
         mockMvc
             .perform(delete("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))

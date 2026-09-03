@@ -6,6 +6,7 @@ import com.tmt.application.domain.media.MediaAttachmentService
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.UpdateSaveCommand
+import com.tmt.application.port.output.persistence.SaveCommandPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -273,5 +274,48 @@ class SaveUpdateServiceTest {
             ErrorCode.SAVE_NOT_FOUND,
             assertThrows<TmtException> { service.delete(userId = 1, saveId = 999) }.errorCode,
         )
+    }
+
+    @Test
+    fun `조회 뒤 동시 삭제로 갱신이 0행이면 404다 (TMT-301)`() {
+        val saveId = seedDraft()
+
+        // 조회는 성공하고 UPDATE만 0행인 상태 — 실제 동시 DELETE가 만드는 창이다.
+        // 그대로 진행하면 사라진 save_id로 insertPhotos가 FK를 위반해 500이 된다
+        val error = assertThrows<TmtException> { raceLostService.update(updateCommand(saveId)) }
+
+        assertEquals(ErrorCode.SAVE_NOT_FOUND, error.errorCode)
+    }
+
+    @Test
+    fun `조회 뒤 동시 삭제로 삭제가 0행이면 404다 (TMT-301)`() {
+        val saveId = seedDraft()
+
+        val error = assertThrows<TmtException> { raceLostService.delete(userId = 1, saveId = saveId) }
+
+        assertEquals(ErrorCode.SAVE_NOT_FOUND, error.errorCode)
+    }
+
+    /** 조회는 통과시키고 쓰기만 0행으로 돌려 경합에 밀린 순간을 만든다. */
+    private val raceLostService =
+        SaveUpdateService(
+            saveQueryPort = saveQueryPort,
+            saveCommandPort = RaceLostCommandPort(saveCommandPort),
+            saveWriteSupport = writeSupport,
+            attachMediaUseCase = attachMediaUseCase,
+            placeStatsPort = placeStatsPort,
+            eventPublisher = ApplicationEventPublisher { published += it },
+        )
+
+    private class RaceLostCommandPort(
+        delegate: SaveCommandPort,
+    ) : SaveCommandPort by delegate {
+        override fun updateSave(
+            saveId: Long,
+            rating: Int?,
+            content: String?,
+        ): Int = 0
+
+        override fun deleteSave(saveId: Long): Int = 0
     }
 }

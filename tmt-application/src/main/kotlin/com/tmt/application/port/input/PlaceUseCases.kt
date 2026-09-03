@@ -13,6 +13,8 @@ interface GetPlaceDetailUseCase {
 data class PlaceDetailView(
     val placeId: Long,
     val name: String,
+    /** 아이콘 키 (E11). 14종 매핑에 실패하면 null */
+    val categoryId: String?,
     val categoryName: String?,
     /** rating_sum / review_count 소수 첫째 자리 (P9). 리뷰 0건이면 null */
     val averageRating: Double?,
@@ -112,6 +114,8 @@ data class PlaceCardView(
     val name: String,
     val roadAddress: String,
     val regionName: String,
+    /** 아이콘 키 (E11). 14종 매핑에 실패하면 null */
+    val categoryId: String?,
     val categoryName: String?,
     val averageRating: Double?,
     val reviewCount: Int,

@@ -85,6 +85,13 @@ class NearbyQueryAdapter(
                 regionPrefix = regionPrefix,
                 limitPlusOne = limit + 1,
             ).map {
-                PinRow(it.getPlaceId(), it.getName(), it.getLatitude(), it.getLongitude(), it.getReviewCount())
+                PinRow(
+                    placeId = it.getPlaceId(),
+                    name = it.getName(),
+                    latitude = it.getLatitude(),
+                    longitude = it.getLongitude(),
+                    categoryId = it.getCategoryId(),
+                    reviewCount = it.getReviewCount(),
+                )
             }
 }

@@ -15,6 +15,7 @@ class GroupReviewShareAdapter(
         userId: Long,
         reviewId: Long,
     ) {
+        // ON CONFLICT DO NOTHING이라 0행은 "이미 공유됨"이고 멱등이 성립한 것이다 (share_uq)
         groupReviewShareRepository.share(groupId = groupId, reviewId = reviewId, userId = userId)
     }
 

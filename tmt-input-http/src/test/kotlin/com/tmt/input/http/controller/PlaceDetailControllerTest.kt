@@ -40,6 +40,7 @@ class PlaceDetailControllerTest {
                 return PlaceDetailView(
                     placeId = 5,
                     name = "큰집",
+                    categoryId = "cat_meat",
                     categoryName = "고기·구이",
                     averageRating = 4.5,
                     reviewCount = 2,
@@ -92,6 +93,8 @@ class PlaceDetailControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.placeId").value("place_5"))
             .andExpect(jsonPath("$.name").value("큰집"))
+            .andExpect(jsonPath("$.categoryId").value("cat_meat"))
+            .andExpect(jsonPath("$.categoryName").value("고기·구이"))
             .andExpect(jsonPath("$.averageRating").value(4.5))
             .andExpect(jsonPath("$.reviewCount").value(2))
             .andExpect(jsonPath("$.photos[0].reviewId").value("rv_7"))
@@ -193,6 +196,7 @@ class PlaceDetailControllerTest {
             placeId = 5,
             placeName = "큰집",
             placeRegionName = "구로구 구로동",
+            placeCategoryId = "cat_meat",
             placeCategoryName = "고기·구이",
             placeFavorite = false,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),

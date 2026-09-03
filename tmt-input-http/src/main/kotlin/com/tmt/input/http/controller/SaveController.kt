@@ -148,7 +148,8 @@ class SaveController(
             .execute(
                 IdempotentRequest(
                     userId = userId,
-                    endpoint = "PUT /v1/saves/$saveId",
+                    // 경로 원문이 아니라 파싱된 id를 쓴다 — save_9와 9가 같은 멱등 공간이어야 한다 (TMT-301)
+                    endpoint = "PUT /v1/saves/$id",
                     idemKey = key,
                     payload = request,
                     responseType = SaveResultResponse::class.java,

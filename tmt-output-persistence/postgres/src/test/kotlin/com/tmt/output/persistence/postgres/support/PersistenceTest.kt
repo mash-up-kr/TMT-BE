@@ -32,6 +32,9 @@ abstract class PersistenceTest {
     @Autowired
     protected lateinit var jdbcTemplate: JdbcTemplate
 
+    /** 테스트가 쓸 행을 만드는 곳. 규칙은 [PersistenceFixtures] 참고. */
+    protected val fixtures: PersistenceFixtures by lazy { PersistenceFixtures(jdbcTemplate) }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
