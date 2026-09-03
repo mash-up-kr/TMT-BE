@@ -93,10 +93,11 @@ class GroupExploreController(
     @GetMapping("/name-availability")
     fun nameAvailability(
         @UserId userId: Long,
-        @RequestParam(required = false) name: String?,
+        @RequestParam name: String,
     ): NameAvailabilityResponse {
-        if (name.isNullOrBlank()) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 필수입니다.")
+        // 누락은 Spring이 400으로 거른다(ExceptionAdvice). 빈 문자열(`?name=`)은 누락이 아니므로 여기서 본다
+        if (name.isBlank()) {
+            throw TmtException(ErrorCode.VALIDATION_FAILED, "name은 비어 있을 수 없습니다.")
         }
         return NameAvailabilityResponse(name = name, available = checkGroupNameUseCase.isAvailable(name))
     }

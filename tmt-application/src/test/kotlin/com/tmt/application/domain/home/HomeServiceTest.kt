@@ -2,8 +2,12 @@ package com.tmt.application.domain.home
 
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.review.ReviewCardComposer
+import com.tmt.application.port.input.GroupSort
 import com.tmt.application.port.input.HomeFeedRequest
 import com.tmt.application.port.output.persistence.GroupCardRow
+import com.tmt.application.port.output.persistence.GroupCardsQuery
+import com.tmt.application.port.output.persistence.GroupCardsSlice
+import com.tmt.application.port.output.persistence.GroupExplorePort
 import com.tmt.application.port.output.persistence.HomeFeedRows
 import com.tmt.application.port.output.persistence.HomeQueryPort
 import com.tmt.application.port.output.persistence.MyGroupRow
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
+import kotlin.test.assertNotNull
 
 /**
  * 홈 유스케이스 — 가입 그룹 0개의 성립, 추천 조회에 넘기는 조건, 좌표 유무에 따른 정렬 분기.
@@ -28,12 +33,13 @@ import java.time.Instant
  */
 class HomeServiceTest {
     private val queryPort = FakeHomeQueryPort()
-    private val service = HomeService(queryPort, composer())
+    private val groupPort = FakeGroupExplorePort()
+    private val service = HomeService(queryPort, groupPort, composer())
 
     @Test
     fun `가입 그룹이 0개여도 홈이 성립하고 추천은 채워진다`() {
         queryPort.myGroups = emptyList()
-        queryPort.recommended = listOf(groupCardRow(3), groupCardRow(4))
+        groupPort.recommended = listOf(groupCardRow(3), groupCardRow(4))
 
         val result = service.get(viewerId = 1)
 
@@ -46,7 +52,13 @@ class HomeServiceTest {
     fun `추천은 조회자 기준 상위 5개를 요청한다 — 가입 그룹 제외는 이 조회의 계약이다`() {
         service.get(viewerId = 42)
 
-        assertEquals(42L to HomeService.RECOMMENDED_COUNT, queryPort.recommendedCall)
+        // 홈은 그룹 탐색의 추천순을 그대로 쓰고, 가입한 그룹만 제외를 요청한다 (TMT-305)
+        val asked = assertNotNull(groupPort.lastQuery)
+        assertEquals(GroupSort.RECOMMENDED.name, asked.sort)
+        assertEquals(42L, asked.viewerId)
+        assertEquals(42L, asked.excludeJoinedBy)
+        assertEquals(HomeService.RECOMMENDED_COUNT, asked.limit)
+        assertNull(asked.after)
     }
 
     @Test
@@ -59,7 +71,7 @@ class HomeServiceTest {
     @Test
     fun `그룹 대표 이미지와 커버는 s3 키에 미디어 base-url을 붙여 내린다`() {
         queryPort.myGroups = listOf(MyGroupRow(1, "성수 커피 탐험대", "groups/1.jpg"))
-        queryPort.recommended = listOf(groupCardRow(3).copy(coverS3Key = "reviews/9.jpg"))
+        groupPort.recommended = listOf(groupCardRow(3).copy(coverS3Key = "reviews/9.jpg"))
 
         val result = service.get(viewerId = 1)
 
@@ -175,25 +187,28 @@ class HomeServiceTest {
             favorite = false,
         )
 
+    /** 홈은 그룹 탐색 포트에 추천 목록을 묻는다 — 무엇을 물었는지가 검증 대상이다 (TMT-305). */
+    private class FakeGroupExplorePort : GroupExplorePort {
+        var recommended: List<GroupCardRow> = emptyList()
+        var lastQuery: GroupCardsQuery? = null
+
+        override fun findGroupCards(query: GroupCardsQuery): GroupCardsSlice {
+            lastQuery = query
+            return GroupCardsSlice(rows = recommended, hasNext = false)
+        }
+
+        override fun existsByName(name: String): Boolean = error("홈에서 쓰지 않는다")
+    }
+
     private class FakeHomeQueryPort : HomeQueryPort {
         var nickname: String? = "하아얀"
         var myGroups: List<MyGroupRow> = emptyList()
-        var recommended: List<GroupCardRow> = emptyList()
         var feedRows: HomeFeedRows = HomeFeedRows(emptyList(), hasNext = false)
-        var recommendedCall: Pair<Long, Int>? = null
         var lastFeedMode: String? = null
 
         override fun findNickname(userId: Long): String? = nickname
 
         override fun findMyGroups(userId: Long): List<MyGroupRow> = myGroups
-
-        override fun findRecommendedGroups(
-            userId: Long,
-            limit: Int,
-        ): List<GroupCardRow> {
-            recommendedCall = userId to limit
-            return recommended
-        }
 
         override fun findFeedRowsByDistance(
             userId: Long,

@@ -44,17 +44,21 @@ interface GroupExploreRepository : JpaRepository<GroupEntity, Long> {
                     WHERE gp.group_id = g.id AND gp.place_id IN (SELECT place_id FROM my_place)
                 ) m ON CAST(:viewerId AS bigint) IS NOT NULL
                 LEFT JOIN LATERAL (
-                    -- 커버는 공유 리뷰의 최신 사진 1장 (G16) — 리뷰 최신순, 리뷰 안에서는 photo_order
+                    -- 커버 정본은 GroupCoverSql이다 (G16). 상세(N장)와 같은 자구를 쓴다
                     SELECT ma.s3_key
-                    FROM group_review_share s
-                    JOIN review r      ON r.id = s.review_id AND r.deleted_at IS NULL
-                    JOIN save_photo sp ON sp.save_id = r.save_id
-                    JOIN media_asset ma ON ma.id = sp.media_asset_id
+                    ${GroupCoverSql.FROM_JOINS}
                     WHERE s.group_id = g.id
-                    ORDER BY r.created_at DESC, r.id DESC, sp.photo_order
+                    ${GroupCoverSql.ORDER_BY}
                     LIMIT 1
                 ) cover ON true
                 WHERE (CAST(:foodCategoryId AS text) IS NULL OR g.food_category_id = :foodCategoryId)
+                  -- 홈 추천 캐러셀은 이미 가입한 그룹을 뺀다 (A §5-3). 탐색 목록은 null로 넘겨 전체를 본다
+                  AND (CAST(:excludeJoinedBy AS bigint) IS NULL OR NOT EXISTS (
+                          SELECT 1 FROM group_membership gm
+                          WHERE gm.group_id = g.id
+                            AND gm.user_id = CAST(:excludeJoinedBy AS bigint)
+                            AND gm.status = 'ACTIVE'
+                      ))
                   AND (CAST(:regionCsv AS text) IS NULL OR EXISTS (
                           SELECT 1 FROM group_region_tag t
                           WHERE t.group_id = g.id AND t.region_tag_id = ANY(string_to_array(:regionCsv, ','))
@@ -85,6 +89,8 @@ interface GroupExploreRepository : JpaRepository<GroupEntity, Long> {
         @Param("queryRegionCsv") queryRegionCsv: String?,
         @Param("foodCategoryId") foodCategoryId: String?,
         @Param("regionCsv") regionCsv: String?,
+        /** 이 사용자가 ACTIVE로 가입한 그룹을 후보에서 뺀다. null이면 빼지 않는다 (A §5-3). */
+        @Param("excludeJoinedBy") excludeJoinedBy: Long?,
         @Param("sort") sort: String,
         @Param("afterK1") afterK1: Long?,
         @Param("afterK2") afterK2: Long?,
