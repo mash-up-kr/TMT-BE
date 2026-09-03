@@ -2,8 +2,11 @@ package com.tmt.output.persistence.postgres.adapter
 
 import com.tmt.application.port.output.persistence.PlaceStatsPort
 import com.tmt.output.persistence.postgres.repository.PlaceStatsRepository
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+
+private val logger = KotlinLogging.logger {}
 
 @Component
 class PlaceStatsAdapter(
@@ -27,6 +30,9 @@ class PlaceStatsAdapter(
         placeId: Long,
         rating: Int,
     ) {
-        placeStatsRepository.removeReview(placeId, rating)
+        val updated = placeStatsRepository.removeReview(placeId, rating)
+        if (updated == 0) {
+            logger.warn { "place $placeId 집계가 이미 어긋나 차감을 건너뛴다 (P9)" }
+        }
     }
 }
