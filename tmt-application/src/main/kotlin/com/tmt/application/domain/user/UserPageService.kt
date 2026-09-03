@@ -160,6 +160,7 @@ class UserPageService(
                         name = row.name,
                         roadAddress = row.roadAddress,
                         regionName = row.regionName,
+                        categoryId = row.categoryId,
                         categoryName = FoodCategories.labelOf(row.categoryId),
                         averageRating = averageRating(row.ratingSum, row.reviewCount),
                         reviewCount = row.reviewCount,

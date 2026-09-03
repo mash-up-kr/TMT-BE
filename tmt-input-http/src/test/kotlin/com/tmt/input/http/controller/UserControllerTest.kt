@@ -142,6 +142,7 @@ class UserControllerTest {
             .andExpect(jsonPath("$.items[0].placeId").value("place_5"))
             .andExpect(jsonPath("$.items[0].isFavorite").value(true))
             .andExpect(jsonPath("$.items[0].averageRating").value(4.7))
+            .andExpect(jsonPath("$.items[0].categoryId").value("cat_korean"))
     }
 
     @Test
@@ -312,6 +313,7 @@ class UserControllerTest {
                             name = "김밥천국",
                             roadAddress = "서울 마포구 오목로 1",
                             regionName = "마포구 도화동",
+                            categoryId = "cat_korean",
                             categoryName = "한식",
                             averageRating = 4.7,
                             reviewCount = 3,

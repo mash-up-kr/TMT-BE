@@ -288,6 +288,7 @@ class UserController(
             name = name,
             roadAddress = roadAddress,
             regionName = regionName,
+            categoryId = categoryId,
             categoryName = categoryName,
             averageRating = averageRating,
             reviewCount = reviewCount,

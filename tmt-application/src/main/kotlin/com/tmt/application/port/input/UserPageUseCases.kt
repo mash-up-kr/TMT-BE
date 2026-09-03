@@ -90,6 +90,8 @@ data class FavoritePlaceView(
     val name: String,
     val roadAddress: String,
     val regionName: String,
+    /** 아이콘 키 (E11). 14종 매핑에 실패하면 null (TMT-239) */
+    val categoryId: String?,
     val categoryName: String?,
     /** 리뷰가 없으면 null. 소수 첫째 자리 (P9·규약 §8-3) */
     val averageRating: Double?,
