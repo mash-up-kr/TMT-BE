@@ -181,7 +181,7 @@ class PersistenceFixtures(
     /** 그룹. `name`이 UNIQUE(G6)라 유일값을 넣는다. `member_count`는 생성자 포함 1에서 시작한다 */
     fun newGroup(
         ownerId: Long,
-        foodCategoryId: String = "korean",
+        foodCategoryId: String = "cat_korean",
     ): Long =
         insertReturningId(
             """
