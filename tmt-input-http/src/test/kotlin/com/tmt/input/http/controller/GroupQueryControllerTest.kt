@@ -124,6 +124,7 @@ class GroupQueryControllerTest {
             placeId = 1L,
             placeName = "가게",
             placeRegionName = "구로구 구로동",
+            placeCategoryId = "cat_korean",
             placeCategoryName = "한식",
             placeFavorite = false,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),

@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 /**
  * 그룹 탐색 실구현 (TMT-220). 응답 형태·ID 표기(`group_`)는 mock과 같다.
  */
-@Tag(name = "그룹 (mock)", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
+@Tag(name = "그룹", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
 @RestController
 @RequestMapping("/v1/groups")
 class GroupExploreController(

@@ -8,6 +8,7 @@ import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.GroupDetailResponse
+import com.tmt.input.http.controller.dto.response.PublicIds
 import com.tmt.input.http.controller.dto.response.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -25,7 +26,7 @@ import java.net.URI
 /**
  * 그룹 생성·편집 실구현 (TMT-221). 응답 형태·ID 표기(`group_`)는 mock과 같다.
  */
-@Tag(name = "그룹 (mock)", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
+@Tag(name = "그룹", description = "명세 v2 — D_01. 그룹 탐색 · D_02. 그룹 생성·상세·편집")
 @RestController
 @RequestMapping("/v1/groups")
 class GroupCommandController(
@@ -65,7 +66,8 @@ class GroupCommandController(
         @UserId userId: Long,
         @PathVariable groupId: String,
         @RequestBody request: GroupRequest,
-    ): GroupDetailResponse = updateGroupUseCase.update(parseGroupId(groupId), request.toCommand(userId)).toResponse()
+    ): GroupDetailResponse =
+        updateGroupUseCase.update(PublicIds.parseGroupId(groupId), request.toCommand(userId)).toResponse()
 
     private fun GroupRequest.toCommand(requesterId: Long) =
         GroupCommand(
@@ -77,10 +79,6 @@ class GroupCommandController(
             regionTagIds = regionTagIds,
             imageAssetId = imageAssetId?.let(::parseAssetId),
         )
-
-    /** 접두·형식이 어긋나면 없는 자원과 같다 — 존재 여부를 새지 않게 NOT_FOUND 계열로 던진다. */
-    private fun parseGroupId(publicId: String): Long =
-        publicId.removePrefix("group_").toLongOrNull() ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
 
     /** 실구현 발급 assetId는 접두 없는 숫자 문자열이다 (TMT-202). 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
     private fun parseAssetId(assetId: String): Long =

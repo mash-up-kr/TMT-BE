@@ -76,6 +76,8 @@ class GroupCommandAdapter(
 
         // 집합 교체라 0행이 정상이다 — 태그가 없던 그룹도 같은 경로를 탄다
         regionTagRepository.deleteAllByGroupId(groupId)
+        // @EmbeddedId라 saveAll이 merge로 가서 태그 수만큼 SELECT가 선행한다 — 지역 태그 상한(26종)이
+        // 작아 감수한다. 벌크가 필요한 규모가 되면 Persistable 구현으로 바꾼다 (PR #87 리뷰)
         regionTagRepository.saveAll(regionTagIds.map { GroupRegionTagEntity(GroupRegionTagId(groupId, it)) })
     }
 
