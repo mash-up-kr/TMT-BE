@@ -1,11 +1,11 @@
 package com.tmt.application.domain.user
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.TicketHistoryItemType
 import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.output.persistence.FavoritePlaceRow
 import com.tmt.application.port.output.persistence.GroupJoinTicketPort
-import com.tmt.application.port.output.persistence.InProgressSaveRow
 import com.tmt.application.port.output.persistence.JoinedGroupRow
 import com.tmt.application.port.output.persistence.ProfileHeaderRow
 import com.tmt.application.port.output.persistence.ReviewGridRow
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class UserPageServiceTest {
     private val queryPort = FakeUserPageQueryPort()
     private val ticketPort = FakeGroupJoinTicketPort()
-    private val service = UserPageService(queryPort, ticketPort, "https://media.example.com/")
+    private val service = UserPageService(queryPort, ticketPort, MediaUrlResolver("https://media.example.com/"))
 
     @Test
     fun `내 프로필에는 티켓 수가 실리고 타인 프로필에는 실리지 않는다`() {
@@ -76,7 +76,7 @@ class UserPageServiceTest {
     }
 
     @Test
-    fun `사진이 없는 완성 리뷰는 그리드에서 건너뛴다`() {
+    fun `사진 0장 리뷰도 그리드에 남고 썸네일만 null이다`() {
         queryPort.reviewRows =
             listOf(
                 ReviewGridRow(1L, 11L, Instant.parse("2026-08-02T00:00:00Z"), null, 5L, "김밥천국", null),
@@ -85,7 +85,10 @@ class UserPageServiceTest {
 
         val slice = service.list(7L, NO_REVIEW_CURSOR, limit = 20)
 
-        assertEquals(listOf(2L), slice.items.map { it.reviewId })
+        // 건너뛰면 칩의 reviewCount와 그리드 개수가 어긋난다 (C4-1, J §8-3)
+        assertEquals(listOf(1L, 2L), slice.items.map { it.reviewId })
+        assertNull(slice.items[0].thumbnailUrl)
+        assertEquals("https://media.example.com/media/2.jpg", slice.items[1].thumbnailUrl)
     }
 
     @Test
@@ -122,17 +125,19 @@ class UserPageServiceTest {
                 JoinedGroupRow(3L, "매콤단짝", "맵부심 모임", null, 4, 10, 6, 2, Instant.parse("2026-07-01T00:00:00Z")),
             )
 
-        val card = service.list(7L, viewerId = null, after = null, limit = 20).items.single()
+        val item = service.list(7L, viewerId = null, after = null, limit = 20).items.single()
 
-        assertNull(card.coverImageUrl)
-        assertEquals(2, card.matchedSavedPlaceCount)
+        assertNull(item.card.coverImageUrl)
+        assertEquals(2, item.card.matchedSavedPlaceCount)
+        assertEquals(Instant.parse("2026-07-01T00:00:00Z"), item.joinedAt)
     }
 
     @Test
-    fun `티켓 이력은 원장과 작성 중 저장을 시각 역순으로 병합한다`() {
+    fun `티켓 이력은 발급·소비·회수만 시각 역순으로 내리고 작성 중 저장은 건수로만 내린다`() {
         queryPort.ledgerRows =
             listOf(
                 ledgerRow(TicketLedgerKind.SIGNUP_GRANT, refId = 1L, at = "2026-08-01T00:00:00Z"),
+                ledgerRow(TicketLedgerKind.REVIEW_DELETE_REVOKE, refId = 4L, at = "2026-08-04T00:00:00Z"),
                 ledgerRow(
                     TicketLedgerKind.GROUP_JOIN_CONSUME,
                     refId = 9L,
@@ -141,15 +146,42 @@ class UserPageServiceTest {
                     groupName = "매콤단짝",
                 ),
             )
-        queryPort.inProgressRows =
-            listOf(InProgressSaveRow(21L, Instant.parse("2026-08-02T00:00:00Z"), 5L, "김밥천국", "서울 마포구"))
+        queryPort.inProgressSaveCount = 2
+        ticketPort.available = 4
 
         val slice = service.list(7L, NO_TICKET_CURSOR, limit = 20)
 
-        assertEquals(listOf("tkh_c9", "tkh_s21", "tkh_g1"), slice.items.map { it.entryId })
-        assertEquals(listOf(-1, null, 1), slice.items.map { it.amount })
-        assertEquals(TicketHistoryItemType.SAVE_IN_PROGRESS, slice.items[1].type)
-        assertEquals("매콤단짝", slice.items[0].group?.name)
+        // T10 (2026-09-03 개정) — 미완성 저장 행이 목록에 섞이지 않는다
+        assertEquals(listOf("tkh_v4", "tkh_c9", "tkh_g1"), slice.items.map { it.entryId })
+        assertEquals(listOf(-1, -1, 1), slice.items.map { it.amount })
+        assertEquals(
+            listOf(
+                TicketHistoryItemType.REVIEW_DELETE_REVOKE,
+                TicketHistoryItemType.GROUP_JOIN,
+                TicketHistoryItemType.SIGNUP_REWARD,
+            ),
+            slice.items.map { it.type },
+        )
+        assertEquals("매콤단짝", slice.items[1].group?.name)
+        assertNull(slice.items[2].place)
+        assertEquals(2, slice.inProgressSaveCount)
+        assertEquals(4, slice.availableCount)
+    }
+
+    @Test
+    fun `작성 중 건수는 커서와 무관하게 전체 값이다`() {
+        queryPort.ledgerRows =
+            listOf(
+                ledgerRow(TicketLedgerKind.REVIEW_GRANT, refId = 2L, at = "2026-08-02T00:00:00Z"),
+                ledgerRow(TicketLedgerKind.REVIEW_GRANT, refId = 3L, at = "2026-08-03T00:00:00Z"),
+            )
+        queryPort.inProgressSaveCount = 1
+
+        val secondPage =
+            service.list(7L, after = TicketHistoryKey(Instant.parse("2026-08-03T00:00:00Z"), "tkh_g3"), limit = 20)
+
+        assertEquals(listOf("tkh_g2"), secondPage.items.map { it.entryId })
+        assertEquals(1, secondPage.inProgressSaveCount)
     }
 
     @Test
@@ -216,7 +248,7 @@ class UserPageServiceTest {
         var groupRows: List<JoinedGroupRow> = emptyList()
         var favoriteRows: List<FavoritePlaceRow> = emptyList()
         var ledgerRows: List<TicketLedgerRow> = emptyList()
-        var inProgressRows: List<InProgressSaveRow> = emptyList()
+        var inProgressSaveCount = 0
 
         override fun userExists(userId: Long): Boolean = existing?.contains(userId) ?: true
 
@@ -249,7 +281,7 @@ class UserPageServiceTest {
 
         override fun findTicketLedgerRows(userId: Long): List<TicketLedgerRow> = ledgerRows
 
-        override fun findInProgressSaveRows(userId: Long): List<InProgressSaveRow> = inProgressRows
+        override fun countInProgressSaves(userId: Long): Int = inProgressSaveCount
     }
 
     private class FakeGroupJoinTicketPort : GroupJoinTicketPort {
@@ -262,6 +294,9 @@ class UserPageServiceTest {
             reviewId: Long,
         ) = error("이 테스트에서 쓰지 않는다")
 
-        override fun grantForSignup(userId: Long) = error("이 테스트에서 쓰지 않는다")
+        override fun revokeOneForReview(
+            userId: Long,
+            reviewId: Long,
+        ): Boolean = error("이 테스트에서 쓰지 않는다")
     }
 }

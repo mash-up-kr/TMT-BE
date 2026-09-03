@@ -1,5 +1,6 @@
 package com.tmt.application.domain.user
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.place.FoodCategories
 import com.tmt.application.port.input.FavoriteKey
 import com.tmt.application.port.input.FavoritePlaceView
@@ -12,6 +13,7 @@ import com.tmt.application.port.input.GetUserReviewGridUseCase
 import com.tmt.application.port.input.GroupCardSlice
 import com.tmt.application.port.input.GroupCardView
 import com.tmt.application.port.input.JoinedGroupKey
+import com.tmt.application.port.input.JoinedGroupView
 import com.tmt.application.port.input.ReviewGridItemView
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.ReviewGridSlice
@@ -26,12 +28,8 @@ import com.tmt.application.port.output.persistence.TicketLedgerRow
 import com.tmt.application.port.output.persistence.UserPageQueryPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import io.github.oshai.kotlinlogging.KotlinLogging
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import kotlin.math.roundToInt
-
-private val logger = KotlinLogging.logger {}
 
 /**
  * 마이페이지·타인 프로필 (TMT-274) — UserMockController를 대체하는 실구현.
@@ -41,7 +39,7 @@ private val logger = KotlinLogging.logger {}
 class UserPageService(
     private val userPageQueryPort: UserPageQueryPort,
     private val groupJoinTicketPort: GroupJoinTicketPort,
-    @param:Value("\${tmt.media.base-url:}") private val mediaBaseUrl: String,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) : GetUserProfileUseCase,
     GetUserReviewGridUseCase,
     GetUserGroupsUseCase,
@@ -79,25 +77,23 @@ class UserPageService(
                 afterReviewId = after?.reviewId,
                 limitPlusOne = limit + 1,
             )
-        val items =
-            rows.take(limit).mapNotNull { row ->
-                // 완성 리뷰는 사진이 보장된다 (C4). 결측이면 데이터 결함 — 그리드에 그릴 수 없어 건너뛴다
-                val thumbnail = row.thumbnailS3Key
-                if (thumbnail == null) {
-                    logger.error { "완성 리뷰에 사진이 없다 - reviewId=${row.reviewId}" }
-                    return@mapNotNull null
-                }
-                ReviewGridItemView(
-                    reviewId = row.reviewId,
-                    saveId = row.saveId,
-                    thumbnailUrl = mediaUrl(thumbnail),
-                    placeId = row.placeId,
-                    placeName = row.placeName,
-                    placeCategoryName = FoodCategories.labelOf(row.placeCategoryId),
-                    createdAt = row.createdAt,
-                )
-            }
-        return ReviewGridSlice(items = items, hasNext = rows.size > limit)
+        return ReviewGridSlice(
+            items =
+                rows.take(limit).map { row ->
+                    ReviewGridItemView(
+                        reviewId = row.reviewId,
+                        saveId = row.saveId,
+                        // 사진 0장 리뷰(C4-1)도 리뷰다 — 건너뛰면 칩의 reviewCount와 그리드 개수가 어긋난다.
+                        // 썸네일만 비워 내리고 화면이 빈 썸네일을 그린다 (J §8-3)
+                        thumbnailUrl = row.thumbnailS3Key?.let(mediaUrlResolver::urlOf),
+                        placeId = row.placeId,
+                        placeName = row.placeName,
+                        placeCategoryName = FoodCategories.labelOf(row.placeCategoryId),
+                        createdAt = row.createdAt,
+                    )
+                },
+            hasNext = rows.size > limit,
+        )
     }
 
     override fun list(
@@ -118,15 +114,18 @@ class UserPageService(
         return GroupCardSlice(
             items =
                 rows.take(limit).map { row ->
-                    GroupCardView(
-                        groupId = row.groupId,
-                        name = row.name,
-                        oneLineDescription = row.oneLineDescription,
-                        coverImageUrl = row.coverS3Key?.let(::mediaUrl),
-                        memberCount = row.memberCount,
-                        reviewCount = row.reviewCount,
-                        placeCount = row.placeCount,
-                        matchedSavedPlaceCount = row.matchedSavedPlaceCount,
+                    JoinedGroupView(
+                        card =
+                            GroupCardView(
+                                groupId = row.groupId,
+                                name = row.name,
+                                oneLineDescription = row.oneLineDescription,
+                                coverImageUrl = row.coverS3Key?.let(mediaUrlResolver::urlOf),
+                                memberCount = row.memberCount,
+                                reviewCount = row.reviewCount,
+                                placeCount = row.placeCount,
+                                matchedSavedPlaceCount = row.matchedSavedPlaceCount,
+                            ),
                         joinedAt = row.joinedAt,
                     )
                 },
@@ -164,7 +163,7 @@ class UserPageService(
                         categoryName = FoodCategories.labelOf(row.categoryId),
                         averageRating = averageRating(row.ratingSum, row.reviewCount),
                         reviewCount = row.reviewCount,
-                        thumbnailUrl = row.thumbnailS3Key?.let(::mediaUrl),
+                        thumbnailUrl = row.thumbnailS3Key?.let(mediaUrlResolver::urlOf),
                         distanceMeters = row.distanceMeters,
                         isFavorite = row.favoriteByViewer,
                         favoritedAt = row.favoritedAt,
@@ -180,24 +179,15 @@ class UserPageService(
         limit: Int,
     ): TicketHistorySlice {
         ensureExists(userId)
-        // 아직 티켓이 나가지 않은 저장도 같은 목록에 섞인다 — 목록을 나누면 클라이언트가 두 커서를 병합해야 한다
-        val merged =
-            userPageQueryPort.findTicketLedgerRows(userId).map { it.toItem() } +
-                userPageQueryPort.findInProgressSaveRows(userId).map { save ->
-                    TicketHistoryItemView(
-                        entryId = "${ENTRY_PREFIX}s${save.saveId}",
-                        type = TicketHistoryItemType.SAVE_IN_PROGRESS,
-                        amount = null,
-                        saveId = save.saveId,
-                        place = TicketHistoryItemView.PlaceRefView(save.placeId, save.placeName, save.placeRoadAddress),
-                        group = null,
-                        occurredAt = save.updatedAt,
-                    )
-                }
+        // 이력은 티켓이 실제로 오간 행만이다 (T10). 미완성 저장은 목록에 섞지 않고 건수 하나로 내린다 —
+        // 화면이 `작성 중` 행 대신 상단 배너를 그리기 때문이다 (J §4-1, 2026-09-03 개정)
         val sorted =
-            merged.sortedWith(
-                compareByDescending<TicketHistoryItemView> { it.occurredAt }.thenByDescending { it.entryId },
-            )
+            userPageQueryPort
+                .findTicketLedgerRows(userId)
+                .map { it.toItem() }
+                .sortedWith(
+                    compareByDescending<TicketHistoryItemView> { it.occurredAt }.thenByDescending { it.entryId },
+                )
         val fromCursor =
             if (after == null) {
                 sorted
@@ -209,6 +199,7 @@ class UserPageService(
             }
         return TicketHistorySlice(
             availableCount = groupJoinTicketPort.countAvailable(userId),
+            inProgressSaveCount = userPageQueryPort.countInProgressSaves(userId),
             items = fromCursor.take(limit),
             hasNext = fromCursor.size > limit,
         )
@@ -245,7 +236,7 @@ class UserPageService(
             occurredAt = occurredAt,
         )
 
-    /** 출처가 다른 행이 한 목록에 섞이므로 접두로 네임스페이스를 가른다 — g=발급, c=소비, v=회수, s=작성 중 */
+    /** 출처가 다른 행이 한 목록에 섞이므로 접두로 네임스페이스를 가른다 — g=발급, c=소비, v=회수 */
     private fun TicketLedgerRow.entryId(): String =
         when (kind) {
             TicketLedgerKind.SIGNUP_GRANT, TicketLedgerKind.REVIEW_GRANT -> "${ENTRY_PREFIX}g$refId"
@@ -265,9 +256,6 @@ class UserPageService(
         if (reviewCount <= 0) return null
         return (ratingSum.toDouble() / reviewCount * 10).roundToInt() / 10.0
     }
-
-    /** 공개 읽기 버킷 (TMT-201) — base-url + s3_key가 곧 조회 URL이다 */
-    private fun mediaUrl(s3Key: String): String = "${mediaBaseUrl.trimEnd('/')}/$s3Key"
 
     companion object {
         private const val ENTRY_PREFIX = "tkh_"

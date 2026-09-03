@@ -1,7 +1,6 @@
 package com.tmt.output.persistence.postgres.adapter
 
 import com.tmt.application.port.output.persistence.FavoritePlaceRow
-import com.tmt.application.port.output.persistence.InProgressSaveRow
 import com.tmt.application.port.output.persistence.JoinedGroupRow
 import com.tmt.application.port.output.persistence.ProfileHeaderRow
 import com.tmt.application.port.output.persistence.ReviewGridRow
@@ -117,16 +116,7 @@ class UserPageQueryAdapter(
             )
         }
 
-    override fun findInProgressSaveRows(userId: Long): List<InProgressSaveRow> =
-        userPageQueryRepository.findInProgressSaveRows(userId).map {
-            InProgressSaveRow(
-                saveId = it.getSaveId(),
-                updatedAt = it.getUpdatedAt(),
-                placeId = it.getPlaceId(),
-                placeName = it.getPlaceName(),
-                placeRoadAddress = it.getPlaceRoadAddress(),
-            )
-        }
+    override fun countInProgressSaves(userId: Long): Int = userPageQueryRepository.countInProgressSaves(userId).toInt()
 
     private fun kindOf(
         rowKind: String,

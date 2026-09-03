@@ -42,8 +42,8 @@ interface UserPageQueryPort {
     /** 발급·소비·회수 전량 — 사용자당 행 수가 티켓 수 수준이라 병합·페이징은 메모리에서 한다. */
     fun findTicketLedgerRows(userId: Long): List<TicketLedgerRow>
 
-    /** 리뷰가 없는 살아있는 저장 — 이력의 `작성 중` 행 재료다 (T10). */
-    fun findInProgressSaveRows(userId: Long): List<InProgressSaveRow>
+    /** 리뷰가 없는 살아있는 저장의 수 — 내 티켓 상단 `작성 중` 배너의 재료다 (T10·C5). */
+    fun countInProgressSaves(userId: Long): Int
 }
 
 data class ProfileHeaderRow(
@@ -59,7 +59,7 @@ data class ReviewGridRow(
     val reviewId: Long,
     val saveId: Long,
     val createdAt: Instant,
-    /** 대표 사진(photo_order 최소). 완성 리뷰는 사진이 보장되지만(C4) 결측이면 null이다 */
+    /** 대표 사진(photo_order 최소). 사진 0장 리뷰(C4-1)는 null이다 */
     val thumbnailS3Key: String?,
     val placeId: Long,
     val placeName: String,
@@ -115,12 +115,4 @@ data class TicketLedgerRow(
     val placeRoadAddress: String?,
     val groupId: Long?,
     val groupName: String?,
-)
-
-data class InProgressSaveRow(
-    val saveId: Long,
-    val updatedAt: Instant,
-    val placeId: Long,
-    val placeName: String,
-    val placeRoadAddress: String,
 )

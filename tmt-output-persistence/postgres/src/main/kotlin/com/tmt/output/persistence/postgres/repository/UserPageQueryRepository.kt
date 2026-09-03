@@ -41,7 +41,7 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
                       JOIN media_asset ma ON ma.id = sp.media_asset_id
                      WHERE sp.save_id = s.id
                      ORDER BY sp.photo_order
-                     LIMIT 1)   AS thumbnailS3Key,
+                     LIMIT 1)   AS thumbnailS3Key,  -- 사진 0장 리뷰(C4-1)는 NULL
                    p.id         AS placeId,
                    p.name       AS placeName,
                    p.category_id AS placeCategoryId
@@ -198,25 +198,20 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     ): List<TicketLedgerRowView>
 
-    /** 리뷰가 없는 살아있는 저장 — `작성 중` 이력 행의 재료 (T10). */
+    /** 리뷰가 없는 살아있는 저장의 수 — 내 티켓 상단 `작성 중` 배너의 재료 (T10·C5). 이어쓰기 목록(GET /v1/saves)과 같은 조건이다. */
     @Query(
         value = """
-            SELECT s.id           AS saveId,
-                   s.updated_at   AS updatedAt,
-                   p.id           AS placeId,
-                   p.name         AS placeName,
-                   p.road_address AS placeRoadAddress
+            SELECT COUNT(*)
             FROM save s
-            JOIN place p ON p.id = s.place_id
             WHERE s.user_id = :userId
               AND s.deleted_at IS NULL
               AND NOT EXISTS (SELECT 1 FROM review r WHERE r.save_id = s.id AND r.deleted_at IS NULL)
         """,
         nativeQuery = true,
     )
-    fun findInProgressSaveRows(
+    fun countInProgressSaves(
         @Param("userId") userId: Long,
-    ): List<InProgressSaveRowView>
+    ): Long
 
     interface ProfileHeaderView {
         fun getUserId(): Long
@@ -312,17 +307,5 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
         fun getGroupId(): Long?
 
         fun getGroupName(): String?
-    }
-
-    interface InProgressSaveRowView {
-        fun getSaveId(): Long
-
-        fun getUpdatedAt(): Instant
-
-        fun getPlaceId(): Long
-
-        fun getPlaceName(): String
-
-        fun getPlaceRoadAddress(): String
     }
 }

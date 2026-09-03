@@ -34,7 +34,8 @@ data class ReviewGridKey(
 data class ReviewGridItemView(
     val reviewId: Long,
     val saveId: Long,
-    val thumbnailUrl: String,
+    /** 첫 사진. 사진 0장 리뷰(C4-1, TMT-268)는 null이고 화면이 빈 썸네일을 그린다 (J §8-3) */
+    val thumbnailUrl: String?,
     val placeId: Long,
     val placeName: String,
     val placeCategoryName: String?,
@@ -59,20 +60,14 @@ data class JoinedGroupKey(
     val groupId: Long,
 )
 
-data class GroupCardView(
-    val groupId: Long,
-    val name: String,
-    val oneLineDescription: String,
-    val coverImageUrl: String?,
-    val memberCount: Int,
-    val reviewCount: Int,
-    val placeCount: Int,
-    val matchedSavedPlaceCount: Int,
+/** 그룹 탭 항목 — 카드는 그룹 탐색·홈과 같은 [GroupCardView]고, 정렬 키(가입 시각)만 얹는다 (J §3-2). */
+data class JoinedGroupView(
+    val card: GroupCardView,
     val joinedAt: Instant,
 )
 
 data class GroupCardSlice(
-    val items: List<GroupCardView>,
+    val items: List<JoinedGroupView>,
     val hasNext: Boolean,
 )
 
@@ -126,9 +121,11 @@ data class TicketHistoryKey(
     val entryId: String,
 )
 
-/** 이력 행의 종류 (J §4-1). 저장에서 파생하는 SAVE_IN_PROGRESS가 원장 종류보다 하나 많다. */
+/**
+ * 이력 행의 종류 (J §4-1). 발급·소비·회수만이다 — 미완성 저장은 목록에 섞이지 않고
+ * [TicketHistorySlice.inProgressSaveCount] 하나로 내린다 (T10, 2026-09-03 개정).
+ */
 enum class TicketHistoryItemType {
-    SAVE_IN_PROGRESS,
     SIGNUP_REWARD,
     REVIEW_REWARD,
     REVIEW_DELETE_REVOKE,
@@ -138,8 +135,8 @@ enum class TicketHistoryItemType {
 data class TicketHistoryItemView(
     val entryId: String,
     val type: TicketHistoryItemType,
-    /** null이면 티켓이 오간 적 없는 행 — 화면이 `작성 중` 배지를 그린다 (T10) */
-    val amount: Int?,
+    /** 항상 +1 또는 -1 — 티켓이 오간 행만 이력이다 (T10) */
+    val amount: Int,
     val saveId: Long?,
     val place: PlaceRefView?,
     val group: GroupRefView?,
@@ -159,6 +156,8 @@ data class TicketHistoryItemView(
 
 data class TicketHistorySlice(
     val availableCount: Int,
+    /** 아직 리뷰가 되지 않은 내 저장의 수 (C5). 커서와 무관한 전체 건수 — 0보다 크면 화면이 상단 배너를 그린다 (J §4-1) */
+    val inProgressSaveCount: Int,
     val items: List<TicketHistoryItemView>,
     val hasNext: Boolean,
 )

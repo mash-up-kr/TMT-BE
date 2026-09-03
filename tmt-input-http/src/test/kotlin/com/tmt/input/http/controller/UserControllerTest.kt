@@ -11,6 +11,7 @@ import com.tmt.application.port.input.GetUserReviewGridUseCase
 import com.tmt.application.port.input.GroupCardSlice
 import com.tmt.application.port.input.GroupCardView
 import com.tmt.application.port.input.JoinedGroupKey
+import com.tmt.application.port.input.JoinedGroupView
 import com.tmt.application.port.input.ReviewGridItemView
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.ReviewGridSlice
@@ -53,7 +54,7 @@ class UserControllerTest {
     @Test
     fun `마이페이지 상단은 표기 접두와 티켓 수를 내린다`() {
         mockMvc
-            .perform(get("/v1/users/me").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .perform(get("/v1/users/me").header(UserIdArgumentResolver.HEADER, "7"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.userId").value("user_7"))
             .andExpect(jsonPath("$.nickname").value("준형이"))
@@ -64,7 +65,7 @@ class UserControllerTest {
     @Test
     fun `내 리뷰 탭 항목에 saveId가 있고 접두 표기를 쓴다`() {
         mockMvc
-            .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_1"))
             .andExpect(jsonPath("$.items[0].saveId").value("save_11"))
@@ -127,7 +128,7 @@ class UserControllerTest {
     @Test
     fun `내 그룹 탭은 본인이 viewer다`() {
         mockMvc
-            .perform(get("/v1/users/me/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .perform(get("/v1/users/me/groups").header(UserIdArgumentResolver.HEADER, "7"))
             .andExpect(status().isOk)
 
         assertEquals(7L, stub.groupCalls.single())
@@ -136,7 +137,7 @@ class UserControllerTest {
     @Test
     fun `좋아요 탭은 PlaceCard 모양으로 내린다`() {
         mockMvc
-            .perform(get("/v1/users/me/favorites").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .perform(get("/v1/users/me/favorites").header(UserIdArgumentResolver.HEADER, "7"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].placeId").value("place_5"))
             .andExpect(jsonPath("$.items[0].isFavorite").value(true))
@@ -144,15 +145,29 @@ class UserControllerTest {
     }
 
     @Test
-    fun `내 티켓은 잔액과 작성 중 행을 함께 내린다`() {
+    fun `내 티켓은 잔액·작성 중 건수·이력을 함께 내리고 이력 행은 증감이 있다`() {
         mockMvc
-            .perform(get("/v1/users/me/tickets").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .perform(get("/v1/users/me/tickets").header(UserIdArgumentResolver.HEADER, "7"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.availableCount").value(4))
-            .andExpect(jsonPath("$.items[0].entryId").value("tkh_s21"))
-            .andExpect(jsonPath("$.items[0].type").value("SAVE_IN_PROGRESS"))
-            .andExpect(jsonPath("$.items[0].amount").doesNotExist())
+            .andExpect(jsonPath("$.inProgressSaveCount").value(1))
+            .andExpect(jsonPath("$.items[0].entryId").value("tkh_g21"))
+            .andExpect(jsonPath("$.items[0].type").value("REVIEW_REWARD"))
+            .andExpect(jsonPath("$.items[0].amount").value(1))
             .andExpect(jsonPath("$.items[0].saveId").value("save_21"))
+            .andExpect(jsonPath("$.items[0].place.placeId").value("place_5"))
+            .andExpect(jsonPath("$.items[0].group").doesNotExist())
+    }
+
+    @Test
+    fun `사진 없는 리뷰는 그리드에서 thumbnailUrl이 null로 내려간다`() {
+        stub.reviewThumbnail = null
+
+        mockMvc
+            .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].reviewId").value("rv_1"))
+            .andExpect(jsonPath("$.items[0].thumbnailUrl").value(null))
     }
 
     @Test
@@ -160,7 +175,7 @@ class UserControllerTest {
         stub.reviewHasNext = true
         val cursor =
             mockMvc
-                .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+                .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
                 .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn()
                 .response.contentAsString
@@ -170,7 +185,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 get("/v1/users/me/reviews")
-                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L)
+                    .header(UserIdArgumentResolver.HEADER, "7")
                     .param("cursor", cursor),
             ).andExpect(status().isOk)
 
@@ -182,7 +197,7 @@ class UserControllerTest {
         stub.reviewHasNext = true
         val cursor =
             mockMvc
-                .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+                .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
                 .andReturn()
                 .response.contentAsString
                 .substringAfter("\"nextCursor\":\"")
@@ -202,6 +217,7 @@ class UserControllerTest {
         GetTicketHistoryUseCase {
         var profileError: TmtException? = null
         var reviewHasNext = false
+        var reviewThumbnail: String? = "https://media.example.com/m.jpg"
         val reviewCalls = mutableListOf<Long>()
         val reviewAfterKeys = mutableListOf<ReviewGridKey?>()
         val groupCalls = mutableListOf<Long?>()
@@ -240,7 +256,7 @@ class UserControllerTest {
                         ReviewGridItemView(
                             reviewId = 1L,
                             saveId = 11L,
-                            thumbnailUrl = "https://media.example.com/m.jpg",
+                            thumbnailUrl = reviewThumbnail,
                             placeId = 5L,
                             placeName = "김밥천국",
                             placeCategoryName = "한식",
@@ -261,15 +277,18 @@ class UserControllerTest {
             return GroupCardSlice(
                 items =
                     listOf(
-                        GroupCardView(
-                            groupId = 3L,
-                            name = "매콤단짝",
-                            oneLineDescription = "맵부심 모임",
-                            coverImageUrl = null,
-                            memberCount = 4,
-                            reviewCount = 10,
-                            placeCount = 6,
-                            matchedSavedPlaceCount = 2,
+                        JoinedGroupView(
+                            card =
+                                GroupCardView(
+                                    groupId = 3L,
+                                    name = "매콤단짝",
+                                    oneLineDescription = "맵부심 모임",
+                                    coverImageUrl = null,
+                                    memberCount = 4,
+                                    reviewCount = 10,
+                                    placeCount = 6,
+                                    matchedSavedPlaceCount = 2,
+                                ),
                             joinedAt = Instant.parse("2026-07-01T00:00:00Z"),
                         ),
                     ),
@@ -312,12 +331,13 @@ class UserControllerTest {
         ): TicketHistorySlice =
             TicketHistorySlice(
                 availableCount = 4,
+                inProgressSaveCount = 1,
                 items =
                     listOf(
                         TicketHistoryItemView(
-                            entryId = "tkh_s21",
-                            type = TicketHistoryItemType.SAVE_IN_PROGRESS,
-                            amount = null,
+                            entryId = "tkh_g21",
+                            type = TicketHistoryItemType.REVIEW_REWARD,
+                            amount = 1,
                             saveId = 21L,
                             place = TicketHistoryItemView.PlaceRefView(5L, "김밥천국", "서울 마포구 오목로 1"),
                             group = null,

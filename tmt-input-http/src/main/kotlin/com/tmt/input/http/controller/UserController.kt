@@ -34,11 +34,11 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 /**
- * 마이페이지·타인 프로필 실구현 (TMT-274) — UserMockController 10종을 대체한다.
+ * 마이페이지·타인 프로필 실구현 (TMT-274) — UserMockController 10종 중 사용자 9종을 대체한다.
+ * 매장 추천(POST /v1/recommendations/places)은 LLM 실구현(TMT-289)까지 mock이 남는다.
  * 두 화면은 탭 3종의 항목 스키마·정렬이 같고, 상단과 소유자 전용 필드(email·티켓·saveId)만 다르다 (J-01 §6-1).
- * 태그의 "(mock)" 표기는 FE 코드젠 그룹이 흔들리지 않게 유지한다 (TMT-192와 같은 결정).
  */
-@Tag(name = "마이페이지·타인 프로필 (mock)", description = "명세 v2 — J · J-01")
+@Tag(name = "마이페이지·타인 프로필", description = "명세 v2 — J · J-01")
 @RestController
 @RequestMapping("/v1/users")
 class UserController(
@@ -66,7 +66,11 @@ class UserController(
         )
     }
 
-    @Operation(summary = "내 리뷰 탭", description = "2열 사진 그리드라 카드가 아니라 썸네일만 내린다. 미완성 저장은 나오지 않는다 (R8).")
+    @Operation(
+        summary = "내 리뷰 탭",
+        description = "2열 사진 그리드라 카드가 아니라 썸네일만 내린다. 사진 0장 리뷰(C4-1)는 thumbnailUrl이 null이다. 미완성 저장은 나오지 않는다 (R8).",
+    )
+    @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
     @GetMapping("/me/reviews")
     fun myReviews(
         @UserId userId: Long,
@@ -84,6 +88,7 @@ class UserController(
         }
 
     @Operation(summary = "내 그룹 탭", description = "가입 오래된 순 — 홈의 myGroups와 같은 기준이라 두 화면에서 순서가 어긋나지 않는다 (G20).")
+    @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
     @GetMapping("/me/groups")
     fun myGroups(
         @UserId userId: Long,
@@ -92,6 +97,7 @@ class UserController(
     ): CursorPage<GroupCardResponse> = groupsPage(ownerId = userId, viewerId = userId, cursor = cursor, limit = limit)
 
     @Operation(summary = "내 좋아요 탭", description = "찜한 매장 목록 (F1). 이 목록에서 isFavorite은 항상 true다.")
+    @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
     @GetMapping("/me/favorites")
     fun myFavorites(
         @UserId userId: Long,
@@ -103,8 +109,11 @@ class UserController(
 
     @Operation(
         summary = "내 티켓",
-        description = "발급·소비·회수와 미완성 저장이 한 목록이다. amount가 null이면 화면이 `작성 중` 배지를 그린다 (T10).",
+        description =
+            "발급·소비·회수 이력과 잔액. 미완성 저장은 목록에 섞이지 않고 inProgressSaveCount 하나로 내린다 — " +
+                "0보다 크면 화면이 상단 `작성 중` 배너를 그린다 (T10, J §4-1).",
     )
+    @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
     @GetMapping("/me/tickets")
     fun myTickets(
         @UserId userId: Long,
@@ -122,6 +131,7 @@ class UserController(
                 ?.let { CursorCodec.encode(TicketCursorSpec, TicketHistoryKey(it.occurredAt, it.entryId), condition) }
         return TicketHistoryResponse(
             availableCount = slice.availableCount,
+            inProgressSaveCount = slice.inProgressSaveCount,
             items = slice.items.map { it.toResponse() },
             nextCursor = nextCursor,
             hasNext = slice.hasNext,
@@ -146,7 +156,7 @@ class UserController(
     }
 
     @Operation(summary = "타인 리뷰 탭", description = "saveId는 소유자만 쓰는 핸들이라 빠진다 (S8). 개인 프로필에는 게이트가 없다 (G2).")
-    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
+    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND, ErrorCode.INVALID_CURSOR)
     @GetMapping("/{userId}/reviews")
     fun userReviews(
         @PathVariable userId: String,
@@ -163,7 +173,7 @@ class UserController(
         }
 
     @Operation(summary = "타인 그룹 탭", description = "matchedSavedPlaceCount는 조회자 기준이라 비로그인이면 0이다 (§6-1).")
-    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
+    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND, ErrorCode.INVALID_CURSOR)
     @GetMapping("/{userId}/groups")
     fun userGroups(
         @UserId viewerId: Long?,
@@ -174,7 +184,7 @@ class UserController(
         groupsPage(ownerId = PublicIds.parseUserId(userId), viewerId = viewerId, cursor = cursor, limit = limit)
 
     @Operation(summary = "타인 좋아요 탭", description = "isFavorite은 조회자 기준이라 여기서는 true가 아닐 수 있다 (F3).")
-    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
+    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND, ErrorCode.INVALID_CURSOR)
     @GetMapping("/{userId}/favorites")
     fun userFavorites(
         @UserId viewerId: Long?,
@@ -218,8 +228,18 @@ class UserController(
             slice.items
                 .lastOrNull()
                 ?.takeIf { slice.hasNext }
-                ?.let { CursorCodec.encode(JoinedGroupCursorSpec, JoinedGroupKey(it.joinedAt, it.groupId), condition) }
-        return CursorPage(items = slice.items.map { it.toResponse() }, nextCursor = nextCursor, hasNext = slice.hasNext)
+                ?.let {
+                    CursorCodec.encode(
+                        JoinedGroupCursorSpec,
+                        JoinedGroupKey(it.joinedAt, it.card.groupId),
+                        condition,
+                    )
+                }
+        return CursorPage(
+            items = slice.items.map { it.card.toResponse() },
+            nextCursor = nextCursor,
+            hasNext = slice.hasNext,
+        )
     }
 
     private fun favoritesPage(
@@ -312,7 +332,8 @@ class UserController(
     data class MyReviewGridItem(
         val reviewId: String,
         val saveId: String,
-        val thumbnailUrl: String,
+        /** 첫 사진. 사진 0장 리뷰(C4-1)는 null — 화면이 빈 썸네일을 그린다 (J §8-3) */
+        val thumbnailUrl: String?,
         val place: ReviewGridPlace,
         val createdAt: String,
     )
@@ -320,7 +341,7 @@ class UserController(
     /** 타인 항목에는 saveId가 없다 — 소유자만 쓰는 핸들이다 (S8). */
     data class UserReviewGridItem(
         val reviewId: String,
-        val thumbnailUrl: String,
+        val thumbnailUrl: String?,
         val place: ReviewGridPlace,
         val createdAt: String,
     )
@@ -334,14 +355,15 @@ class UserController(
 
     data class TicketHistoryResponse(
         val availableCount: Int,
+        /** 아직 리뷰가 되지 않은 내 저장의 수. 커서와 무관한 전체 건수 — 0보다 크면 상단 배너 (J §4-1) */
+        val inProgressSaveCount: Int,
         val items: List<TicketHistoryItem>,
         val nextCursor: String?,
         val hasNext: Boolean,
     )
 
-    /** 이력 행의 종류 (J §4-1). 저장에서 파생하는 SAVE_IN_PROGRESS가 원장 종류보다 하나 많다. */
+    /** 이력 행의 종류 (J §4-1). 발급·소비·회수 4종 — 미완성 저장은 inProgressSaveCount로 갔다 (2026-09-03 개정). */
     enum class TicketHistoryType {
-        SAVE_IN_PROGRESS,
         SIGNUP_REWARD,
         REVIEW_REWARD,
         REVIEW_DELETE_REVOKE,
@@ -351,8 +373,8 @@ class UserController(
     data class TicketHistoryItem(
         val entryId: String,
         val type: TicketHistoryType,
-        /** null이면 티켓이 오간 적 없는 행이다 — 화면이 `작성 중` 배지를 그린다 (T10). */
-        val amount: Int?,
+        /** 항상 +1 또는 -1. 화면 제목(`티켓 획득`·`티켓 사용`)은 이 부호에서 파생한다 */
+        val amount: Int,
         val saveId: String?,
         /** 매장과 무관한 이력이면 null. SIGNUP_REWARD는 place·group이 둘 다 null이다 (T11). */
         val place: PlaceRef?,
