@@ -20,9 +20,13 @@ class GroupStatsAdapter(
         groupStatsRepository.removeMember(groupId)
     }
 
-    /** 세 문장이 한 트랜잭션이어야 한다 — 중간에 끊기면 place_count가 group_place 행 수와 어긋난다. */
+    /**
+     * 세 문장이 한 트랜잭션이어야 한다 — 중간에 끊기면 place_count가 group_place 행 수와 어긋난다.
+     * 한 트랜잭션인 것만으로는 부족해 그룹 행을 먼저 잠근다 (TMT-310).
+     */
     @Transactional
     override fun refreshShareStats(groupId: Long) {
+        groupStatsRepository.lockGroup(groupId)
         groupStatsRepository.clearGroupPlaces(groupId)
         groupStatsRepository.rebuildGroupPlaces(groupId)
         groupStatsRepository.refreshShareCounts(groupId, Instant.now())
