@@ -6,6 +6,7 @@ import com.tmt.application.port.output.persistence.GroupCardsQuery
 import com.tmt.application.port.output.persistence.GroupCardsSlice
 import com.tmt.application.port.output.persistence.GroupExplorePort
 import com.tmt.output.persistence.postgres.repository.GroupExploreRepository
+import com.tmt.output.persistence.postgres.repository.LikePatterns
 import org.springframework.stereotype.Component
 
 @Component
@@ -16,7 +17,7 @@ class GroupExploreAdapter(
         val rows =
             repository.findGroupCards(
                 viewerId = query.viewerId,
-                query = query.query,
+                queryPattern = LikePatterns.contains(query.query),
                 queryFoodCsv = query.queryFoodCategoryIds.toCsvOrNull(),
                 queryRegionCsv = query.queryRegionTagIds.toCsvOrNull(),
                 foodCategoryId = query.foodCategoryId,

@@ -36,8 +36,8 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                 CROSS JOIN pt
                 WHERE (
                         CAST(:query AS text) IS NULL
-                        OR p.name ILIKE '%' || :query || '%'
-                        OR p.road_address ILIKE '%' || :query || '%'
+                        OR p.name ILIKE :queryPattern ESCAPE '\'
+                        OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
                   AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
@@ -57,6 +57,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
         @Param("lng") lng: Double,
         @Param("radius") radius: Int?,
         @Param("query") query: String?,
+        @Param("queryPattern") queryPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,
@@ -89,8 +90,8 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                 FROM place p
                 WHERE (
                         CAST(:query AS text) IS NULL
-                        OR p.name ILIKE '%' || :query || '%'
-                        OR p.road_address ILIKE '%' || :query || '%'
+                        OR p.name ILIKE :queryPattern ESCAPE '\'
+                        OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
                   AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
@@ -106,6 +107,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
     )
     fun searchByRelevance(
         @Param("query") query: String?,
+        @Param("queryPattern") queryPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,
