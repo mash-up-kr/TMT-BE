@@ -21,4 +21,16 @@ interface GroupJoinTicketPort {
         userId: Long,
         reviewId: Long,
     ): Boolean
+
+    /**
+     * 그룹 가입으로 티켓 1장을 소비한다 (T3·T7, TX-3). 소비했으면 true, `AVAILABLE` 티켓이
+     * 없으면 false다. 발급 오래된 순으로 고른다.
+     *
+     * 구현은 조건부 UPDATE 한 문장이어야 한다 — 읽어서 고르고 쓰면 동시 요청이 같은 티켓을
+     * 두 번 소비한다.
+     */
+    fun consumeOne(
+        userId: Long,
+        groupId: Long,
+    ): Boolean
 }

@@ -264,6 +264,19 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
         counts[userId] = available - 1
         return true
     }
+
+    val consumedFor = mutableListOf<Pair<Long, Long>>()
+
+    override fun consumeOne(
+        userId: Long,
+        groupId: Long,
+    ): Boolean {
+        val available = counts.getOrDefault(userId, 0)
+        if (available <= 0) return false
+        counts[userId] = available - 1
+        consumedFor += userId to groupId
+        return true
+    }
 }
 
 class FakePlaceStatsPort : PlaceStatsPort {

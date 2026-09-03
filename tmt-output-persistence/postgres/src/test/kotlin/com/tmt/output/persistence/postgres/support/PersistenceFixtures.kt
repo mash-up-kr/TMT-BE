@@ -194,6 +194,39 @@ class PersistenceFixtures(
             ownerId,
         )
 
+    /** ACTIVE 멤버십. 같은 (group_id, user_id)의 ACTIVE 행은 하나뿐이다 (membership_active_uq) */
+    fun joinGroup(
+        groupId: Long,
+        userId: Long,
+    ): Long =
+        insertReturningId(
+            "INSERT INTO group_membership (group_id, user_id) VALUES (?, ?) RETURNING id",
+            groupId,
+            userId,
+        )
+
+    /**
+     * AVAILABLE 티켓 1장. 근거 `reward_grant`는 (source_type, source_id, reward_type)이 UNIQUE라(T8)
+     * source_id에 유일값을 넣는다 — 실제 리뷰가 아니어도 FK가 없어 성립한다
+     */
+    fun newTicket(userId: Long): Long {
+        val grantId =
+            insertReturningId(
+                """
+                INSERT INTO reward_grant (user_id, reward_type, source_type, source_id)
+                VALUES (?, 'GROUP_JOIN_TICKET', 'REVIEW', ?)
+                RETURNING id
+                """.trimIndent(),
+                userId,
+                nextSequence(),
+            )
+        return insertReturningId(
+            "INSERT INTO group_join_ticket (user_id, reward_grant_id) VALUES (?, ?) RETURNING id",
+            userId,
+            grantId,
+        )
+    }
+
     /** 공유는 `(group_id, review_id)`가 UNIQUE라 같은 리뷰를 한 그룹에 두 번 넣을 수 없다 (share_uq) */
     fun shareReview(
         groupId: Long,

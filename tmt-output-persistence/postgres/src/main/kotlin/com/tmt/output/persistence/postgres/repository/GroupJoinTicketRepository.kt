@@ -47,4 +47,32 @@ interface GroupJoinTicketRepository : JpaRepository<GroupJoinTicketEntity, Long>
         @Param("userId") userId: Long,
         @Param("reviewId") reviewId: Long,
     ): Int
+
+    /**
+     * 그룹 가입으로 AVAILABLE 티켓 1장을 발급 오래된 순으로 소비한다 (T3·T7). 0행이면 티켓이 없다.
+     *
+     * `FOR UPDATE SKIP LOCKED` — 다른 트랜잭션이 잡은 장은 건너뛴다. 두 그룹에 거의 동시에
+     * 가입해도 티켓이 두 장이면 서로 다른 장을 집고, 한 장이면 뒤에 온 쪽이 기다리지 않고 0행을 받는다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE group_join_ticket
+            SET status = 'CONSUMED', consumed_group_id = :groupId, consumed_at = now()
+            WHERE status = 'AVAILABLE'
+              AND id = (
+                  SELECT id
+                  FROM group_join_ticket
+                  WHERE user_id = :userId AND status = 'AVAILABLE'
+                  ORDER BY id
+                  LIMIT 1
+                  FOR UPDATE SKIP LOCKED
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun consumeOne(
+        @Param("userId") userId: Long,
+        @Param("groupId") groupId: Long,
+    ): Int
 }
