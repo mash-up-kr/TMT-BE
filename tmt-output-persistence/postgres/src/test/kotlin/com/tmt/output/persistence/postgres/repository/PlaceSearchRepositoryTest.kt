@@ -38,6 +38,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 lng = lng,
                 radius = 1000,
                 query = null,
+                queryPattern = null,
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -70,6 +71,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             lng = lng,
             radius = 1000,
             query = null,
+            queryPattern = null,
             queryCategoryCsv = "",
             categoryId = null,
             regionPrefix = region,
@@ -101,6 +103,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 lng = lng,
                 radius = null,
                 query = null,
+                queryPattern = null,
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -123,6 +126,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
         val rows =
             repository.searchByRelevance(
                 query = "김밥천국",
+                queryPattern = LikePatterns.contains("김밥천국"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -151,6 +155,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             afterPlaceId: Long?,
         ) = repository.searchByRelevance(
             query = null,
+            queryPattern = null,
             queryCategoryCsv = "",
             categoryId = null,
             regionPrefix = region,
@@ -179,6 +184,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository
                 .searchByRelevance(
                     query = token,
+                    queryPattern = LikePatterns.contains(token),
                     queryCategoryCsv = "",
                     categoryId = "cat_korean",
                     regionPrefix = region,
@@ -203,6 +209,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository
                 .searchByRelevance(
                     query = "한식",
+                    queryPattern = LikePatterns.contains("한식"),
                     queryCategoryCsv = "cat_korean",
                     categoryId = null,
                     regionPrefix = region,
@@ -229,6 +236,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository
                 .searchByRelevance(
                     query = null,
+                    queryPattern = null,
                     queryCategoryCsv = "",
                     categoryId = null,
                     regionPrefix = region,
