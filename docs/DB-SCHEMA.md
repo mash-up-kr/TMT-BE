@@ -65,6 +65,10 @@ erDiagram
 ### D6. 삭제는 두 종류다 (R6)
 
 - `save.deleted_at`·`review.deleted_at` — soft delete. 티켓 회수 이력·집계 정합성의 근거를 남긴다
+  - **예외: 리뷰가 되지 않은 임시저장은 hard delete다** (명세 F·G·I §5-2, `DELETE /v1/saves/{saveId}`).
+    드래프트는 티켓도 집계도 건드린 적이 없어 남길 근거가 없다. 자식(`save_photo`·`save_tag`)은
+    스키마에 CASCADE가 없어 애플리케이션이 같은 트랜잭션에서 먼저 지우고, `media_asset`은
+    `STAGED`로 되돌려 TTL(M4)에 맡긴다
 - `media_asset` 행과 S3 오브젝트 — **실제 삭제** (commit 이후, 재시도 가능 M5)
 - 그 외 모든 테이블은 hard delete (공유 해제, 찜 해제 등)
 

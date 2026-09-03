@@ -2,16 +2,18 @@
 -- 실행: psql -U tmt -d tmt -f scripts/seed/verify_ut2_seed.sql
 --
 -- 검사 1~5는 파생 집계의 전역 불변식이라 전체를 본다. 검사 6~8은 시드에만 성립하는 계약이라
--- (리뷰≠티켓인 보유 상한 T6, 탈퇴자 공유 잔존, TMT-268의 사진 선택화 예정) 시드 범위로 좁힌다 —
--- 시드 리뷰 = seed/ut2/* 사진이 붙은 리뷰 (PR #84 리뷰).
+-- (리뷰≠티켓인 보유 상한 T6, 탈퇴자 공유 잔존) 시드 범위로 좁힌다 —
+-- 시드 리뷰 = V4의 persona 작성자(901~903)가 쓴 리뷰.
+--
+-- 범위를 사진으로 잡지 않는다: 사진은 리뷰 성립 조건이 아니라(C4-1, TMT-268) 사진 없는
+-- 리뷰가 검사에서 조용히 빠지기 때문이다 — 티켓 누락이 0행으로 통과해 버린다.
 
 -- 시드 리뷰 범위 (검사 6~8 공용)
 CREATE TEMP VIEW _seed_reviews AS
-SELECT DISTINCT r.id, r.user_id
+SELECT r.id, r.user_id
 FROM review r
-JOIN save_photo sp ON sp.save_id = r.save_id
-JOIN media_asset ma ON ma.id = sp.media_asset_id
-WHERE ma.s3_key LIKE 'seed/ut2/%';
+JOIN save s ON s.id = r.save_id
+WHERE s.user_id IN (901, 902, 903);
 
 -- 1) place 파생 집계 (P9): review_count·rating_sum vs 실제 행
 SELECT 'place_stats' AS check, p.id, p.name, p.review_count, c.cnt, p.rating_sum, c.rsum
@@ -59,13 +61,21 @@ FROM group_review_share grs JOIN review r ON r.id = grs.review_id AND r.deleted_
 GROUP BY grs.group_id, r.place_id
 HAVING NOT EXISTS (SELECT 1 FROM group_place gp WHERE gp.group_id = grs.group_id AND gp.place_id = r.place_id);
 
--- 6) [시드 한정] 완성 리뷰의 필수 요소 (C4): 별점·본문·사진 1장 이상
-SELECT 'review_c4' AS check, r.id, s.rating, char_length(s.content) AS content_len,
-       (SELECT count(*) FROM save_photo sp WHERE sp.save_id = s.id) AS photos
+-- 6) [시드 한정] 완성 리뷰의 필수 요소 (C4): 동행 1 · 좋은 점 1 · 별점 · 본문(공백 제외 1자 이상)
+--    사진은 조건이 아니다 (C4-1) — 0장이어도 리뷰다.
+SELECT 'review_c4' AS check, r.id, s.rating, char_length(btrim(s.content)) AS content_len,
+       (SELECT count(*) FROM save_tag st JOIN review_tag_definition d ON d.id = st.tag_id
+         WHERE st.save_id = s.id AND d.tag_type = 'COMPANION') AS companion_tags,
+       (SELECT count(*) FROM save_tag st JOIN review_tag_definition d ON d.id = st.tag_id
+         WHERE st.save_id = s.id AND d.tag_type = 'POSITIVE_POINT') AS positive_tags
 FROM review r JOIN save s ON s.id = r.save_id
 WHERE r.id IN (SELECT id FROM _seed_reviews) AND r.deleted_at IS NULL
-  AND (s.rating IS NULL OR s.content IS NULL OR char_length(s.content) = 0
-       OR NOT EXISTS (SELECT 1 FROM save_photo sp WHERE sp.save_id = s.id));
+  AND (s.rating IS NULL
+       OR s.content IS NULL OR char_length(btrim(s.content)) = 0
+       OR NOT EXISTS (SELECT 1 FROM save_tag st JOIN review_tag_definition d ON d.id = st.tag_id
+                       WHERE st.save_id = s.id AND d.tag_type = 'COMPANION')
+       OR NOT EXISTS (SELECT 1 FROM save_tag st JOIN review_tag_definition d ON d.id = st.tag_id
+                       WHERE st.save_id = s.id AND d.tag_type = 'POSITIVE_POINT'));
 
 -- 7) [시드 한정] 리뷰 1건 = 발급 티켓 1장 — 실데이터는 보유 상한(T6)으로 리뷰≠티켓일 수 있다
 SELECT 'ticket_grant' AS check, r.id AS review_id

@@ -20,10 +20,6 @@ open class TicketRequiredException(
     val requiredCount: Int = 1,
 ) : RuntimeException(errorCode.defaultMessage)
 
-class ReviewDeleteTicketRequiredException(
-    availableCount: Int,
-) : TicketRequiredException(ErrorCode.REVIEW_DELETE_TICKET_REQUIRED, availableCount)
-
 class GroupJoinTicketRequiredException(
     availableCount: Int,
 ) : TicketRequiredException(ErrorCode.GROUP_JOIN_TICKET_REQUIRED, availableCount)

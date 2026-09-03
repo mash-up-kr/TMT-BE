@@ -25,4 +25,8 @@ object PublicIds {
     fun parsePlaceId(publicId: String): Long =
         publicId.removePrefix("place_").toLongOrNull()
             ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
+
+    fun parseReviewId(publicId: String): Long =
+        publicId.removePrefix("rv_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
 }

@@ -173,9 +173,9 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
             WHERE p.review_count > 0
               AND p.location && ST_MakeEnvelope(:west, :south, :east, :north, 4326)::geography
               AND (
-                    CAST(:query AS text) IS NULL
-                    OR p.name ILIKE '%' || :query || '%'
-                    OR p.road_address ILIKE '%' || :query || '%'
+                    CAST(:queryPattern AS text) IS NULL
+                    OR p.name ILIKE :queryPattern ESCAPE '\'
+                    OR p.road_address ILIKE :queryPattern ESCAPE '\'
                     OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                   )
               AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
@@ -196,7 +196,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         @Param("west") west: Double,
         @Param("centerLat") centerLat: Double?,
         @Param("centerLng") centerLng: Double?,
-        @Param("query") query: String?,
+        @Param("queryPattern") queryPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,

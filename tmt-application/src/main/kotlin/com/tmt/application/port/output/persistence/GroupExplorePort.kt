@@ -27,6 +27,8 @@ data class GroupCardsQuery(
 data class GroupCardsSlice(
     val rows: List<GroupCardRow>,
     val hasNext: Boolean,
+    /** 마지막 행의 정렬 키. 키셋 재료라 카드가 아니라 슬라이스가 들고 있다. */
+    val lastKey: GroupListKey? = null,
 )
 
 data class GroupCardRow(
@@ -39,6 +41,4 @@ data class GroupCardRow(
     val reviewCount: Int,
     val placeCount: Int,
     val matchedSavedPlaceCount: Int,
-    val sortKey1: Long,
-    val sortKey2: Long,
 )
