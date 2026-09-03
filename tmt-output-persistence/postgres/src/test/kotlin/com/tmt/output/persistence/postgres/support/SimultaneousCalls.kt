@@ -48,12 +48,19 @@ class SimultaneousCalls(
                 executor.submit {
                     try {
                         check(start.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "출발 신호를 받지 못했다" }
-                        val enteredAt = System.nanoTime()
-                        try {
-                            results += requireNotNull(transaction.execute { block() })
-                        } finally {
-                            spans += Span(enteredAt, System.nanoTime())
-                        }
+                        results +=
+                            requireNotNull(
+                                transaction.execute {
+                                    // 구간은 트랜잭션 안에서 잰다 — 바깥에서 재면 커넥션 획득 대기가
+                                    // 겹침으로 잡혀, 순차로 돈 실행도 overlapped=true가 된다
+                                    val enteredAt = System.nanoTime()
+                                    try {
+                                        block()
+                                    } finally {
+                                        spans += Span(enteredAt, System.nanoTime())
+                                    }
+                                },
+                            )
                     } catch (e: Throwable) {
                         failures += e
                     } finally {
