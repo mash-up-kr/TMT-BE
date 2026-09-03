@@ -169,6 +169,28 @@ class UserPageServiceTest {
     }
 
     @Test
+    fun `같은 시각의 이력은 번호 순서대로 내려간다`() {
+        // entryId를 문자열로 비교하면 tkh_g9 > tkh_g10이라 9가 10보다 위로 올라온다 (PR #96 리뷰)
+        queryPort.ledgerRows =
+            (9L..11L).map { ledgerRow(TicketLedgerKind.REVIEW_GRANT, refId = it, at = SAME_INSTANT) }
+
+        val slice = service.list(7L, NO_TICKET_CURSOR, limit = 20)
+
+        assertEquals(listOf("tkh_g11", "tkh_g10", "tkh_g9"), slice.items.map { it.entryId })
+    }
+
+    @Test
+    fun `같은 시각의 커서도 번호 기준으로 잘린다`() {
+        queryPort.ledgerRows =
+            (9L..11L).map { ledgerRow(TicketLedgerKind.REVIEW_GRANT, refId = it, at = SAME_INSTANT) }
+
+        // 문자열 비교였다면 tkh_g9 다음이 없어 빈 페이지가 나온다
+        val second = service.list(7L, after = TicketHistoryKey(Instant.parse(SAME_INSTANT), "tkh_g10"), limit = 20)
+
+        assertEquals(listOf("tkh_g9"), second.items.map { it.entryId })
+    }
+
+    @Test
     fun `작성 중 건수는 커서와 무관하게 전체 값이다`() {
         queryPort.ledgerRows =
             listOf(
@@ -203,6 +225,9 @@ class UserPageServiceTest {
     companion object {
         private val NO_REVIEW_CURSOR: ReviewGridKey? = null
         private val NO_TICKET_CURSOR: TicketHistoryKey? = null
+
+        /** 발급이 한 트랜잭션에서 여러 건 나가면 created_at이 같다 — tie-break가 드러나는 자리다. */
+        private const val SAME_INSTANT = "2026-08-05T00:00:00Z"
     }
 
     private fun favoriteRow(

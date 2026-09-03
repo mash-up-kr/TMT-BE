@@ -29,6 +29,7 @@ import com.tmt.application.port.output.persistence.UserPageQueryPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.springframework.stereotype.Service
+import java.time.Instant
 import kotlin.math.roundToInt
 
 /**
@@ -186,17 +187,13 @@ class UserPageService(
             userPageQueryPort
                 .findTicketLedgerRows(userId)
                 .map { it.toItem() }
-                .sortedWith(
-                    compareByDescending<TicketHistoryItemView> { it.occurredAt }.thenByDescending { it.entryId },
-                )
+                .sortedWith(compareByDescending { orderOf(it.occurredAt, it.entryId) })
         val fromCursor =
             if (after == null) {
                 sorted
             } else {
-                sorted.filter {
-                    it.occurredAt < after.occurredAt ||
-                        (it.occurredAt == after.occurredAt && it.entryId < after.entryId)
-                }
+                val last = orderOf(after.occurredAt, after.entryId)
+                sorted.filter { orderOf(it.occurredAt, it.entryId) < last }
             }
         return TicketHistorySlice(
             availableCount = groupJoinTicketPort.countAvailable(userId),
@@ -244,6 +241,31 @@ class UserPageService(
             TicketLedgerKind.GROUP_JOIN_CONSUME -> "${ENTRY_PREFIX}c$refId"
             TicketLedgerKind.REVIEW_DELETE_REVOKE -> "${ENTRY_PREFIX}v$refId"
         }
+
+    /**
+     * 이력 한 행의 정렬 위치. **정렬과 커서 자르기가 반드시 같은 기준을 써야** 페이지가 겹치거나 빠지지 않아서
+     * 한 곳에서만 만든다.
+     *
+     * `entryId`를 문자열로 비교하면 `tkh_g9`가 `tkh_g10`보다 커서, 같은 시각에 발급된 두 행이
+     * **번호 역순으로 뒤집혀 보인다.** 접두는 문자열로, 뒤의 일련번호는 숫자로 나눠서 본다 (PR #96 리뷰).
+     */
+    private fun orderOf(
+        occurredAt: Instant,
+        entryId: String,
+    ): EntryOrder {
+        val prefix = entryId.takeWhile { !it.isDigit() }
+        return EntryOrder(occurredAt, prefix, entryId.removePrefix(prefix).toLongOrNull() ?: 0L)
+    }
+
+    /** 출처(prefix)가 다르면 그것으로, 같으면 일련번호로 가른다. 시각이 1차 키다. */
+    private data class EntryOrder(
+        val occurredAt: Instant,
+        val prefix: String,
+        val sequence: Long,
+    ) : Comparable<EntryOrder> {
+        override fun compareTo(other: EntryOrder): Int =
+            compareValuesBy(this, other, { it.occurredAt }, { it.prefix }, { it.sequence })
+    }
 
     private fun ensureExists(userId: Long) {
         if (!userPageQueryPort.userExists(userId)) throw TmtException(ErrorCode.USER_NOT_FOUND)
