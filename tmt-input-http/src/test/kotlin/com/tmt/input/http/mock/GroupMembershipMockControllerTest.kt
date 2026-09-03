@@ -10,7 +10,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -49,7 +48,6 @@ class GroupMembershipMockControllerTest {
                     fakeMockMediaUrls(),
                     groupStore,
                     saveStore,
-                    placeStore,
                     membershipStore,
                     shareStore,
                     ticketLedger,
@@ -166,54 +164,6 @@ class GroupMembershipMockControllerTest {
             .andExpect(jsonPath("$.title").value("그룹 가입에 필요한 티켓이 부족합니다."))
             .andExpect(jsonPath("$.ticket.availableCount").value(0))
             .andExpect(jsonPath("$.ticket.shortageCount").value(1))
-    }
-
-    @Test
-    fun `공유 목록은 내 리뷰 전체를 공유 여부와 함께 내린다`() {
-        MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_1")
-        MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_2")
-        join().andExpect(status().isCreated)
-        shareStore.replace(group.groupId, 1, listOf("review_1"))
-
-        mockMvc
-            .perform(get("/v1/groups/${group.groupId}/review-shares").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.items.length()").value(2))
-            .andExpect(jsonPath("$.sharedCount").value(1))
-            .andExpect(jsonPath("$.items[?(@.reviewId == 'review_1')].isShared").value(true))
-            .andExpect(jsonPath("$.items[0].placeName").value("델리스피자"))
-    }
-
-    @Test
-    fun `공유는 전체 교체다 — 빠진 것은 해제된다`() {
-        MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_1")
-        MockFixtures.review(saveStore, place.placeId, ownerId = 1, reviewId = "review_2")
-        join().andExpect(status().isCreated)
-        shareStore.replace(group.groupId, 1, listOf("review_1"))
-
-        mockMvc
-            .perform(
-                put("/v1/groups/${group.groupId}/review-shares")
-                    .header(UserIdArgumentResolver.HEADER, "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{ "reviewIds": ["review_2"] }"""),
-            ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.sharedReviewIds[0]").value("review_2"))
-            .andExpect(jsonPath("$.sharedCount").value(1))
-
-        assertEquals(setOf("review_2"), shareStore.userShares(group.groupId, 1))
-    }
-
-    @Test
-    fun `가입하지 않은 그룹에는 공유할 수 없다`() {
-        mockMvc
-            .perform(
-                put("/v1/groups/${group.groupId}/review-shares")
-                    .header(UserIdArgumentResolver.HEADER, "1")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{ "reviewIds": [] }"""),
-            ).andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.code").value("GROUP_MEMBERSHIP_REQUIRED"))
     }
 
     @Test

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.assertThrows
 
 class MediaAttachmentServiceTest {
     private val port = FakeMediaAssetPort()
-    private val service = MediaAttachmentService(port, baseUrl = "https://media.tmt.example/")
+    private val service = MediaAttachmentService(port, MediaUrlResolver("https://media.tmt.example/"))
 
     @Test
     fun `내가 발급받은 STAGED 사진은 붙일 수 있다`() {

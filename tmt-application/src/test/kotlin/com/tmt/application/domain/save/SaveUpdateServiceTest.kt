@@ -3,6 +3,7 @@ package com.tmt.application.domain.save
 import com.tmt.application.domain.aisummary.ReviewCommittedEvent
 import com.tmt.application.domain.media.FakeMediaAssetPort
 import com.tmt.application.domain.media.MediaAttachmentService
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.UpdateSaveCommand
@@ -26,7 +27,8 @@ class SaveUpdateServiceTest {
     private val ticketPort = FakeGroupJoinTicketPort()
     private val placeStatsPort = FakePlaceStatsPort()
     private val published = mutableListOf<Any>()
-    private val attachMediaUseCase = MediaAttachmentService(mediaAssetPort, baseUrl = "https://media.tmt.example")
+    private val attachMediaUseCase =
+        MediaAttachmentService(mediaAssetPort, MediaUrlResolver("https://media.tmt.example"))
     private val writeSupport =
         SaveWriteSupport(
             reviewTagPort = reviewTagPort,

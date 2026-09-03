@@ -37,6 +37,22 @@ interface GroupReviewShareRepository : JpaRepository<GroupReviewShareEntity, Lon
         @Param("reviewId") reviewId: Long,
     ): Int
 
+    /** 집합 교체의 삭제 쪽 (H §3-2) — 목록에 없는 내 공유를 내린다. 빈 목록이면 전부 내린다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            DELETE FROM group_review_share s
+            WHERE s.group_id = :groupId AND s.user_id = :userId
+              AND s.review_id <> ALL (CAST(:reviewIds AS bigint[]))
+        """,
+        nativeQuery = true,
+    )
+    fun deleteUserSharesNotIn(
+        @Param("groupId") groupId: Long,
+        @Param("userId") userId: Long,
+        @Param("reviewIds") reviewIds: Array<Long>,
+    ): Int
+
     /** 리뷰가 내려간 그룹들 — 집계를 다시 맞출 대상이다. 삭제 전에 조회한다. */
     @Query("SELECT s.groupId FROM GroupReviewShareEntity s WHERE s.reviewId = :reviewId")
     fun findGroupIdsByReviewId(

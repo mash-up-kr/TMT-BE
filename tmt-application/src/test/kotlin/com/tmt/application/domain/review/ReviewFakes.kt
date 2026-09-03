@@ -89,6 +89,13 @@ class FakeGroupReviewSharePort(
         unsharedReviewIds += reviewId
         return groupIdsByReview[reviewId].orEmpty().size
     }
+
+    /** 이 fake를 쓰는 리뷰 쪽 테스트는 집합 교체(TX-4)를 태우지 않는다 — 호출되면 그 자체가 결함이다. */
+    override fun replaceUserShares(
+        groupId: Long,
+        userId: Long,
+        reviewIds: List<Long>,
+    ) = error("리뷰 테스트에서 쓰지 않는다")
 }
 
 class FakeGroupStatsPort : GroupStatsPort {

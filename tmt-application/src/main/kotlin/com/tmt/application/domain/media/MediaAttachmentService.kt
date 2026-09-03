@@ -5,13 +5,12 @@ import com.tmt.application.port.input.GetMediaUrlsUseCase
 import com.tmt.application.port.output.persistence.MediaAssetPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
 @Service
 class MediaAttachmentService(
     private val mediaAssetPort: MediaAssetPort,
-    @param:Value("\${tmt.media.base-url:}") private val baseUrl: String,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) : AttachMediaUseCase,
     GetMediaUrlsUseCase {
     override fun verifyAttachable(
@@ -55,6 +54,6 @@ class MediaAttachmentService(
         if (assetIds.isEmpty()) return emptyMap()
         return mediaAssetPort
             .findByIds(assetIds)
-            .associate { it.id to "${baseUrl.trimEnd('/')}/${it.s3Key}" }
+            .associate { it.id to mediaUrlResolver.urlOf(it.s3Key) }
     }
 }
