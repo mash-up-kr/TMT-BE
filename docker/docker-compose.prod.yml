@@ -27,6 +27,10 @@ services:
       - MEDIA_BASE_URL=${MEDIA_BASE_URL}
       # 리뷰 요약 LLM 키 (TMT-232). 정본은 SSM /tmt-prod/ai/* — 빈 값이면 해당 프로바이더 비활성
       - GROQ_API_KEY=${GROQ_API_KEY}
+      # 모델 소멸 시 SSM /tmt-prod/ai/groq-model 값만 바꿔 복구한다 (TMT-297).
+      # :- 기본값이 있는 이유: .env에 빈 값이 오면 Spring이 yml 기본값 대신 빈 문자열을 쓰기 때문.
+      # 우선순위: SSM 값 → 이 :- 기본값 → (compose 밖 실행에서만) application.yml 기본값
+      - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       # 주소 API 키 (TMT-187)·addressId 서명 키 (TMT-191). 정본은 SSM /tmt-prod/address/*
       - JUSO_SEARCH_KEY=${JUSO_SEARCH_KEY}

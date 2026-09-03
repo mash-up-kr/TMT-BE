@@ -168,6 +168,8 @@ jobs:
           MEDIA_BASE_URL=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_MEDIA_PREFIX}/base-url --query Parameter.Value --output text)
           # LLM 키 (TMT-232) — 아직 등록 전이면 빈 값으로 두고 해당 프로바이더는 앱이 건너뛴다
           GROQ_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
+          # 모델 id — 파라미터가 없거나 빈 값이면 앱 기본값을 쓴다 (TMT-297)
+          GROQ_MODEL=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-model --query Parameter.Value --output text 2>/dev/null || echo "")
           GEMINI_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/gemini-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
           # 주소 API 키 (TMT-187) — 검색용·좌표용이 서로 다른 키다. 없으면 주소 검색이
           # ADDRESS_PROVIDER_UNAVAILABLE로 죽으므로 LLM 키와 달리 빈 값 폴백을 두지 않는다
@@ -205,6 +207,7 @@ jobs:
           MEDIA_BUCKET=\$MEDIA_BUCKET
           MEDIA_BASE_URL=\$MEDIA_BASE_URL
           GROQ_API_KEY=\$GROQ_API_KEY
+          GROQ_MODEL=\$GROQ_MODEL
           GEMINI_API_KEY=\$GEMINI_API_KEY
           JUSO_SEARCH_KEY=\$JUSO_SEARCH_KEY
           JUSO_COORD_KEY=\$JUSO_COORD_KEY

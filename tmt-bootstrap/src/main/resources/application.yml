@@ -30,7 +30,8 @@ tmt:
       api-key: ${GROQ_API_KEY:}
       # llama-3.3-70b는 Groq에서 내려갔다(model_not_found). 실호출로 후보를 비교해 고른 값 —
       # gpt-oss-120b는 한국어 띄어쓰기가 깨지고 토큰을 5배 썼다 (TMT-232)
-      model: qwen/qwen3.8-27b
+      # 모델이 또 소멸하면 코드 배포 없이 SSM /tmt-prod/ai/groq-model 값으로 바꾼다 (TMT-297)
+      model: ${GROQ_MODEL:qwen/qwen3.8-27b}
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: gemini-2.5-flash

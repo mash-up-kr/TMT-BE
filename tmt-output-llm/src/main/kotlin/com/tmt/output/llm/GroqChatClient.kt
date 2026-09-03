@@ -16,7 +16,7 @@ import tools.jackson.databind.JsonNode
 @Component
 class GroqChatClient(
     @param:Value("\${tmt.ai-summary.groq.api-key:}") private val apiKey: String,
-    @param:Value("\${tmt.ai-summary.groq.model:llama-3.3-70b-versatile}") private val model: String,
+    @param:Value("\${tmt.ai-summary.groq.model}") private val model: String,
     @param:Value("\${tmt.ai-summary.groq.base-url:https://api.groq.com/openai/v1}") baseUrl: String,
 ) : ChatJsonClient {
     private val restClient: RestClient = RestClient.builder().baseUrl(baseUrl).build()
