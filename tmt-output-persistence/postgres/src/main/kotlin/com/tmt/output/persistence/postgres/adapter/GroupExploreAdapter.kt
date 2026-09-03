@@ -22,6 +22,7 @@ class GroupExploreAdapter(
                 queryRegionCsv = query.queryRegionTagIds.toCsvOrNull(),
                 foodCategoryId = query.foodCategoryId,
                 regionCsv = query.regionTagIds.toCsvOrNull(),
+                excludeJoinedBy = query.excludeJoinedBy,
                 sort = query.sort,
                 afterK1 = query.after?.k1,
                 afterK2 = query.after?.k2,

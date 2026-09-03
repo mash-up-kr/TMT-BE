@@ -57,12 +57,9 @@ interface GroupDetailRepository : JpaRepository<GroupEntity, Long> {
     @Query(
         value = """
             SELECT ma.s3_key AS s3Key, r.id AS reviewId
-            FROM group_review_share s
-            JOIN review r       ON r.id = s.review_id AND r.deleted_at IS NULL
-            JOIN save_photo sp  ON sp.save_id = r.save_id
-            JOIN media_asset ma ON ma.id = sp.media_asset_id
+            ${GroupCoverSql.FROM_JOINS}
             WHERE s.group_id = :groupId
-            ORDER BY r.created_at DESC, r.id DESC, sp.photo_order
+            ${GroupCoverSql.ORDER_BY}
             LIMIT :limit
         """,
         nativeQuery = true,

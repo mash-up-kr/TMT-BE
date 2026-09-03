@@ -4,7 +4,8 @@ import java.time.Instant
 
 /**
  * 홈 읽기 (TMT-230). 그룹 테이블을 읽지만 그룹 실구현(TMT-220~223)과 파일을 나눠 둔다 —
- * 홈이 필요로 하는 모양(추천 상위 N·내 그룹 가입순)이 그룹 목록과 달라서다.
+ * 홈이 필요로 하는 모양(내 그룹 가입순·피드 키셋)이 그룹 목록과 달라서다.
+ * **추천 캐러셀은 여기 없다** — 그룹 탐색의 추천순과 같은 목록이라 GroupExplorePort가 준다 (TMT-305).
  * 키셋·집계는 SQL이, 카드 조립은 서비스가 한다.
  */
 interface HomeQueryPort {
@@ -12,15 +13,6 @@ interface HomeQueryPort {
 
     /** 가입 순서(오래된 순) — A §2 */
     fun findMyGroups(userId: Long): List<MyGroupRow>
-
-    /**
-     * 추천순(G17) 상위 [limit]개. **이미 가입한 그룹은 후보에서 뺀다** — 홈 캐러셀에만 적용되는
-     * 규칙이고 그룹 탐색 목록에는 적용하지 않는다 (A §5-3).
-     */
-    fun findRecommendedGroups(
-        userId: Long,
-        limit: Int,
-    ): List<GroupCardRow>
 
     /**
      * 가입한 그룹들에 공유된 리뷰를 거리 오름차순 (거리, reviewId) 키셋으로 읽는다.

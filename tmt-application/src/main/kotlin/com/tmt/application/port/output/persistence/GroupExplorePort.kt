@@ -20,6 +20,11 @@ data class GroupCardsQuery(
     val regionTagIds: List<String>,
     /** GroupSort 이름 그대로 — 쿼리가 CASE로 정렬 키를 고른다. */
     val sort: String,
+    /**
+     * 이 사용자가 이미 가입한 그룹을 후보에서 뺀다. 홈 추천 캐러셀만 쓰는 규칙이고
+     * 그룹 탐색 목록에는 걸지 않는다 — 탐색은 전체 목록이 맞다 (A §5-3).
+     */
+    val excludeJoinedBy: Long? = null,
     val after: GroupListKey?,
     val limit: Int,
 )
