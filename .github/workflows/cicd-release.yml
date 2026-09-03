@@ -97,10 +97,46 @@ jobs:
           echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
           echo "public_ip=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
 
+      # 2026-09-01 v0.1.0 배포 장애 (TMT-306): 인스턴스가 메모리 고갈로 얼어 SSM 에이전트가 죽어 있었는데,
+      # send-command는 성공하고 명령만 영원히 InProgress였다. 워크플로는 11분 뒤 "InProgress로 끝났다"고
+      # 실패했고 그 메시지가 진짜 원인(에이전트 사망 → 재부팅 필요)을 가렸다. 보내기 전에 살았는지 본다.
+      - name: SSM 에이전트 생존 확인
+        env:
+          INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
+        run: |
+          # 일시적 하트비트 누락·에이전트 재시작으로 잠깐 ConnectionLost일 수 있어 3회(10초 간격) 본다.
+          # aws 호출 자체가 실패(AccessDenied 등)하면 read가 스텝을 조용히 죽이므로 결과를 먼저 변수에 담는다
+          PING=""; LAST_PING=""
+          for attempt in 1 2 3; do
+            INFO=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].[PingStatus,LastPingDateTime]' --output text 2>&1) || {
+              echo "::error::describe-instance-information 호출 실패 — CI 사용자 정책(ci.tf)의 ssm:DescribeInstanceInformation을 확인하세요: ${INFO}"
+              exit 1
+            }
+            read -r PING LAST_PING <<< "${INFO}"
+            echo "SSM PingStatus=${PING:-None} LastPing=${LAST_PING:-None} (attempt ${attempt})"
+            [ "${PING:-}" = "Online" ] && break
+            [ "$attempt" -lt 3 ] && sleep 10
+          done
+          if [ "${PING:-}" != "Online" ]; then
+            echo "::error::WAS(${INSTANCE_ID})의 SSM 에이전트가 ${PING:-None} 상태입니다 (마지막 ping ${LAST_PING:-없음}). 인스턴스가 응답 불능일 가능성이 높습니다 — 헬스체크 후 aws ec2 reboot-instances 를 검토하세요. 배포 명령을 보내지 않고 중단합니다"
+            exit 1
+          fi
+          # PingStatus는 누락이 몇 번 쌓여야 바뀌는 지연 지표다. 에이전트는 5분 간격으로 ping하므로
+          # 마지막 ping이 10분 넘게 과거면 "Online이지만 방금 얼었을" 가능성을 경고로 남긴다 (중단은 안 한다)
+          if [ -n "${LAST_PING:-}" ] && [ "${LAST_PING}" != "None" ]; then
+            AGE=$(( $(date -u +%s) - $(date -u -d "${LAST_PING}" +%s 2>/dev/null || date -u +%s) ))
+            if [ "$AGE" -gt 600 ]; then
+              echo "::warning::SSM 마지막 ping이 ${AGE}초 전입니다 — Online으로 표시돼도 인스턴스가 방금 얼었을 수 있습니다. 배포가 InProgress에 머물면 이 값을 먼저 보세요"
+            fi
+          fi
+
       - name: 배포 (SSM Run Command)
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
+          PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
         run: |
           # compose 파일은 scp 대신 명령 페이로드에 실어 보낸다. Run Command 인라인
           # 파라미터 한도(약 8KB) 안에 넉넉히 들어가는 크기다.
@@ -201,8 +237,10 @@ jobs:
 
           # aws ssm wait command-executed는 최대 100초라 이미지 pull이 끝나기 전에
           # 타임아웃될 수 있어 직접 폴링한다. 발급 직후에는 조회가 404일 수 있다.
+          # 원격 executionTimeout(600s)이 먼저 걸리므로 정상이라면 10분 안에 종료 상태가 온다.
+          # 15분까지 기다려도 InProgress면 명령이 오래 걸리는 게 아니라 에이전트가 상태를 못 올리는 것이다
           STATUS=Pending
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 90); do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
               --query 'Status' --output text 2>/dev/null || echo Pending)
@@ -218,7 +256,13 @@ jobs:
             --output json | jq -r '"--- status: \(.Status)\n--- stdout\n\(.Stdout)\n--- stderr\n\(.Stderr)"'
 
           if [ "$STATUS" != "Success" ]; then
-            echo "::error::배포 명령이 ${STATUS} 상태로 끝났습니다"
+            # 명령이 안 끝난 것(InProgress)과 에이전트가 죽은 것을 갈라서 보여준다. 배포 스크립트는
+            # 구 컨테이너를 내린 뒤 새 컨테이너를 띄우므로, 서비스가 살아 있는지도 같이 남긴다
+            PING=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo Unknown)
+            HEALTH=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${PUBLIC_IP}:8080/api/health/db" || true)
+            echo "::error::배포 명령이 ${STATUS} 상태로 끝났습니다 — SSM 에이전트 ${PING}, 서비스 헬스 HTTP ${HEALTH}. InProgress + 에이전트 비정상이면 인스턴스 동결이니 재부팅을, Failed면 위 stderr를 보세요"
             exit 1
           fi
 
