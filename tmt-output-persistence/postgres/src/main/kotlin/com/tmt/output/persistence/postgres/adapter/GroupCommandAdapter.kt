@@ -74,6 +74,7 @@ class GroupCommandAdapter(
         group.imageAssetId = imageAssetId
         duplicateNameToError { groupRepository.saveAndFlush(group) }
 
+        // 집합 교체라 0행이 정상이다 — 태그가 없던 그룹도 같은 경로를 탄다
         regionTagRepository.deleteAllByGroupId(groupId)
         regionTagRepository.saveAll(regionTagIds.map { GroupRegionTagEntity(GroupRegionTagId(groupId, it)) })
     }

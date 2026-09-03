@@ -26,12 +26,17 @@ interface SaveCommandPort {
         placeId: Long,
     ): Long
 
-    /** 이어쓰기의 본문·별점 교체. `updated_at`도 함께 올린다 — 이어쓰기 목록의 정렬 키다. */
+    /**
+     * 이어쓰기의 본문·별점 교체. `updated_at`도 함께 올린다 — 이어쓰기 목록의 정렬 키다.
+     *
+     * **갱신 행 수를 돌려준다.** 조회로 대상을 확인한 뒤 이 UPDATE가 나가기까지의 틈에 동시
+     * 삭제가 끼면 0이 된다 — 조회 시점의 존재 확인으로는 못 막고 행 수만이 "내가 갱신했다"를 증명한다.
+     */
     fun updateSave(
         saveId: Long,
         rating: Int?,
         content: String?,
-    )
+    ): Int
 
     /** 전체 교체·삭제 전에 부른다. 행이 남으면 media_asset_id UNIQUE가 재부착을 막는다. */
     fun deletePhotos(saveId: Long)

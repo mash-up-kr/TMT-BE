@@ -76,14 +76,17 @@ class FakeSaveCommandPort : SaveCommandPort {
         return id
     }
 
+    /** 실제 UPDATE와 같게 갱신 행 수를 돌려준다 — 없는 저장이면 0이다. */
     override fun updateSave(
         saveId: Long,
         rating: Int?,
         content: String?,
-    ) {
+    ): Int {
         val index = saves.indexOfFirst { it.id == saveId }
-        if (index >= 0) saves[index] = saves[index].copy(rating = rating, content = content)
+        if (index < 0) return 0
+        saves[index] = saves[index].copy(rating = rating, content = content)
         updatedAt[saveId] = Instant.now()
+        return 1
     }
 
     override fun deletePhotos(saveId: Long) {
