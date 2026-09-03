@@ -35,7 +35,7 @@ class PlaceQueryRepositoryTest : PersistenceTest() {
                 name = "상세매장",
                 latitude = 37.5,
                 longitude = 127.0,
-                categoryId = "korean",
+                categoryId = "cat_korean",
                 reviewCount = 3,
                 ratingSum = 12,
             )
@@ -43,7 +43,7 @@ class PlaceQueryRepositoryTest : PersistenceTest() {
         val detail = repository.findDetail(place, null)!!
 
         assertEquals("상세매장", detail.getName())
-        assertEquals("korean", detail.getCategoryId())
+        assertEquals("cat_korean", detail.getCategoryId())
         assertEquals(3, detail.getReviewCount())
         assertEquals(12L, detail.getRatingSum())
         assertEquals(37.5, detail.getLatitude(), 1e-6)

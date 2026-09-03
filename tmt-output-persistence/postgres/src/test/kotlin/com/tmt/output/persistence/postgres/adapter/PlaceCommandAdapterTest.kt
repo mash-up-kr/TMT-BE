@@ -94,7 +94,7 @@ class PlaceCommandAdapterTest : PersistenceTest() {
     }
 
     private fun newPlaceRow(
-        categoryId: String? = "korean",
+        categoryId: String? = "cat_korean",
         jibunAddress: String? = "서울특별시 중구 태평로1가 31",
     ) = NewPlaceRow(
         externalId = "manual-${PersistenceFixtures.nextSequence()}",

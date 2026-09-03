@@ -172,7 +172,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
     fun `카테고리 칩은 검색어와 AND로 걸린다`() {
         val region = isolatedRegion()
         val token = "칩${PersistenceFixtures.nextSequence()}"
-        val match = fixtures.newPlace(name = "$token 한식", regionName = region, categoryId = "korean")
+        val match = fixtures.newPlace(name = "$token 한식", regionName = region, categoryId = "cat_korean")
         val otherCategory = fixtures.newPlace(name = "$token 일식", regionName = region, categoryId = "japanese")
 
         val rows =
@@ -180,7 +180,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 .searchByRelevance(
                     query = token,
                     queryCategoryCsv = "",
-                    categoryId = "korean",
+                    categoryId = "cat_korean",
                     regionPrefix = region,
                     afterSortValue = null,
                     afterPlaceId = null,
@@ -196,14 +196,14 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
     fun `검색어가 카테고리 라벨이면 CSV로 넘어온 코드로도 잡힌다`() {
         val region = isolatedRegion()
         // 이름·주소에는 없고 카테고리만 맞는 매장 — 서비스가 라벨을 id로 바꿔 CSV로 넘긴 경우다
-        val byCategory = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "korean")
+        val byCategory = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "cat_korean")
         val other = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "japanese")
 
         val rows =
             repository
                 .searchByRelevance(
                     query = "한식",
-                    queryCategoryCsv = "korean",
+                    queryCategoryCsv = "cat_korean",
                     categoryId = null,
                     regionPrefix = region,
                     afterSortValue = null,

@@ -38,7 +38,7 @@ class PersistenceFixtures(
         longitude: Double = SEOUL_CITY_HALL_LNG,
         roadAddress: String = "서울특별시 중구 세종대로 110",
         regionName: String = "중구 태평로1가",
-        categoryId: String? = "korean",
+        categoryId: String? = "cat_korean",
         reviewCount: Int = 0,
         ratingSum: Long = 0,
     ): Long =

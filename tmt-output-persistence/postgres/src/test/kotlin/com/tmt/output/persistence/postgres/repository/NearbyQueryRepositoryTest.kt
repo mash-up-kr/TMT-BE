@@ -22,6 +22,7 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
 
     /** 반경 술어를 테스트마다 다른 좌표로 좁혀 다른 테스트의 매장이 섞이지 않게 한다. */
     private fun isolatedPoint(): Pair<Double, Double> {
+        // 시청에서 남쪽으로 10도 — 서울 밖으로 나가는 게 의도다. 시드·다른 테스트의 서울 좌표와 절대 겹치지 않는다
         // 위도 1도 ≈ 111km. 0.01도씩 남쪽으로 내려가며 테스트끼리 최소 1km 떨어뜨린다
         val offset = OFFSET.getAndIncrement() * 0.01
         return SEOUL_CITY_HALL_LAT - 10 - offset to SEOUL_CITY_HALL_LNG
