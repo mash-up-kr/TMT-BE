@@ -5,8 +5,6 @@ import com.tmt.application.port.input.GetNearbyReviewsUseCase
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyReviewKey
 import com.tmt.application.port.input.NearbyReviewsRequest
-import com.tmt.common.exception.ErrorCode
-import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.controller.dto.response.CursorPage
 import com.tmt.input.http.controller.dto.response.PublicIds
@@ -37,14 +35,11 @@ class NearbyController(
     @GetMapping("/reviews")
     fun nearbyReviews(
         @UserId userId: Long?,
-        @RequestParam(required = false) latitude: Double?,
-        @RequestParam(required = false) longitude: Double?,
+        @RequestParam latitude: Double,
+        @RequestParam longitude: Double,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): CursorPage<ReviewCardResponse> {
-        if (latitude == null || longitude == null) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "latitude·longitude는 필수이고 위경도 범위 안이어야 합니다.")
-        }
         // 좌표가 바뀌면 거리 정렬이 바뀌므로 이전 커서는 무효다 (규약 §5-3)
         val condition = CursorCondition.of("NEARBY_REVIEWS", latitude, longitude)
         val after = CursorCodec.decode(NearbyCursorSpec, cursor, condition)
@@ -80,18 +75,15 @@ class NearbyController(
     @GetMapping("/places")
     fun nearbyPlaces(
         @UserId userId: Long?,
-        @RequestParam(required = false) north: Double?,
-        @RequestParam(required = false) south: Double?,
-        @RequestParam(required = false) east: Double?,
-        @RequestParam(required = false) west: Double?,
+        @RequestParam north: Double,
+        @RequestParam south: Double,
+        @RequestParam east: Double,
+        @RequestParam west: Double,
         @RequestParam(required = false) latitude: Double?,
         @RequestParam(required = false) longitude: Double?,
         @RequestParam(required = false) query: String?,
         @RequestParam(required = false) curationTagId: String?,
     ): NearbyPlacesResponse {
-        if (north == null || south == null || east == null || west == null) {
-            throw TmtException(ErrorCode.VALIDATION_FAILED, "viewport 경계(north·south·east·west)는 필수입니다.")
-        }
         val result =
             getNearbyPlacesUseCase.get(
                 NearbyPlacesRequest(
