@@ -18,38 +18,11 @@ class GroupAssembler(
             groupId = group.groupId,
             name = group.name,
             oneLineDescription = group.oneLineDescription,
-            coverImageUrl = stats.coverPhotos.firstOrNull()?.url,
+            coverImageUrl = stats.coverPhotoUrls.firstOrNull(),
             memberCount = membershipStore.memberCount(group.groupId),
             reviewCount = stats.reviewCount,
             placeCount = stats.placeCount,
             matchedSavedPlaceCount = matchedSavedPlaceCount(group.groupId, viewerId),
-        )
-    }
-
-    fun detail(
-        group: MockGroup,
-        viewerId: Long?,
-    ): GroupDetailResponse {
-        val stats = statsOf(group.groupId)
-        return GroupDetailResponse(
-            groupId = group.groupId,
-            name = group.name,
-            oneLineDescription = group.oneLineDescription,
-            description = group.description,
-            imageUrl = group.imageAssetId?.let(mockMediaUrls::urlOf),
-            coverImages = stats.coverPhotos.take(MAX_COVER_IMAGES),
-            memberCount = membershipStore.memberCount(group.groupId),
-            reviewCount = stats.reviewCount,
-            placeCount = stats.placeCount,
-            foodCategory =
-                GroupDetailResponse.FoodCategory(
-                    group.foodCategoryId,
-                    GroupTags.foodLabelOf(group.foodCategoryId),
-                ),
-            regionTags = group.regionTagIds.map { GroupDetailResponse.RegionTag(it, GroupTags.regionLabelOf(it)) },
-            matchedSavedPlaceCount = matchedSavedPlaceCount(group.groupId, viewerId),
-            isMember = membershipStore.isMember(group.groupId, viewerId),
-            isOwner = viewerId != null && group.ownerId == viewerId,
         )
     }
 
@@ -67,15 +40,8 @@ class GroupAssembler(
         return GroupStats(
             reviewCount = reviews.size,
             placeCount = reviews.map { it.placeId }.distinct().size,
-            coverPhotos =
-                reviews.flatMap { save ->
-                    save.photoAssetIds.map {
-                        GroupDetailResponse.CoverImage(
-                            url = mockMediaUrls.urlOf(it),
-                            reviewId = save.reviewId!!,
-                        )
-                    }
-                },
+            coverPhotoUrls =
+                reviews.flatMap { save -> save.photoAssetIds.map { mockMediaUrls.urlOf(it) } },
         )
     }
 
@@ -98,45 +64,10 @@ class GroupAssembler(
     private data class GroupStats(
         val reviewCount: Int,
         val placeCount: Int,
-        val coverPhotos: List<GroupDetailResponse.CoverImage>,
+        val coverPhotoUrls: List<String>,
     )
 
-    data class GroupDetailResponse(
-        val groupId: String,
-        val name: String,
-        val oneLineDescription: String,
-        val description: String?,
-        val imageUrl: String?,
-        val coverImages: List<CoverImage>,
-        val memberCount: Int,
-        val reviewCount: Int,
-        val placeCount: Int,
-        val foodCategory: FoodCategory,
-        val regionTags: List<RegionTag>,
-        val matchedSavedPlaceCount: Int,
-        val isMember: Boolean,
-        val isOwner: Boolean,
-    ) {
-        data class CoverImage(
-            val url: String,
-            val reviewId: String,
-        )
-
-        data class FoodCategory(
-            val categoryId: String,
-            val label: String,
-        )
-
-        data class RegionTag(
-            val regionTagId: String,
-            val label: String,
-        )
-    }
-
     companion object {
-        // 상단 캐러셀은 공유 리뷰 사진 최신순 최대 5장 (G16)
-        private const val MAX_COVER_IMAGES = 5
-
         /**
          * 추천순 정렬 (G17) — 내 저장 매장과 겹치는 수 → 가입자 수 → groupId.
          * 그룹 탐색과 홈 추천 캐러셀이 같은 기준을 써야 두 화면이 갈리지 않는다.
