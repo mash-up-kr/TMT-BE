@@ -52,7 +52,7 @@ class NearbyServiceTest {
         favorite = true,
     )
 
-    private fun pin(id: Long) = PinRow(id, "p$id", 37.5, 126.9, 1)
+    private fun pin(id: Long) = PinRow(id, "p$id", 37.5, 126.9, "cat_korean", 1)
 
     @Test
     fun `위경도 범위 밖이면 VALIDATION_FAILED다`() {

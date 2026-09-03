@@ -72,6 +72,7 @@ class PlaceSearchService(
                     name = row.name,
                     roadAddress = row.roadAddress,
                     regionName = row.regionName,
+                    categoryId = row.categoryId,
                     categoryName = FoodCategories.labelOf(row.categoryId),
                     // 평균 = rating_sum / review_count (P9), 소수 첫째 자리. 리뷰 0건이면 null
                     averageRating =

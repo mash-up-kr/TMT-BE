@@ -66,6 +66,7 @@ class PlaceSearchControllerTest {
             .andExpect(jsonPath("$.items[0].placeId").value("place_1"))
             .andExpect(jsonPath("$.items[0].name").value("델리스피자"))
             .andExpect(jsonPath("$.items[0].regionName").value("마포구 도화동"))
+            .andExpect(jsonPath("$.items[0].categoryId").value("cat_western"))
             .andExpect(jsonPath("$.items[0].categoryName").value("양식"))
             .andExpect(jsonPath("$.items[0].reviewCount").value(0))
             .andExpect(jsonPath("$.items[0].averageRating").doesNotExist())
@@ -196,6 +197,7 @@ class PlaceSearchControllerTest {
             name = "델리스피자",
             roadAddress = "서울 마포구 도화동 200-14",
             regionName = "마포구 도화동",
+            categoryId = "cat_western",
             categoryName = "양식",
             averageRating = null,
             reviewCount = 0,
