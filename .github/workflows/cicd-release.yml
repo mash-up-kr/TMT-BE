@@ -104,13 +104,32 @@ jobs:
         env:
           INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
         run: |
-          read -r PING LAST_PING <<< "$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
-            --query 'InstanceInformationList[0].[PingStatus,LastPingDateTime]' --output text)"
-          echo "SSM PingStatus=${PING:-None} LastPing=${LAST_PING:-None}"
+          # 일시적 하트비트 누락·에이전트 재시작으로 잠깐 ConnectionLost일 수 있어 3회(10초 간격) 본다.
+          # aws 호출 자체가 실패(AccessDenied 등)하면 read가 스텝을 조용히 죽이므로 결과를 먼저 변수에 담는다
+          PING=""; LAST_PING=""
+          for attempt in 1 2 3; do
+            INFO=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].[PingStatus,LastPingDateTime]' --output text 2>&1) || {
+              echo "::error::describe-instance-information 호출 실패 — CI 사용자 정책(ci.tf)의 ssm:DescribeInstanceInformation을 확인하세요: ${INFO}"
+              exit 1
+            }
+            read -r PING LAST_PING <<< "${INFO}"
+            echo "SSM PingStatus=${PING:-None} LastPing=${LAST_PING:-None} (attempt ${attempt})"
+            [ "${PING:-}" = "Online" ] && break
+            [ "$attempt" -lt 3 ] && sleep 10
+          done
           if [ "${PING:-}" != "Online" ]; then
             echo "::error::WAS(${INSTANCE_ID})의 SSM 에이전트가 ${PING:-None} 상태입니다 (마지막 ping ${LAST_PING:-없음}). 인스턴스가 응답 불능일 가능성이 높습니다 — 헬스체크 후 aws ec2 reboot-instances 를 검토하세요. 배포 명령을 보내지 않고 중단합니다"
             exit 1
+          fi
+          # PingStatus는 누락이 몇 번 쌓여야 바뀌는 지연 지표다. 에이전트는 5분 간격으로 ping하므로
+          # 마지막 ping이 10분 넘게 과거면 "Online이지만 방금 얼었을" 가능성을 경고로 남긴다 (중단은 안 한다)
+          if [ -n "${LAST_PING:-}" ] && [ "${LAST_PING}" != "None" ]; then
+            AGE=$(( $(date -u +%s) - $(date -u -d "${LAST_PING}" +%s 2>/dev/null || date -u +%s) ))
+            if [ "$AGE" -gt 600 ]; then
+              echo "::warning::SSM 마지막 ping이 ${AGE}초 전입니다 — Online으로 표시돼도 인스턴스가 방금 얼었을 수 있습니다. 배포가 InProgress에 머물면 이 값을 먼저 보세요"
+            fi
           fi
 
       - name: 배포 (SSM Run Command)
@@ -242,7 +261,7 @@ jobs:
             PING=$(aws ssm describe-instance-information \
               --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
               --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo Unknown)
-            HEALTH=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${PUBLIC_IP}:8080/api/health/db" || echo 000)
+            HEALTH=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${PUBLIC_IP}:8080/api/health/db" || true)
             echo "::error::배포 명령이 ${STATUS} 상태로 끝났습니다 — SSM 에이전트 ${PING}, 서비스 헬스 HTTP ${HEALTH}. InProgress + 에이전트 비정상이면 인스턴스 동결이니 재부팅을, Failed면 위 stderr를 보세요"
             exit 1
           fi
