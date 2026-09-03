@@ -207,6 +207,28 @@ class PersistenceFixtures(
             userId,
         )
 
+    /**
+     * 가입. [joinedAt]은 가입 오래된 순(G20) 커서를 보는 테스트가 넘긴다.
+     * `(group_id, user_id)`는 ACTIVE일 때만 UNIQUE라(D5) 같은 쌍을 LEFT로는 여러 번 넣을 수 있다.
+     */
+    fun newMembership(
+        groupId: Long,
+        userId: Long,
+        joinedAt: Instant = Instant.now(),
+        status: String = "ACTIVE",
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO group_membership (group_id, user_id, status, joined_at)
+            VALUES (?, ?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            groupId,
+            userId,
+            status,
+            java.sql.Timestamp.from(joinedAt),
+        )
+
     private fun insertReturningId(
         sql: String,
         vararg args: Any?,

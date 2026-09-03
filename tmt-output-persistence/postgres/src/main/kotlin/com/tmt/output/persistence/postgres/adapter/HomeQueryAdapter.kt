@@ -1,6 +1,5 @@
 package com.tmt.output.persistence.postgres.adapter
 
-import com.tmt.application.port.output.persistence.GroupCardRow
 import com.tmt.application.port.output.persistence.HomeFeedRows
 import com.tmt.application.port.output.persistence.HomeQueryPort
 import com.tmt.application.port.output.persistence.MyGroupRow
@@ -20,23 +19,6 @@ class HomeQueryAdapter(
     override fun findMyGroups(userId: Long): List<MyGroupRow> =
         homeQueryRepository.findMyGroups(userId).map {
             MyGroupRow(groupId = it.getGroupId(), name = it.getName(), imageS3Key = it.getImageS3Key())
-        }
-
-    override fun findRecommendedGroups(
-        userId: Long,
-        limit: Int,
-    ): List<GroupCardRow> =
-        homeQueryRepository.findRecommendedGroups(userId, limit).map {
-            GroupCardRow(
-                groupId = it.getGroupId(),
-                name = it.getName(),
-                oneLineDescription = it.getOneLineDescription(),
-                coverS3Key = it.getCoverS3Key(),
-                memberCount = it.getMemberCount(),
-                reviewCount = it.getReviewCount(),
-                placeCount = it.getPlaceCount(),
-                matchedSavedPlaceCount = it.getMatchedSavedPlaceCount(),
-            )
         }
 
     override fun findFeedRowsByDistance(
