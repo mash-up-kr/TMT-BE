@@ -196,6 +196,7 @@ class PlaceDetailControllerTest {
             placeId = 5,
             placeName = "큰집",
             placeRegionName = "구로구 구로동",
+            placeCategoryId = "cat_meat",
             placeCategoryName = "고기·구이",
             placeFavorite = false,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),

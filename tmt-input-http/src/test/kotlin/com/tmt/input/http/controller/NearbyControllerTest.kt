@@ -66,6 +66,7 @@ class NearbyControllerTest {
             .andExpect(jsonPath("$.items[0].author.userId").value("user_901"))
             .andExpect(jsonPath("$.items[0].place.placeId").value("place_5"))
             .andExpect(jsonPath("$.items[0].photos[0].photoId").value("sp_13"))
+            .andExpect(jsonPath("$.items[0].place.categoryId").value("cat_meat"))
             .andExpect(jsonPath("$.items[0].place.categoryName").value("고기·구이"))
             .andExpect(jsonPath("$.items[0].contentLength").value(5))
             .andExpect(jsonPath("$.hasNext").value(false))
@@ -170,6 +171,7 @@ class NearbyControllerTest {
             placeId = 5,
             placeName = "큰집",
             placeRegionName = "구로구 구로동",
+            placeCategoryId = "cat_meat",
             placeCategoryName = "고기·구이",
             placeFavorite = false,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),

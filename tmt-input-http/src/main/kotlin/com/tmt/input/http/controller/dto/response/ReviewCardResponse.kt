@@ -38,6 +38,8 @@ data class ReviewCardResponse(
         val placeId: String,
         val name: String,
         val regionName: String,
+        /** 아이콘 키 (E11). 14종 매핑에 실패하면 null (TMT-239) */
+        val categoryId: String?,
         /** 14종 라벨. 카테고리 매핑 실패 매장은 null — FE는 미노출 (TMT-240) */
         val categoryName: String?,
         val isFavorite: Boolean,
