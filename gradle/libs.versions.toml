@@ -4,6 +4,7 @@ springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 kotlinPlugin = "2.3.21"
 querydsl = "5.1.0"
+testcontainers = "1.21.3"
 ktLintPlugin = "14.2.0"
 javaVersion = "21"
 
@@ -52,6 +53,11 @@ spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-
 kotlin-junit5 = { group = "org.jetbrains.kotlin", name = "kotlin-test-junit5" }
 junit = { group = "org.junit.platform", name = "junit-platform-launcher" }
 mockk = { group = "io.mockk", name = "mockk", version = "1.14.11" }
+# Testcontainers (TMT-295) — persistence 통합 테스트에서 실 PostGIS를 띄운다
+testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
+testcontainers-junit = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+# Boot 4는 test 자동설정을 모듈별로 쪼갰다 — @DataJpaTest·@AutoConfigureTestDatabase가 여기 있다
+spring-boot-starter-data-jpa-test = { group = "org.springframework.boot", name = "spring-boot-starter-data-jpa-test" }
 
 [bundles]
 # 공통 (convention에서 사용)
@@ -59,6 +65,8 @@ spring-common = ["spring-boot-starter-autoconfigure"]
 kotlin-spring = ["kotlin-reflect", "kotlin-jackson", "kotlin-logging"]
 test-implementation = ["spring-boot-starter-test", "kotlin-junit5", "mockk"]
 test-runtime = ["junit"]
+# persistence 모듈에서만 쓴다 — 공통 test 번들에 넣으면 전 모듈이 컨테이너 의존성을 끌어온다
+test-containers = ["testcontainers-postgresql", "testcontainers-junit", "spring-boot-starter-data-jpa-test"]
 
 # 모듈별
 bootstrap = ["spring-boot-starter-web", "spring-boot-starter-actuator"]

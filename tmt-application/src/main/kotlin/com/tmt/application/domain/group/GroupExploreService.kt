@@ -58,11 +58,10 @@ class GroupExploreService(
                         reviewCount = row.reviewCount,
                         placeCount = row.placeCount,
                         matchedSavedPlaceCount = row.matchedSavedPlaceCount,
-                        sortKey1 = row.sortKey1,
-                        sortKey2 = row.sortKey2,
                     )
                 },
             hasNext = slice.hasNext,
+            lastKey = slice.lastKey,
         )
     }
 

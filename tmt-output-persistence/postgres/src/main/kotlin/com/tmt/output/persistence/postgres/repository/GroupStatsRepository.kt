@@ -8,6 +8,23 @@ import org.springframework.data.repository.query.Param
 import java.time.Instant
 
 interface GroupStatsRepository : JpaRepository<GroupEntity, Long> {
+    /**
+     * 그룹 행을 잠근다. 값이 필요한 게 아니라 [refreshShareCounts]까지의 구간을 그룹 단위로
+     * 직렬화하는 것이 목적이다 — 같은 그룹에 갱신이 겹치면 `group_place`를 비우는 쪽과
+     * 다시 만드는 쪽이 엇갈려 PK가 충돌한다 (TMT-310).
+     *
+     * 행 잠금이라 다른 그룹의 갱신은 그대로 동시에 진행되고, 읽기도 막지 않는다.
+     *
+     * `FOR UPDATE`가 아니라 `FOR NO KEY UPDATE`인 이유: 전자는 자식 테이블 INSERT의 FK 검사
+     * (`FOR KEY SHARE`)까지 막아, 갱신이 도는 동안 같은 그룹의 가입·공유 추가가 대기한다.
+     * 후자는 그걸 막지 않으면서 갱신끼리는 여전히 직렬화한다 — 마지막 [refreshShareCounts]의
+     * UPDATE가 잡는 것과 같은 강도다.
+     */
+    @Query(value = "SELECT id FROM groups WHERE id = :groupId FOR NO KEY UPDATE", nativeQuery = true)
+    fun lockGroup(
+        @Param("groupId") groupId: Long,
+    ): Long?
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE GroupEntity g SET g.memberCount = g.memberCount + 1 WHERE g.id = :groupId")
     fun addMember(

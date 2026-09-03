@@ -62,6 +62,26 @@ data "aws_iam_policy_document" "db_secret_read" {
   }
 }
 
+# 스왑·메모리 지표 발행 (TMT-303). 네임스페이스를 TMT/Memory로 못박아 다른 지표를 못 만든다.
+data "aws_iam_policy_document" "metrics_put" {
+  statement {
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["TMT/Memory"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "metrics_put" {
+  name   = "${local.name}-metrics-put"
+  role   = aws_iam_role.instance.id
+  policy = data.aws_iam_policy_document.metrics_put.json
+}
+
 resource "aws_iam_role_policy" "db_secret_read" {
   name   = "${local.name}-db-secret-read"
   role   = aws_iam_role.instance.id

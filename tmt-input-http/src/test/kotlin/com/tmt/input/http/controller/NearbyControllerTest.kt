@@ -66,6 +66,7 @@ class NearbyControllerTest {
             .andExpect(jsonPath("$.items[0].author.userId").value("user_901"))
             .andExpect(jsonPath("$.items[0].place.placeId").value("place_5"))
             .andExpect(jsonPath("$.items[0].photos[0].photoId").value("sp_13"))
+            .andExpect(jsonPath("$.items[0].place.categoryId").value("cat_meat"))
             .andExpect(jsonPath("$.items[0].place.categoryName").value("고기·구이"))
             .andExpect(jsonPath("$.items[0].contentLength").value(5))
             .andExpect(jsonPath("$.hasNext").value(false))
@@ -138,7 +139,7 @@ class NearbyControllerTest {
 
         placesResult =
             NearbyPlacesResult(
-                pins = listOf(NearbyPlacesResult.Pin(5, "큰집", 37.4857, 126.8887, 3)),
+                pins = listOf(NearbyPlacesResult.Pin(5, "큰집", 37.4857, 126.8887, "cat_korean", 3)),
                 truncated = true,
             )
 
@@ -146,6 +147,7 @@ class NearbyControllerTest {
             .perform(get("/v1/nearby/places?north=37.50&south=37.47&east=126.91&west=126.87&query=큰집"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].placeId").value("place_5"))
+            .andExpect(jsonPath("$.items[0].categoryId").value("cat_korean"))
             .andExpect(jsonPath("$.items[0].reviewCount").value(3))
             .andExpect(jsonPath("$.truncated").value(true))
             .andExpect(jsonPath("$.nextCursor").doesNotExist())
@@ -169,6 +171,7 @@ class NearbyControllerTest {
             placeId = 5,
             placeName = "큰집",
             placeRegionName = "구로구 구로동",
+            placeCategoryId = "cat_meat",
             placeCategoryName = "고기·구이",
             placeFavorite = false,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),

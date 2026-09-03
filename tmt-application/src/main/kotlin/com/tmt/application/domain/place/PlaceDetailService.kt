@@ -30,6 +30,7 @@ class PlaceDetailService(
         return PlaceDetailView(
             placeId = row.placeId,
             name = row.name,
+            categoryId = row.categoryId,
             categoryName = FoodCategories.labelOf(row.categoryId),
             // 평균 = rating_sum / review_count (P9), 소수 첫째 자리. 141k 대부분이 리뷰 0건이라 0 나눗셈 금지
             averageRating =

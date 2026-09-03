@@ -9,4 +9,16 @@ interface GroupJoinTicketPort {
         userId: Long,
         reviewId: Long,
     )
+
+    /**
+     * 리뷰 삭제로 티켓 1장을 회수한다 (R7, TX-5). 회수했으면 true, 회수할 `AVAILABLE` 티켓이
+     * 없으면 false다 — 이미 그룹 가입에 쓴 티켓은 되돌릴 수 없다.
+     *
+     * 구현은 조건부 UPDATE 한 문장이어야 한다. 읽어서 고르고 쓰면 동시 요청이 같은 티켓을
+     * 두 번 회수한다. 티켓은 서로 구분되지 않지만 이 리뷰가 발급한 장을 먼저 고른다.
+     */
+    fun revokeOneForReview(
+        userId: Long,
+        reviewId: Long,
+    ): Boolean
 }

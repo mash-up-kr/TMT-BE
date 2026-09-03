@@ -28,6 +28,7 @@ fun ReviewCardView.toResponse(masked: Boolean = false): ReviewCardResponse =
                 placeId = PublicIds.place(placeId),
                 name = placeName,
                 regionName = placeRegionName,
+                categoryId = placeCategoryId,
                 categoryName = placeCategoryName,
                 isFavorite = placeFavorite,
             ),

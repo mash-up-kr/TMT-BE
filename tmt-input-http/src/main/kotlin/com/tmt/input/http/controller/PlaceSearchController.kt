@@ -85,6 +85,7 @@ class PlaceSearchController(
                         name = it.name,
                         roadAddress = it.roadAddress,
                         regionName = it.regionName,
+                        categoryId = it.categoryId,
                         categoryName = it.categoryName,
                         averageRating = it.averageRating,
                         reviewCount = it.reviewCount,

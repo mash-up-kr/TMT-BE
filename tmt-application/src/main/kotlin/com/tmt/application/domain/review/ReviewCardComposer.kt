@@ -47,6 +47,7 @@ class ReviewCardComposer(
                 placeId = row.placeId,
                 placeName = row.placeName,
                 placeRegionName = row.placeRegionName,
+                placeCategoryId = row.placeCategoryId,
                 placeCategoryName = FoodCategories.labelOf(row.placeCategoryId),
                 placeFavorite = row.favorite,
                 createdAt = row.createdAt,

@@ -23,6 +23,7 @@ class PlaceCardAssembler(
             name = place.name,
             roadAddress = place.roadAddress,
             regionName = place.regionName,
+            categoryId = ReviewFormRules.categoryIdOf(place.categoryName),
             categoryName = place.categoryName,
             averageRating = ratings.takeIf { it.isNotEmpty() }?.let { (it.average() * 10).roundToInt() / 10.0 },
             reviewCount = reviews.size,

@@ -6,6 +6,8 @@ data class PlaceCardResponse(
     val name: String,
     val roadAddress: String,
     val regionName: String,
+    /** 카테고리 아이콘 키. 14종 매핑에 실패하면 null (E11). */
+    val categoryId: String?,
     /** 14종 매핑에 실패하면 null (E11). */
     val categoryName: String?,
     /** 리뷰가 없으면 null. 소수 첫째 자리 (규약 §8-3). */

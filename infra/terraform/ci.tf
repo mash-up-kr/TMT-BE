@@ -51,7 +51,8 @@ data "aws_iam_policy_document" "ci_deploy" {
   }
 
   statement {
-    actions   = ["ssm:GetCommandInvocation"]
+    # DescribeInstanceInformation — 배포 전 에이전트 생존 확인 (TMT-306). 리소스 단위 제한을 지원하지 않는다
+    actions   = ["ssm:GetCommandInvocation", "ssm:DescribeInstanceInformation"]
     resources = ["*"]
   }
 }

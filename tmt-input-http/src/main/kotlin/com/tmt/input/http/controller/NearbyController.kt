@@ -113,6 +113,7 @@ class NearbyController(
                         name = it.name,
                         latitude = it.latitude,
                         longitude = it.longitude,
+                        categoryId = it.categoryId,
                         reviewCount = it.reviewCount,
                     )
                 },
@@ -129,6 +130,8 @@ class NearbyController(
             val name: String,
             val latitude: Double,
             val longitude: Double,
+            /** 카테고리 아이콘 키 (E11). 14종 매핑에 실패하면 null */
+            val categoryId: String?,
             val reviewCount: Int,
         )
     }

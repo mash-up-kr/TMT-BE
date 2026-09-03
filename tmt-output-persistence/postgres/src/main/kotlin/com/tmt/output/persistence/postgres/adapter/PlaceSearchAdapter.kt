@@ -4,6 +4,7 @@ import com.tmt.application.port.output.persistence.PlaceSearchCriteria
 import com.tmt.application.port.output.persistence.PlaceSearchPort
 import com.tmt.application.port.output.persistence.PlaceSearchRow
 import com.tmt.application.port.output.persistence.PlaceSearchRows
+import com.tmt.output.persistence.postgres.repository.LikePatterns
 import com.tmt.output.persistence.postgres.repository.PlaceSearchRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +17,8 @@ class PlaceSearchAdapter(
     override fun search(criteria: PlaceSearchCriteria): PlaceSearchRows {
         // 빈 목록이면 빈 문자열이 되고 string_to_array('', ',')는 빈 배열이라 ANY가 아무것도 못 고른다
         val queryCategoryCsv = criteria.queryCategoryIds.joinToString(",")
+        // similarity()는 원문이 필요하고 ILIKE는 이스케이프된 패턴이 필요해 둘을 따로 넘긴다
+        val queryPattern = LikePatterns.contains(criteria.query)
         val rows =
             if (criteria.sortByDistance) {
                 placeSearchRepository.searchByDistance(
@@ -23,6 +26,7 @@ class PlaceSearchAdapter(
                     lng = requireNotNull(criteria.longitude) { "거리 정렬은 좌표가 있을 때만 고른다" },
                     radius = criteria.radiusMeters,
                     query = criteria.query,
+                    queryPattern = queryPattern,
                     queryCategoryCsv = queryCategoryCsv,
                     categoryId = criteria.categoryId,
                     regionPrefix = criteria.regionPrefix,
@@ -34,6 +38,7 @@ class PlaceSearchAdapter(
             } else {
                 placeSearchRepository.searchByRelevance(
                     query = criteria.query,
+                    queryPattern = queryPattern,
                     queryCategoryCsv = queryCategoryCsv,
                     categoryId = criteria.categoryId,
                     regionPrefix = criteria.regionPrefix,

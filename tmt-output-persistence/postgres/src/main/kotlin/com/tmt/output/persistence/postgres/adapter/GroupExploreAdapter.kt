@@ -1,10 +1,12 @@
 package com.tmt.output.persistence.postgres.adapter
 
+import com.tmt.application.port.input.GroupListKey
 import com.tmt.application.port.output.persistence.GroupCardRow
 import com.tmt.application.port.output.persistence.GroupCardsQuery
 import com.tmt.application.port.output.persistence.GroupCardsSlice
 import com.tmt.application.port.output.persistence.GroupExplorePort
 import com.tmt.output.persistence.postgres.repository.GroupExploreRepository
+import com.tmt.output.persistence.postgres.repository.LikePatterns
 import org.springframework.stereotype.Component
 
 @Component
@@ -15,7 +17,7 @@ class GroupExploreAdapter(
         val rows =
             repository.findGroupCards(
                 viewerId = query.viewerId,
-                query = query.query,
+                queryPattern = LikePatterns.contains(query.query),
                 queryFoodCsv = query.queryFoodCategoryIds.toCsvOrNull(),
                 queryRegionCsv = query.queryRegionTagIds.toCsvOrNull(),
                 foodCategoryId = query.foodCategoryId,
@@ -26,9 +28,10 @@ class GroupExploreAdapter(
                 afterGroupId = query.after?.groupId,
                 limitPlusOne = query.limit + 1,
             )
+        val page = rows.take(query.limit)
         return GroupCardsSlice(
             rows =
-                rows.take(query.limit).map {
+                page.map {
                     GroupCardRow(
                         groupId = it.getGroupId(),
                         name = it.getName(),
@@ -38,11 +41,10 @@ class GroupExploreAdapter(
                         reviewCount = it.getReviewCount(),
                         placeCount = it.getPlaceCount(),
                         matchedSavedPlaceCount = it.getMatchedSavedPlaceCount().toInt(),
-                        sortKey1 = it.getSortKey1(),
-                        sortKey2 = it.getSortKey2(),
                     )
                 },
             hasNext = rows.size > query.limit,
+            lastKey = page.lastOrNull()?.let { GroupListKey(it.getSortKey1(), it.getSortKey2(), it.getGroupId()) },
         )
     }
 
