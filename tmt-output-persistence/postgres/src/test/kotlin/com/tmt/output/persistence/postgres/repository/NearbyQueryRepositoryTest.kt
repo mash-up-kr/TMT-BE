@@ -188,6 +188,33 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
     }
 
     @Test
+    fun `핀 검색어의 퍼센트는 와일드카드가 아니라 글자다 (TMT-296)`() {
+        val (lat, lng) = isolatedPoint()
+        val literal = fixtures.newPlace(name = "100% 수제버거", latitude = lat, longitude = lng, reviewCount = 1)
+        val other = fixtures.newPlace(name = "무관한가게", latitude = lat, longitude = lng, reviewCount = 1)
+
+        val pins =
+            repository
+                .findPins(
+                    north = lat + 0.01,
+                    south = lat - 0.01,
+                    east = lng + 0.01,
+                    west = lng - 0.01,
+                    centerLat = null,
+                    centerLng = null,
+                    queryPattern = LikePatterns.contains("100%"),
+                    queryCategoryCsv = "",
+                    categoryId = null,
+                    regionPrefix = null,
+                    limitPlusOne = 50,
+                ).map { it.getPlaceId() }
+
+        // ESCAPE가 빠지면 `%`가 bbox 안 전 매장을 잡아 무관한가게까지 나온다
+        assertEquals(listOf(literal), pins)
+        assertFalse(other in pins)
+    }
+
+    @Test
     fun `핀은 지역 접두어로 걸러진다`() {
         val (lat, lng) = isolatedPoint()
         val region = "마포구 도화동"
