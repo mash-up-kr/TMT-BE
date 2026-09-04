@@ -12,7 +12,8 @@ import jakarta.persistence.Table
 class UserEntity(
     @Column(nullable = false, unique = true)
     val kakaoId: Long,
-    @Column(length = 10, nullable = false)
+    /** 2~20자, 중복 허용 (U3). 폭·CHECK의 정본은 V6 마이그레이션이다 */
+    @Column(length = 20, nullable = false)
     var nickname: String,
     @Column(columnDefinition = "text")
     var profileImageUrl: String? = null,
