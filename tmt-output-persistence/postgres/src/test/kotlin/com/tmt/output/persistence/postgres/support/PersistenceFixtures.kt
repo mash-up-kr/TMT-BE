@@ -64,18 +64,25 @@ class PersistenceFixtures(
             ratingSum,
         )
 
+    /** [deletedAt]은 버린 저장(D6)을 세지 않는지 보는 테스트가 넘긴다. */
     fun newSave(
         userId: Long,
         placeId: Long,
         rating: Int? = 5,
         content: String? = "맛있었다",
+        deletedAt: Instant? = null,
     ): Long =
         insertReturningId(
-            "INSERT INTO save (user_id, place_id, rating, content) VALUES (?, ?, ?, ?) RETURNING id",
+            """
+            INSERT INTO save (user_id, place_id, rating, content, deleted_at)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
             userId,
             placeId,
             rating,
             content,
+            deletedAt?.let { java.sql.Timestamp.from(it) },
         )
 
     /** [createdAt]은 `(created_at, id)` 커서를 보는 테스트가 순서를 직접 정하려고 넘긴다. */
@@ -163,11 +170,18 @@ class PersistenceFixtures(
         )
     }
 
+    /** [createdAt]은 `(created_at, place_id)` 커서를 보는 좋아요 탭 테스트가 순서를 직접 정하려고 넘긴다. */
     fun addFavorite(
         userId: Long,
         placeId: Long,
+        createdAt: Instant? = null,
     ) {
-        jdbcTemplate.update("INSERT INTO place_favorite (user_id, place_id) VALUES (?, ?)", userId, placeId)
+        jdbcTemplate.update(
+            "INSERT INTO place_favorite (user_id, place_id, created_at) VALUES (?, ?, COALESCE(?, now()))",
+            userId,
+            placeId,
+            createdAt?.let { java.sql.Timestamp.from(it) },
+        )
     }
 
     /** 찜이 없는 상태에서 시작해야 하는 테스트용 — 그 한 행만 지운다. */
@@ -227,6 +241,65 @@ class PersistenceFixtures(
             userId,
             status,
             java.sql.Timestamp.from(joinedAt),
+        )
+
+    /** 그룹의 매장 파생 집계 행 (D3). `shared_review_count`가 0이 되면 행을 지우는 것이 규칙이다. */
+    fun addGroupPlace(
+        groupId: Long,
+        placeId: Long,
+        sharedReviewCount: Int = 1,
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO group_place (group_id, place_id, shared_review_count) VALUES (?, ?, ?)",
+            groupId,
+            placeId,
+            sharedReviewCount,
+        )
+    }
+
+    /**
+     * 티켓 발급 근거 (T8). [sourceType]은 `'SIGNUP'`이면 [sourceId]가 user_id, `'REVIEW'`면 review_id다.
+     * `(source_type, source_id, reward_type)`이 UNIQUE라 같은 근거로 두 번 발급되지 않는다.
+     */
+    fun grantReward(
+        userId: Long,
+        sourceType: String,
+        sourceId: Long,
+        createdAt: Instant = Instant.now(),
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO reward_grant (user_id, reward_type, source_type, source_id, created_at)
+            VALUES (?, 'GROUP_JOIN_TICKET', ?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            userId,
+            sourceType,
+            sourceId,
+            java.sql.Timestamp.from(createdAt),
+        )
+
+    /** 근거 1건당 티켓 1장 (§3). 소비·회수 이력을 보는 테스트가 상태와 시각을 직접 준다 (T4: 만료 없음). */
+    fun newTicket(
+        userId: Long,
+        rewardGrantId: Long,
+        status: String = "AVAILABLE",
+        consumedGroupId: Long? = null,
+        consumedAt: Instant? = null,
+        revokedAt: Instant? = null,
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO group_join_ticket (user_id, reward_grant_id, status, consumed_group_id, consumed_at, revoked_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            userId,
+            rewardGrantId,
+            status,
+            consumedGroupId,
+            consumedAt?.let { java.sql.Timestamp.from(it) },
+            revokedAt?.let { java.sql.Timestamp.from(it) },
         )
 
     private fun insertReturningId(
