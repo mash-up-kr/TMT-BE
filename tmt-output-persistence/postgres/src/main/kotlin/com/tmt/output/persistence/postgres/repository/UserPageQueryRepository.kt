@@ -67,19 +67,22 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
     /**
      * 가입 오래된 순 (G20), (joined_at, group_id) ASC 키셋. 집계 3종은 groups의 파생 컬럼(D3)을 쓰고,
      * matched는 저장(Save) 기준 교집합이다 (G12) — viewer가 없으면 0.
+     *
+     * 커버 서브쿼리의 `s`(group_review_share)는 [GroupCoverSql] 별칭이다 — 바깥 matched의
+     * `save s`와 스코프가 달라 겹치지 않는다.
      */
     @Query(
         value = """
             SELECT g.id                   AS groupId,
                    g.name                 AS name,
                    g.one_line_description AS oneLineDescription,
-                   (SELECT ma.s3_key FROM group_review_share grs
-                      JOIN review r     ON r.id = grs.review_id AND r.deleted_at IS NULL
-                      JOIN save_photo sp ON sp.save_id = r.save_id
-                      JOIN media_asset ma ON ma.id = sp.media_asset_id
-                     WHERE grs.group_id = g.id
-                     ORDER BY grs.created_at DESC, grs.review_id DESC, sp.photo_order
-                     LIMIT 1)             AS coverS3Key,
+                   -- 커버 정본은 GroupCoverSql이다 (G16) — 그룹 탭은 GroupCard를 그대로 쓰므로
+                   -- 그룹 상세·탐색과 같은 사진이어야 한다 (TMT-305)
+                   (SELECT ma.s3_key
+                    ${GroupCoverSql.FROM_JOINS}
+                    WHERE s.group_id = g.id
+                    ${GroupCoverSql.ORDER_BY}
+                    LIMIT 1)              AS coverS3Key,
                    g.member_count         AS memberCount,
                    g.review_count         AS reviewCount,
                    g.place_count          AS placeCount,

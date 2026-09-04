@@ -83,10 +83,15 @@ class UserPageQueryAdapterTest : PersistenceTest() {
         fixtures.newMembership(g1, owner, joinedAt = at(2))
         fixtures.newMembership(g2, owner, joinedAt = at(1))
         fixtures.newMembership(fixtures.newGroup(owner), owner, joinedAt = at(3), status = "LEFT")
-        val shared = fixtures.newPublishedReview(place, owner)
+        // 커버는 **리뷰** 최신순이다 (G16) — 오래된 리뷰를 나중에 공유해도 최신 리뷰 사진이 커버여야 한다.
+        // 공유 시각으로 정렬하면 여기서 갈린다 (PR #96 리뷰)
+        val older = fixtures.newPublishedReview(place, owner, createdAt = at(1))
+        val newer = fixtures.newPublishedReview(place, owner, createdAt = at(2))
         val cover = fixtures.newMediaAsset(owner)
-        fixtures.attachPhoto(shared.saveId, cover)
-        fixtures.shareReview(g1, shared.reviewId, owner)
+        fixtures.attachPhoto(newer.saveId, cover)
+        fixtures.attachPhoto(older.saveId, fixtures.newMediaAsset(owner))
+        fixtures.shareReview(g1, newer.reviewId, owner)
+        fixtures.shareReview(g1, older.reviewId, owner) // 오래된 리뷰가 나중에 공유됐다
         fixtures.addGroupPlace(g1, place)
         fixtures.newSave(viewer, place) // 조회자가 같은 매장을 저장했다 → g1과 1곳 일치 (G12)
 
