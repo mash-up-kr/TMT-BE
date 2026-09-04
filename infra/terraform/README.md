@@ -114,11 +114,14 @@ aws ssm put-parameter --name /tmt-prod/db/password --type SecureString \
 
 **DB 서브넷은 퍼블릭이다.** NAT Gateway를 안 쓰기로 한 이상 아웃바운드 경로는 IGW뿐이다. VPC 인터페이스 엔드포인트라는 선택지도 있지만, 필요한 것만 세도 ECR 2개 + SSM 3개 + KMS 1개로 6개이고 엔드포인트당 시간 과금이 붙어 월 $45 정도가 된다. NAT Gateway와 비슷한 금액이라 실익이 없어서 쓰지 않는다. 인바운드는 보안그룹에서 WAS 보안그룹 소스의 5432만 허용하므로 외부에서 DB에 직접 닿을 수는 없다. 나중에 NAT를 도입하면 `db` 서브넷의 라우팅 테이블만 갈아끼우면 된다 — 그러라고 서브넷을 갈라뒀다.
 
-## 스왑 관측 (TMT-303)
+## 스왑 관측 (TMT-303 · 336)
 
 스왑 2GiB(TMT-298)는 메모리 스파이크를 "동결"에서 "느린 채 살아 있음"으로 바꾼다. 그 대신 **열화를 아무도
 모르는 상태**가 생길 수 있어, 두 인스턴스가 5분마다 CloudWatch `TMT/Memory`에 지표를 올린다
-(`user_data`의 `tmt-swap-metrics.timer`). 커스텀 지표 4개·알람 2개는 무료 한도 안이고 API 호출은 월 $0.2 미만이다.
+(`user_data/swap_metrics.sh.tftpl`의 `tmt-swap-metrics.timer` — WAS·DB가 한 파일을 공유하고 `Role`만 다르다).
+
+**커스텀 지표는 8개다** — 이름 4종 × `Role` 차원 2개다. CloudWatch는 (이름, 차원) 조합마다 과금하므로
+이름만 세면 절반으로 잘못 센다. 알람 4개와 함께 무료 한도(지표 10개·알람 10개) 안이고 API 호출은 월 $0.2 미만이다.
 
 | 지표 | 뜻 |
 |---|---|
@@ -128,9 +131,17 @@ aws ssm put-parameter --name /tmt-prod/db/password --type SecureString \
 
 **판단 기준** (PR #83 리뷰에서 정한 값):
 
-- **관측**: `SwapUsedPercent >= 25%`(≈512MB)가 5분 지속 — 알람 `tmt-prod-{was,db}-swap-used-25pct`가 ALARM으로 바뀐다 (알림 액션은 없다, 콘솔에서 본다)
-- **교체 판단**: 상시 트래픽에서 swap in/out이 **주 2회 이상 반복**되면 인스턴스 상향(TMT-298 재론). 배포·시드 적재처럼
+- **관측**: `SwapUsedPercent >= 25%`(≈512MB)가 5분 지속 — 알람 `tmt-prod-{was,db}-swap-used-25pct`
+- **밀려남**: 직전 5분에 스왑아웃이 한 페이지라도 있으면 — 알람 `tmt-prod-{was,db}-swap-out`.
+  사용률만 보면 첫 열화를 놓친다. 실측 첫 스왑아웃이 226페이지(≈0.9MB)였는데 사용률로는 0%로 반올림돼
+  25% 알람이 침묵했다. **이 알람의 히스토리가 곧 아래 "주 2회" 카운트다**
+- **교체 판단**: 상시 트래픽에서 스왑아웃이 **주 2회 이상 반복**되면 인스턴스 상향(TMT-298 재론). 배포·시드 적재처럼
   예정된 순간의 일시 스왑은 근거에서 뺀다 — 반복성이 기준이다
+
+알람 넷 다 **알림 액션이 없다.** 콘솔에서 상태와 히스토리를 본다.
+
+**`INSUFFICIENT_DATA`는 정상이 아니라 관측이 끊긴 것이다.** `treat_missing_data`가 `missing`이라
+지표가 안 올라오면 OK로 덮이지 않고 그대로 드러난다 — 타이머·IAM(`metrics_put`)·IMDS 중 하나를 의심한다.
 
 확인:
 
