@@ -35,7 +35,10 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                 FROM place p
                 CROSS JOIN pt
                 WHERE (
-                        CAST(:query AS text) IS NULL
+                        -- 널 가드도 :queryPattern이 정본이다 (TMT-335). :query로 가르면
+                        -- 빈 검색어에서 "검색어 있음"으로 읽히는데 ILIKE NULL은 NULL이라
+                        -- OR가 카테고리 한 갈래로 조용히 좁혀진다
+                        CAST(:queryPattern AS text) IS NULL
                         OR p.name ILIKE :queryPattern ESCAPE '\'
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
@@ -89,7 +92,10 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                        ) AS favorite
                 FROM place p
                 WHERE (
-                        CAST(:query AS text) IS NULL
+                        -- 널 가드도 :queryPattern이 정본이다 (TMT-335). :query로 가르면
+                        -- 빈 검색어에서 "검색어 있음"으로 읽히는데 ILIKE NULL은 NULL이라
+                        -- OR가 카테고리 한 갈래로 조용히 좁혀진다
+                        CAST(:queryPattern AS text) IS NULL
                         OR p.name ILIKE :queryPattern ESCAPE '\'
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))

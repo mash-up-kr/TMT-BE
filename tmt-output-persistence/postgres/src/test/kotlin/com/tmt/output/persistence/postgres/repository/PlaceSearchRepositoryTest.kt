@@ -285,6 +285,85 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
         assertEquals(s3KeyOf(aliveAsset), rows.single().getS3Key())
     }
 
+    @Test
+    fun `패턴이 없으면 검색어 조건이 아예 걸리지 않는다 — 널 가드의 정본은 패턴이다`() {
+        val region = isolatedRegion()
+        val korean = fixtures.newPlace(regionName = region, categoryId = "cat_korean")
+        val japanese = fixtures.newPlace(regionName = region, categoryId = "cat_japanese")
+
+        // 빈 검색어가 흘러들어온 상황 — query는 비어 있지만 LikePatterns.contains는 null을 준다.
+        // :query로 가르면 "검색어 있음"이 되고 ILIKE NULL은 NULL이라 카테고리 갈래만 남는다 (TMT-335)
+        val rows =
+            repository.searchByRelevance(
+                query = "",
+                queryPattern = null,
+                queryCategoryCsv = "cat_korean",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 10,
+            )
+
+        assertEquals(setOf(korean, japanese), rows.map { it.getPlaceId() }.toSet())
+    }
+
+    @Test
+    fun `거리순도 같은 규칙이다`() {
+        val region = isolatedRegion()
+        val korean =
+            fixtures.newPlace(regionName = region, categoryId = "cat_korean", latitude = BASE_LAT, longitude = BASE_LNG)
+        val japanese =
+            fixtures.newPlace(
+                regionName = region,
+                categoryId = "cat_japanese",
+                latitude = BASE_LAT + 0.001,
+                longitude = BASE_LNG,
+            )
+
+        val rows =
+            repository.searchByDistance(
+                lat = BASE_LAT,
+                lng = BASE_LNG,
+                radius = null,
+                query = "",
+                queryPattern = null,
+                queryCategoryCsv = "cat_korean",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 10,
+            )
+
+        assertEquals(listOf(korean, japanese), rows.map { it.getPlaceId() })
+    }
+
+    @Test
+    fun `검색어의 퍼센트는 와일드카드가 아니라 글자다 (TMT-296)`() {
+        val region = isolatedRegion()
+        val literal = fixtures.newPlace(name = "100% 수제버거", regionName = region)
+        fixtures.newPlace(name = "김밥천국", regionName = region)
+
+        val rows =
+            repository.searchByRelevance(
+                query = "100%",
+                queryPattern = LikePatterns.contains("100%"),
+                queryCategoryCsv = "",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 10,
+            )
+
+        // 이스케이프가 없으면 `%`가 전 행을 잡아 김밥천국까지 나온다
+        assertEquals(listOf(literal), rows.map { it.getPlaceId() })
+    }
+
     private fun s3KeyOf(mediaAssetId: Long): String =
         jdbcTemplate.queryForObject("SELECT s3_key FROM media_asset WHERE id = ?", String::class.java, mediaAssetId)!!
 
