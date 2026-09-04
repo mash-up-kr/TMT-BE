@@ -196,29 +196,6 @@ class PersistenceFixtures(
         )
 
     /**
-     * 멤버십. 기본은 ACTIVE·지금 가입이고, 같은 (group_id, user_id)의 ACTIVE 행은 하나뿐이다
-     * (membership_active_uq). `LEFT`를 만들면 탈퇴 이력이 남은 상태를 재현할 수 있다.
-     */
-    fun newMembership(
-        groupId: Long,
-        userId: Long,
-        status: String = "ACTIVE",
-        joinedAt: Instant = Instant.now(),
-    ): Long =
-        insertReturningId(
-            """
-            INSERT INTO group_membership (group_id, user_id, status, joined_at, left_at)
-            VALUES (?, ?, ?, ?, ?)
-            RETURNING id
-            """.trimIndent(),
-            groupId,
-            userId,
-            status,
-            Timestamp.from(joinedAt),
-            if (status == "LEFT") Timestamp.from(joinedAt) else null,
-        )
-
-    /**
      * 발급 근거 1건 (T8). `(source_type, source_id, reward_type)`이 UNIQUE라 source_id에 유일값을 넣는다 —
      * 실제 리뷰가 아니어도 FK가 없어 성립한다. [newTicket]이 쓰고, 회수 테스트는 리뷰 id를 직접 준다.
      */
