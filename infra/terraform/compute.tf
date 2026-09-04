@@ -6,7 +6,11 @@ resource "aws_instance" "was" {
   key_name               = aws_key_pair.main.key_name
   iam_instance_profile   = aws_iam_instance_profile.instance.name
 
-  user_data = file("${path.module}/user_data/was.sh")
+  # 스왑 관측 스크립트는 DB와 공유한다 — 차이가 Role 차원뿐이라 정본을 하나로 뒀다 (TMT-336).
+  # 템플릿 안에서는 templatefile을 부를 수 없어 여기서 펼쳐 넣는다.
+  user_data = templatefile("${path.module}/user_data/was.sh.tftpl", {
+    swap_metrics = templatefile("${path.module}/user_data/swap_metrics.sh.tftpl", { role = "was" })
+  })
 
   root_block_device {
     volume_type           = "gp3"
@@ -43,6 +47,7 @@ resource "aws_instance" "db" {
     password_param  = aws_ssm_parameter.db_password.name
     backup_bucket   = aws_s3_bucket.backup.id
     backup_schedule = var.backup_schedule
+    swap_metrics    = templatefile("${path.module}/user_data/swap_metrics.sh.tftpl", { role = "db" })
   })
 
   root_block_device {
