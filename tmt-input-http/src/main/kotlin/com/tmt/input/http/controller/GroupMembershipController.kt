@@ -108,7 +108,8 @@ class GroupMembershipController(
             }
         return ResponseEntity
             .status(result.status)
-            .location(URI.create("/v1/groups/$groupId/memberships/me"))
+            // 응답 본문의 groupId와 같은 정규화된 표기를 쓴다 — 클라이언트가 보낸 원본은 `1`일 수도 있다
+            .location(URI.create("/v1/groups/${PublicIds.group(id)}/memberships/me"))
             .body(result.response)
     }
 

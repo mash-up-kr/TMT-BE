@@ -74,9 +74,12 @@ class GroupMembershipService(
         }
 
         if (!groupJoinTicketPort.consumeOne(userId, groupId)) {
+            // countAvailable로 세면 안 된다 — 소비 실패의 절반은 "다른 트랜잭션이 잡은 장을 건너뛴 것"인데
+            // READ COMMITTED라 그 장이 아직 AVAILABLE로 보인다. 응답이 `available: 1, shortage: 0`인
+            // 409가 되어 화면이 "티켓 있는데 실패"를 받는다 (PR #99 리뷰)
             throw TicketShortageException(
                 errorCode = ErrorCode.GROUP_JOIN_TICKET_REQUIRED,
-                availableCount = groupJoinTicketPort.countAvailable(userId),
+                availableCount = groupJoinTicketPort.countConsumable(userId),
                 requiredCount = REQUIRED_TICKETS,
             )
         }
@@ -108,11 +111,12 @@ class GroupMembershipService(
         if (target.ownerId == userId) throw TmtException(ErrorCode.GROUP_OWNER_CANNOT_LEAVE)
 
         if (!groupMembershipPort.leave(groupId, userId)) throw TmtException(ErrorCode.GROUP_MEMBERSHIP_REQUIRED)
-        groupStatsPort.removeMember(groupId)
 
-        if (groupReviewSharePort.unshareAllByUser(groupId, userId) > 0) {
-            groupStatsPort.refreshShareStats(groupId)
-        }
+        // 공유를 먼저 내리고 그룹 행을 나중에 잡는다 — 공유 집합 교체(TX-4)가 `공유 → lockGroup` 순서라
+        // 반대로 두면 두 요청이 서로의 자원을 기다린다. 한 트랜잭션이라 순서가 결과를 바꾸지는 않는다
+        val unshared = groupReviewSharePort.unshareAllByUser(groupId, userId)
+        groupStatsPort.removeMember(groupId)
+        if (unshared > 0) groupStatsPort.refreshShareStats(groupId)
     }
 
     companion object {

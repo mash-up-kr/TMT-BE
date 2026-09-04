@@ -45,7 +45,7 @@ class GroupMembershipRepositoryConcurrencyTest : PersistenceTest() {
     fun `탈퇴한 뒤 다시 가입하면 새 ACTIVE 행이 생긴다 — LEFT 행은 유일성에 걸리지 않는다`() {
         val userId = fixtures.newUser()
         val groupId = fixtures.newGroup(fixtures.newUser())
-        fixtures.joinGroup(groupId, userId)
+        fixtures.newMembership(groupId, userId)
 
         assertEquals(1, transaction.execute { repository.leave(groupId, userId) })
         assertEquals(0, transaction.execute { repository.leave(groupId, userId) }, "두 번째 탈퇴는 0행이다")

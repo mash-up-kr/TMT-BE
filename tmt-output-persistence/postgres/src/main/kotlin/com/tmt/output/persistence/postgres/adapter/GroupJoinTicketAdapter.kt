@@ -43,4 +43,6 @@ class GroupJoinTicketAdapter(
         userId: Long,
         groupId: Long,
     ): Boolean = groupJoinTicketRepository.consumeOne(userId, groupId) > 0
+
+    override fun countConsumable(userId: Long): Int = groupJoinTicketRepository.countConsumable(userId)
 }

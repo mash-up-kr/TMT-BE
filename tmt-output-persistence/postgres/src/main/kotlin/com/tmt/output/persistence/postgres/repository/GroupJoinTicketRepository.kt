@@ -75,4 +75,22 @@ interface GroupJoinTicketRepository : JpaRepository<GroupJoinTicketEntity, Long>
         @Param("userId") userId: Long,
         @Param("groupId") groupId: Long,
     ): Int
+
+    /**
+     * [consumeOne]과 같은 술어로 세므로 "집을 수 있는 장"만 나온다 — 남이 잡은 장은 SKIP LOCKED가 건너뛴다.
+     * 세는 동안 그 행들을 잡지만, 이 쿼리를 부르는 경로는 곧 예외로 롤백돼 바로 풀린다.
+     */
+    @Query(
+        value = """
+            SELECT count(*) FROM (
+                SELECT id FROM group_join_ticket
+                WHERE user_id = :userId AND status = 'AVAILABLE'
+                FOR UPDATE SKIP LOCKED
+            ) t
+        """,
+        nativeQuery = true,
+    )
+    fun countConsumable(
+        @Param("userId") userId: Long,
+    ): Int
 }

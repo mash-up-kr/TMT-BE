@@ -33,4 +33,13 @@ interface GroupJoinTicketPort {
         userId: Long,
         groupId: Long,
     ): Boolean
+
+    /**
+     * **지금 이 트랜잭션이 실제로 집을 수 있는** `AVAILABLE` 티켓 수. [countAvailable]과 달리
+     * 다른 트랜잭션이 잡고 있는 장은 빼고 센다.
+     *
+     * [consumeOne]이 false를 준 뒤 잔여 수를 알릴 때 쓴다 — 그 자리에서 [countAvailable]로 세면
+     * 커밋 전인 남의 소비가 안 보여, 소비에 실패했는데 "쓸 수 있는 티켓이 있다"는 응답이 나간다.
+     */
+    fun countConsumable(userId: Long): Int
 }

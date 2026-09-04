@@ -108,8 +108,12 @@ class InterleavedTransactions(
     }
 
     /**
-     * @param followerBlocked 후행이 선행의 락에 실제로 걸렸는지. **false면 두 트랜잭션이 겹치지 않은 것이고,
-     *   그 테스트는 경합을 검증하지 못했다** — 결과값이 기대와 같더라도 단언에 실패시켜야 한다.
+     * @param followerBlocked 후행이 선행의 락에 **대기했는지**. 겹침 자체는 이 값이 아니라 래치가 보장한다 —
+     *   후행은 선행이 문장을 실행한 뒤에 진입하고 선행은 그 뒤에 커밋하므로, 이 값과 무관하게 두 트랜잭션은 겹친다.
+     *
+     *   대기하는 잠금(기본 `UPDATE`·`FOR UPDATE`)에서는 **false가 곧 "겹치지 않았다"**이므로 단언에 실패시킨다.
+     *   반면 `FOR UPDATE SKIP LOCKED`는 남이 잡은 행을 기다리지 않고 건너뛰므로 **false가 정상이고,
+     *   그 경우 판정은 갱신 건수로 한다** (`GroupJoinTicketRepositoryConcurrencyTest`).
      */
     data class InterleavedResult<T>(
         val leaderResult: T,

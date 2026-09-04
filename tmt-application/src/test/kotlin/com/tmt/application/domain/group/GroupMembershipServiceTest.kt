@@ -114,7 +114,11 @@ class GroupMembershipServiceTest {
             override fun unshareAllByUser(
                 groupId: Long,
                 userId: Long,
-            ): Int = shares.size.also { shares.clear() }
+            ): Int =
+                shares.size.also {
+                    stats += "unshare"
+                    shares.clear()
+                }
 
             override fun findSharedGroupIds(reviewId: Long) = emptyList<Long>()
 
@@ -240,6 +244,20 @@ class GroupMembershipServiceTest {
     }
 
     @Test
+    fun `소비에 실패하면 잔여 수를 집을 수 있는 장 기준으로 알린다`() {
+        // 다른 트랜잭션이 유일한 장을 잡고 있는 상황 — 잔고는 1인데 이 요청이 집을 수 있는 건 0이다.
+        // countAvailable로 세면 `available: 1, shortage: 0`인 409가 나가 응답이 자기모순이 된다
+        tickets.seed(userId, 1)
+        tickets.consumable = 0
+        tickets.consumeFails = true
+
+        val e = assertThrows<TicketShortageException> { service.join(JoinGroupCommand(userId, groupId, emptyList())) }
+
+        assertEquals(0, e.availableCount)
+        assertEquals(1, e.shortageCount)
+    }
+
+    @Test
     fun `없는 그룹이면 GROUP_NOT_FOUND다`() {
         target = null
 
@@ -260,7 +278,8 @@ class GroupMembershipServiceTest {
 
         assertFalse(userId in members)
         assertTrue(shares.isEmpty())
-        assertEquals(listOf("removeMember", "refresh"), stats)
+        // 공유를 먼저 내리고 그룹 행을 나중에 잡는다 — 공유 집합 교체와 잠금 순서를 맞춘 것이다 (PR #99 리뷰)
+        assertEquals(listOf("unshare", "removeMember", "refresh"), stats)
     }
 
     @Test
@@ -269,7 +288,7 @@ class GroupMembershipServiceTest {
 
         service.leave(groupId, userId)
 
-        assertEquals(listOf("removeMember"), stats)
+        assertEquals(listOf("unshare", "removeMember"), stats)
     }
 
     @Test

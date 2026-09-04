@@ -1,5 +1,6 @@
 package com.tmt.output.persistence.postgres.repository
 
+import com.tmt.output.persistence.postgres.entity.GroupJoinTicketStatus
 import com.tmt.output.persistence.postgres.support.InterleavedTransactions
 import com.tmt.output.persistence.postgres.support.PersistenceTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -67,6 +68,29 @@ class GroupJoinTicketRepositoryConcurrencyTest : PersistenceTest() {
         assertEquals(groupA, consumedGroupOf(older))
         assertEquals(groupB, consumedGroupOf(newer))
         assertNotEquals(consumedGroupOf(older), consumedGroupOf(newer))
+    }
+
+    @Test
+    fun `소비에 밀린 트랜잭션은 집을 수 있는 장을 0으로 센다`() {
+        val userId = fixtures.newUser()
+        fixtures.newTicket(userId)
+        val groupId = fixtures.newGroup(fixtures.newUser())
+
+        // 선행이 유일한 장을 잡은 채 커밋 전이다. 후행 입장에서 status는 아직 AVAILABLE로 보이지만
+        // 집을 수는 없다 — 잔여 수를 countByUserIdAndStatus로 세면 "티켓 있는데 가입 실패"가 나간다
+        val result =
+            interleaved.followerEntersBeforeCommit(
+                leader = { repository.consumeOne(userId, groupId) },
+                follower = {
+                    val consumable = repository.countConsumable(userId)
+                    val available = repository.countByUserIdAndStatus(userId, GroupJoinTicketStatus.AVAILABLE)
+                    consumable to available
+                },
+            )
+
+        assertEquals(1, result.leaderResult)
+        assertEquals(0 to 1, result.followerResult, "집을 수 있는 장은 0, 겉보기 잔고는 1이어야 한다")
+        assertFalse(result.followerBlocked, "SKIP LOCKED라 세는 동안에도 기다리면 안 된다")
     }
 
     @Test
