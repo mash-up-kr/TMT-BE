@@ -19,6 +19,10 @@ enum class ErrorCode(
     INTERNAL_ERROR_TEST(ErrorType.INTERNAL, "에러 테스트용 예외입니다."),
     IDEMPOTENCY_CONFLICT(ErrorType.CONFLICT, "같은 멱등성 키로 다른 요청이 이미 처리되었습니다."),
 
+    // 인증
+    AUTH_KAKAO_CODE_INVALID(ErrorType.UNAUTHORIZED, "카카오 인가 코드가 유효하지 않습니다."),
+    AUTH_KAKAO_UNAVAILABLE(ErrorType.EXTERNAL_UNAVAILABLE, "카카오 로그인 서비스가 응답하지 않습니다."),
+
     // 매장
     PLACE_NOT_FOUND(ErrorType.NOT_FOUND, "매장을 찾을 수 없습니다."),
     PLACE_CATEGORY_NOT_FOUND(ErrorType.VALIDATION, "음식 카테고리가 목록에 없습니다."),
