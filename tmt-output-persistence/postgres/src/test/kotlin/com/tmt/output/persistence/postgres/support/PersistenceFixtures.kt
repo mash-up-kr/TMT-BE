@@ -1,6 +1,7 @@
 package com.tmt.output.persistence.postgres.support
 
 import org.springframework.jdbc.core.JdbcTemplate
+import java.sql.Timestamp
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 
@@ -192,6 +193,52 @@ class PersistenceFixtures(
             "테스트그룹${nextSequence()}",
             foodCategoryId,
             ownerId,
+        )
+
+    /**
+     * 발급 근거 1건 (T8). `(source_type, source_id, reward_type)`이 UNIQUE라 source_id에 유일값을 넣는다 —
+     * 실제 리뷰가 아니어도 FK가 없어 성립한다. [newTicket]이 쓰고, 회수 테스트는 리뷰 id를 직접 준다.
+     */
+    fun grantReward(
+        userId: Long,
+        sourceType: String = "REVIEW",
+        sourceId: Long = nextSequence(),
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO reward_grant (user_id, reward_type, source_type, source_id)
+            VALUES (?, 'GROUP_JOIN_TICKET', ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            userId,
+            sourceType,
+            sourceId,
+        )
+
+    /**
+     * 티켓 1장. 기본은 `AVAILABLE`이고, `CONSUMED`·`REVOKED`로 이미 쓰였거나 회수된 장을 만들 수 있다 —
+     * 티켓 이력(T10)처럼 상태별 행이 필요한 테스트가 쓴다.
+     */
+    fun newTicket(
+        userId: Long,
+        status: String = "AVAILABLE",
+        rewardGrantId: Long = grantReward(userId),
+        consumedGroupId: Long? = null,
+        consumedAt: Instant? = null,
+        revokedAt: Instant? = null,
+    ): Long =
+        insertReturningId(
+            """
+            INSERT INTO group_join_ticket (user_id, reward_grant_id, status, consumed_group_id, consumed_at, revoked_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            userId,
+            rewardGrantId,
+            status,
+            consumedGroupId,
+            consumedAt?.let(Timestamp::from),
+            revokedAt?.let(Timestamp::from),
         )
 
     /** 공유는 `(group_id, review_id)`가 UNIQUE라 같은 리뷰를 한 그룹에 두 번 넣을 수 없다 (share_uq) */

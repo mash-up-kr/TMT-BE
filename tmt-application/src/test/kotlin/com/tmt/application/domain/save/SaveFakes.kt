@@ -264,6 +264,28 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
         counts[userId] = available - 1
         return true
     }
+
+    val consumedFor = mutableListOf<Pair<Long, Long>>()
+
+    /** 경합에 밀린 상황을 흉내낼 때 쓴다 — 잔고는 있는데 집을 수 있는 장이 0인 경우다 */
+    var consumable: Int? = null
+
+    override fun countConsumable(userId: Long): Int = consumable ?: countAvailable(userId)
+
+    /** SKIP LOCKED가 남의 장을 건너뛴 상황 — 잔고가 있어도 소비가 실패한다 */
+    var consumeFails = false
+
+    override fun consumeOne(
+        userId: Long,
+        groupId: Long,
+    ): Boolean {
+        if (consumeFails) return false
+        val available = counts.getOrDefault(userId, 0)
+        if (available <= 0) return false
+        counts[userId] = available - 1
+        consumedFor += userId to groupId
+        return true
+    }
 }
 
 class FakePlaceStatsPort : PlaceStatsPort {

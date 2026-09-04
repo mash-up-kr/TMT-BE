@@ -38,4 +38,11 @@ class GroupJoinTicketAdapter(
         userId: Long,
         reviewId: Long,
     ): Boolean = groupJoinTicketRepository.revokeOneForReview(userId, reviewId) > 0
+
+    override fun consumeOne(
+        userId: Long,
+        groupId: Long,
+    ): Boolean = groupJoinTicketRepository.consumeOne(userId, groupId) > 0
+
+    override fun countConsumable(userId: Long): Int = groupJoinTicketRepository.countConsumable(userId)
 }

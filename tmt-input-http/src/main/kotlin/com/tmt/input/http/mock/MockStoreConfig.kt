@@ -34,9 +34,6 @@ class MockStoreConfig {
     fun mockReviewIdGenerator(): MockReviewIdGenerator = MockReviewIdGenerator()
 
     @Bean
-    fun mockIdempotencyRegistry(): MockIdempotencyRegistry = MockIdempotencyRegistry()
-
-    @Bean
     fun mockFavoriteStore(): MockFavoriteStore = MockFavoriteStore()
 
     @Bean
@@ -252,47 +249,4 @@ class MockReviewIdGenerator {
     private val sequence = AtomicLong()
 
     fun next(): String = "review_${sequence.incrementAndGet()}"
-}
-
-/**
- * Idempotency-Key 등록부 (공통 규약 §9). 같은 사용자·같은 키·같은 바디면 최초 응답을
- * 재현하고, 바디가 다르면 IDEMPOTENCY_CONFLICT다.
- */
-class MockIdempotencyRegistry {
-    /**
-     * 최초 응답을 통째로 들고 재현한다 — 상태에서 다시 조립하면 이번 요청으로 발급된
-     * 티켓 수(grantedCount) 같은 "그 순간의 값"이 복원되지 않는다.
-     * DB 스키마의 `idempotency_key.response_body JSONB`에 대응한다.
-     */
-    data class Entry(
-        val bodyFingerprint: String,
-        val response: Any,
-    )
-
-    private val entries = ConcurrentHashMap<String, Entry>()
-
-    /** 등록된 항목이 있으면 돌려주고, 없으면 null. 바디가 다르면 예외를 던지는 판단은 호출부 몫. */
-    fun find(
-        userId: Long,
-        endpoint: String,
-        key: String,
-    ): Entry? = entries[keyOf(userId, endpoint, key)]
-
-    fun register(
-        userId: Long,
-        endpoint: String,
-        key: String,
-        bodyFingerprint: String,
-        response: Any,
-    ) {
-        entries[keyOf(userId, endpoint, key)] = Entry(bodyFingerprint, response)
-    }
-
-    // 규약·DB PK와 같은 (user_id, endpoint, idem_key) 조합. endpoint가 빠지면
-    // 서로 다른 엔드포인트가 키 공간을 공유해 남의 응답이 재현된다.
-    private fun keyOf(
-        userId: Long,
-        endpoint: String,
-        key: String,
-    ): String = "$userId:$endpoint:$key"
 }
