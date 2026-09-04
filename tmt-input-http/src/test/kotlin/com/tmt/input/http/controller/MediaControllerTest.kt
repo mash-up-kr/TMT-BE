@@ -82,10 +82,18 @@ class MediaControllerTest {
 
     @Test
     fun `허용 목록 밖 형식이면 MEDIA_CONTENT_TYPE_NOT_ALLOWED다`() {
+        // 예시로 쓰던 image/heic가 M8로 허용됐다 (TMT-349) — 여전히 목록 밖인 형식으로 바꾼다
         mockMvc
-            .perform(request("""{ "contentType": "image/heic", "contentLength": 1024 }"""))
+            .perform(request("""{ "contentType": "image/gif", "contentLength": 1024 }"""))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("MEDIA_CONTENT_TYPE_NOT_ALLOWED"))
+    }
+
+    @Test
+    fun `heic는 허용된다 — 아이폰 원본 업로드 (M8)`() {
+        mockMvc
+            .perform(request("""{ "contentType": "image/heic", "contentLength": 1024 }"""))
+            .andExpect(status().isCreated)
     }
 
     @Test

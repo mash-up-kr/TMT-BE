@@ -109,7 +109,7 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 
 - ~~공공데이터 적재 파이프라인용 스테이징 테이블~~ — TMT-162에서 확정: 적재 중간 테이블은 UNLOGGED 임시(`place_staging`, 적재 후 DROP), 소분류 원문은 `place_semas_category`(V3)에 보존해 매핑 수정 시 재적재 없이 UPDATE로 반영한다
 - `users` 상세 (카카오 OAuth 필드 — 토큰 저장 여부는 인증 구현 이슈에서)
-- 미결 정책 반영분: 매장 직접 등록이 P0에 들어오면 `place.external_source`에 `USER_SUBMITTED` 추가 (도메인 §7-1), heic 허용 여부(M3)
+- 미결 정책 반영분: 매장 직접 등록이 P0에 들어오면 `place.external_source`에 `USER_SUBMITTED` 추가 (도메인 §7-1). ~~heic 허용 여부(M3)~~ — M8로 허용 확정 (2026-09-04, TMT-349)
 
 ## 변경 이력
 
