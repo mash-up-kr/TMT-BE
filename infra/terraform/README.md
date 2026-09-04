@@ -178,6 +178,11 @@ docker exec -it postgres bash -c \
 - **CI 자격** — 배포 IAM 사용자에 붙일 정책이 `ci.tf`에 있다. 사용자 자체는 state에 두지 않으므로 부착은 수동: `aws iam attach-user-policy --user-name <ci-user> --policy-arn "$(terraform output -raw ci_deploy_policy_arn)"`
 - **배포 경로** — `cicd-release.yml`이 SSM Run Command로 WAS에 명령을 보낸다. SSH 전면 차단과 충돌하지 않고, 인스턴스는 `Name=tmt-prod-was` 태그로 찾는다
 - **DB 접속 정보** — 정본은 SSM 파라미터 `/tmt-prod/db/*`. 배포 시 WAS가 읽어 앱 컨테이너에 주입하므로 GitHub Secrets에 비밀번호가 없다
+- **Sentry DSN** — 정본은 SSM 파라미터 `/tmt-prod/sentry/dsn`. 값 등록은 수동이다:
+  ```bash
+  aws ssm put-parameter --name /tmt-prod/sentry/dsn --type String --value "<DSN>" --overwrite
+  ```
+  등록 전에는 빈 값으로 배포되고 SDK가 no-op으로 뜬다 — 앱은 정상이고 에러 수집만 안 된다
 
 ## 아직 없는 것
 
