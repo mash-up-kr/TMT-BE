@@ -15,6 +15,7 @@ class GroupReviewShareAdapter(
         userId: Long,
         reviewId: Long,
     ) {
+        // ON CONFLICT DO NOTHING이라 0행은 "이미 공유됨"이고 멱등이 성립한 것이다 (share_uq)
         groupReviewShareRepository.share(groupId = groupId, reviewId = reviewId, userId = userId)
     }
 
@@ -24,6 +25,21 @@ class GroupReviewShareAdapter(
         userId: Long,
     ): Int = groupReviewShareRepository.deleteByGroupIdAndUserId(groupId, userId)
 
+    @Transactional(readOnly = true)
+    override fun findSharedGroupIds(reviewId: Long): List<Long> =
+        groupReviewShareRepository.findGroupIdsByReviewId(reviewId)
+
     @Transactional
     override fun unshareByReview(reviewId: Long): Int = groupReviewShareRepository.deleteByReviewId(reviewId)
+
+    /** 삭제·삽입 둘 다 멱등이라(NOT IN + ON CONFLICT DO NOTHING) 재시도가 안전하다. */
+    @Transactional
+    override fun replaceUserShares(
+        groupId: Long,
+        userId: Long,
+        reviewIds: List<Long>,
+    ) {
+        groupReviewShareRepository.deleteUserSharesNotIn(groupId, userId, reviewIds.toTypedArray())
+        reviewIds.forEach { groupReviewShareRepository.share(groupId = groupId, reviewId = it, userId = userId) }
+    }
 }

@@ -57,6 +57,7 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 | 빌드 | `./gradlew :tmt-bootstrap:bootJar` |
 | 이미지 | Docker 이미지 빌드 → ECR에 `latest` 태그로 push |
 | 대상 조회 | `Name=tmt-prod-was` 태그로 실행 중인 WAS 인스턴스 ID·공인 IP 조회 |
+| 에이전트 확인 | SSM 에이전트 `PingStatus`가 `Online`이 아니면 명령을 보내지 않고 중단 — 인스턴스가 얼어 있으면 명령이 영원히 `InProgress`로 남아 원인을 가린다 (2026-09-01 장애, TMT-306). 이때는 `aws ec2 reboot-instances` 후 릴리즈를 재실행(`gh run rerun --failed`)한다 |
 | 배포 | SSM Run Command로 WAS에서 실행: compose 파일 갱신(명령 페이로드로 전달) → DB 접속 정보를 SSM 파라미터(`/tmt-prod/db/*`)에서 읽어 `.env` 생성 → ECR pull → `tmt-app` `--force-recreate` 재기동 |
 | DB | **건드리지 않는다** — PostgreSQL은 DB 인스턴스의 user_data 소관 (`infra/terraform`) |
 | 헬스체크 | `http://<WAS_IP>:8080/api/health/db`가 응답할 때까지 최대 3분 대기, 실패 시 워크플로 실패 |

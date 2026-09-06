@@ -1,0 +1,132 @@
+package com.tmt.application.domain.save
+
+import com.tmt.application.domain.aisummary.ReviewCommittedEvent
+import com.tmt.application.port.input.AttachMediaUseCase
+import com.tmt.application.port.input.DeleteSaveUseCase
+import com.tmt.application.port.input.SaveResult
+import com.tmt.application.port.input.UpdateSaveCommand
+import com.tmt.application.port.input.UpdateSaveUseCase
+import com.tmt.application.port.output.persistence.PlaceStatsPort
+import com.tmt.application.port.output.persistence.SaveCommandPort
+import com.tmt.application.port.output.persistence.SaveQueryPort
+import com.tmt.application.port.output.persistence.SaveRow
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+/**
+ * 이어쓰기(G §5)와 임시저장 버리기(F·G·I §5-2). 둘 다 `reviewId IS NULL`일 때만 움직인다 (S4) —
+ * 리뷰가 된 저장의 수정·삭제는 리뷰 경로 소관이고, 그쪽만 티켓 회수 규칙(R6·R7)을 지킨다.
+ */
+@Service
+class SaveUpdateService(
+    private val saveQueryPort: SaveQueryPort,
+    private val saveCommandPort: SaveCommandPort,
+    private val saveWriteSupport: SaveWriteSupport,
+    private val attachMediaUseCase: AttachMediaUseCase,
+    private val placeStatsPort: PlaceStatsPort,
+    private val eventPublisher: ApplicationEventPublisher,
+) : UpdateSaveUseCase,
+    DeleteSaveUseCase {
+    @Transactional
+    override fun update(command: UpdateSaveCommand): SaveResult {
+        val save = findDraft(command.saveId, command.userId)
+        // 매장은 바꿀 수 없다 (S6). 읽을 수 없는 placeId도 "다른 매장"과 같게 본다
+        if (command.newPlaceRequested || command.placeId != save.placeId) {
+            throw TmtException(ErrorCode.SAVE_PLACE_IMMUTABLE)
+        }
+
+        val existingAssetIds = saveQueryPort.findPhotoAssetIds(command.saveId)
+        saveWriteSupport.validate(
+            userId = command.userId,
+            photoAssetIds = command.photoAssetIds,
+            companionTagIds = command.companionTagIds,
+            positivePointTagIds = command.positivePointTagIds,
+            rating = command.rating,
+            content = command.content,
+            reattachableIds = existingAssetIds.toSet(),
+        )
+
+        // 조회와 이 UPDATE 사이에 동시 삭제가 끼면 0행이다. 그대로 진행하면 사라진 save_id로
+        // insertPhotos가 FK를 위반해 500이 된다 — 여기서 404로 끊는다 (TMT-301)
+        if (saveCommandPort.updateSave(command.saveId, command.rating, command.content) == 0) {
+            throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+        }
+        // 전체 교체다 — 남은 save_photo 행이 있으면 media_asset_id UNIQUE가 재부착을 막는다
+        saveCommandPort.deletePhotos(command.saveId)
+        saveCommandPort.insertPhotos(command.saveId, command.photoAssetIds)
+        saveCommandPort.deleteTags(command.saveId)
+        saveCommandPort.insertTags(
+            command.saveId,
+            (command.companionTagIds + command.positivePointTagIds).distinct(),
+        )
+
+        val keptAssetIds = existingAssetIds.intersect(command.photoAssetIds.toSet())
+        attachMediaUseCase.detach(existingAssetIds - command.photoAssetIds.toSet())
+        attachMediaUseCase.attach(command.photoAssetIds, reattachableIds = keptAssetIds)
+
+        val completed =
+            SaveRules.satisfiesReviewCriteria(
+                companionTagCount = command.companionTagIds.size,
+                positivePointTagCount = command.positivePointTagIds.size,
+                rating = command.rating,
+                content = command.content,
+            )
+        if (!completed) {
+            return SaveResult(
+                saveId = command.saveId,
+                reviewId = null,
+                placeId = save.placeId,
+                grantedCount = 0,
+                availableCount = saveWriteSupport.availableTicketCount(command.userId),
+            )
+        }
+
+        // 판정이 이번에 충족됐다 — 리뷰·티켓·집계가 이 시점에 생긴다 (C6)
+        val reviewId = saveCommandPort.insertReview(command.saveId, command.userId, save.placeId)
+        val granted = saveWriteSupport.tryGrantTicket(command.userId, reviewId)
+        placeStatsPort.addReview(save.placeId, requireNotNull(command.rating))
+        eventPublisher.publishEvent(ReviewCommittedEvent(reviewId = reviewId, placeId = save.placeId))
+
+        return SaveResult(
+            saveId = command.saveId,
+            reviewId = reviewId,
+            placeId = save.placeId,
+            grantedCount = granted,
+            availableCount = saveWriteSupport.availableTicketCount(command.userId),
+        )
+    }
+
+    @Transactional
+    override fun delete(
+        userId: Long,
+        saveId: Long,
+    ) {
+        findDraft(saveId, userId)
+
+        val assetIds = saveQueryPort.findPhotoAssetIds(saveId)
+        // save 행을 지운다 (F·G·I §5-2). V1 FK에 ON DELETE CASCADE가 없어 자식을 먼저 지운다
+        saveCommandPort.deletePhotos(saveId)
+        saveCommandPort.deleteTags(saveId)
+        // 동시 삭제에 밀리면 0행이다 — 이미 지운 것을 다시 지워도 404다 (F·G·I §5-2)
+        if (saveCommandPort.deleteSave(saveId) == 0) {
+            throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+        }
+        // 사진은 지우지 않고 STAGED로 되돌린다 — 미부착 TTL이 정리한다 (M4)
+        attachMediaUseCase.detach(assetIds)
+    }
+
+    /** 없는 저장과 남의 저장을 구분하지 않는다 — saveId가 순번이라 구분하면 존재 여부가 샌다 (S8). */
+    private fun findDraft(
+        saveId: Long,
+        userId: Long,
+    ): SaveRow {
+        val save =
+            saveQueryPort.findSave(saveId)?.takeIf { it.userId == userId }
+                ?: throw TmtException(ErrorCode.SAVE_NOT_FOUND)
+        if (save.reviewId != null) throw TmtException(ErrorCode.SAVE_ALREADY_REVIEWED)
+        return save
+    }
+}

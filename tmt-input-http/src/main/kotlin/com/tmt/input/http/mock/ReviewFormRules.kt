@@ -67,4 +67,9 @@ object ReviewFormRules {
             "cat_fastfood" to "패스트푸드",
             "cat_buffet" to "뷔페",
         )
+
+    private val CATEGORY_ID_BY_LABEL = FOOD_CATEGORIES.entries.associateBy({ it.value }, { it.key })
+
+    /** mock의 매장은 노출명만 들고 있어 아이콘 키를 역으로 찾는다 (TMT-239). */
+    fun categoryIdOf(categoryName: String?): String? = categoryName?.let { CATEGORY_ID_BY_LABEL[it] }
 }

@@ -24,3 +24,9 @@ tmt:
       # 기본값을 두지 않아 누락 시 기동 단계에서 바로 실패한다 — 토큰 서명 키가 없으면
       # 인증 전체가 무의미해진다 (TMT-272)
       secret: ${JWT_SECRET}
+
+# 에러 수집 (TMT-325). DSN이 비면 SDK가 no-op이다.
+# release는 배포 커밋 SHA — CI가 .env로 내려준다
+sentry:
+  dsn: ${SENTRY_DSN:}
+  release: ${SENTRY_RELEASE:}

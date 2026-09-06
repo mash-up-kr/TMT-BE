@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":tmt-output-storage:s3"))
 
     implementation(libs.bundles.bootstrap)
+    implementation(libs.sentry.logback)
 }
 
 tasks {

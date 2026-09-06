@@ -4,6 +4,7 @@ import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.application.port.output.persistence.NearbyReviewRows
 import com.tmt.application.port.output.persistence.PinRow
 import com.tmt.application.port.output.persistence.ReviewCardRow
+import com.tmt.output.persistence.postgres.repository.LikePatterns
 import com.tmt.output.persistence.postgres.repository.NearbyQueryRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -77,13 +78,20 @@ class NearbyQueryAdapter(
                 west = west,
                 centerLat = centerLatitude,
                 centerLng = centerLongitude,
-                query = query,
+                queryPattern = LikePatterns.contains(query),
                 // 빈 목록이면 어떤 category_id와도 일치하지 않는 CSV가 된다 ('' 단일 원소)
                 queryCategoryCsv = queryCategoryIds.joinToString(","),
                 categoryId = categoryId,
                 regionPrefix = regionPrefix,
                 limitPlusOne = limit + 1,
             ).map {
-                PinRow(it.getPlaceId(), it.getName(), it.getLatitude(), it.getLongitude(), it.getReviewCount())
+                PinRow(
+                    placeId = it.getPlaceId(),
+                    name = it.getName(),
+                    latitude = it.getLatitude(),
+                    longitude = it.getLongitude(),
+                    categoryId = it.getCategoryId(),
+                    reviewCount = it.getReviewCount(),
+                )
             }
 }

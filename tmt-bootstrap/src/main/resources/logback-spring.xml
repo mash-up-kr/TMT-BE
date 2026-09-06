@@ -22,10 +22,29 @@
 
     <!-- prod 프로필 -->
     <springProfile name="prod">
+        <!-- 값 정본은 application-prod.yml -->
+        <springProperty scope="context" name="sentryDsn" source="sentry.dsn" defaultValue=""/>
+        <springProperty scope="context" name="sentryRelease" source="sentry.release" defaultValue=""/>
+
+        <!-- ERROR만 이벤트가 된다 — 4xx는 ExceptionAdvice가 warn으로 남겨 올라가지 않는다 (TMT-325) -->
+        <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+            <options>
+                <dsn>${sentryDsn}</dsn>
+                <environment>prod</environment>
+                <release>${sentryRelease}</release>
+                <maxBreadcrumbs>100</maxBreadcrumbs>
+                <sendDefaultPii>false</sendDefaultPii>
+                <contextTag>requestId</contextTag>
+            </options>
+            <minimumEventLevel>ERROR</minimumEventLevel>
+            <minimumBreadcrumbLevel>INFO</minimumBreadcrumbLevel>
+        </appender>
+
         <logger name="com.tmt" level="INFO"/>
         <logger name="org.hibernate.SQL" level="WARN"/>
         <root level="INFO">
             <appender-ref ref="STDOUT"/>
+            <appender-ref ref="SENTRY"/>
         </root>
     </springProfile>
 </configuration>

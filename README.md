@@ -58,6 +58,8 @@ docker compose -f docker/docker-compose.local.yml up -d
 ./gradlew build
 ```
 
+persistence 통합 테스트는 Testcontainers로 PostGIS를 띄운다 — Docker가 떠 있어야 하고, `~/.testcontainers.properties`에 `testcontainers.reuse.enable=true`를 넣으면 컨테이너를 재사용해 반복 실행이 빨라진다(선택).
+
 ## 실행 환경
 
 프로필은 **`local`(개인 작업 환경)과 `prod`(운영·배포)** 두 가지다.

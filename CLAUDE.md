@@ -11,7 +11,7 @@ Kotlin 2.3 / Spring Boot 4.1 / JDK 21 / Gradle 9.5(멀티모듈·헥사고날) /
 ## Canonical commands
 
 - 빌드 + 테스트 + ktlint: `./gradlew build`
-- 테스트만: `./gradlew test` / 특정 클래스: `./gradlew test --tests "SaveMockControllerTest"`
+- 테스트만: `./gradlew test` / 특정 클래스: `./gradlew test --tests "SaveControllerTest"`
 - 포매팅: `./gradlew ktlintFormat` (커밋 전 실행 — CI가 `ktlintCheck`로 막는다)
 - 로컬 실행: `docker compose -f docker/docker-compose.local.yml up -d` 후 `./gradlew :tmt-bootstrap:bootRun`
 

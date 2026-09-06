@@ -55,6 +55,23 @@ class SaveCommandAdapter(
         saveTagRepository.saveAll(tagIds.map { SaveTagEntity(SaveTagId(saveId = saveId, tagId = it)) })
     }
 
+    override fun updateSave(
+        saveId: Long,
+        rating: Int?,
+        content: String?,
+    ): Int = saveRepository.updateContent(saveId, rating?.toShort(), content)
+
+    // 자식 행 삭제는 0행이 정상이다 — 사진·태그가 없던 저장도 전체 교체·삭제 경로를 그대로 탄다
+    override fun deletePhotos(saveId: Long) {
+        savePhotoRepository.deleteBySaveId(saveId)
+    }
+
+    override fun deleteTags(saveId: Long) {
+        saveTagRepository.deleteBySaveId(saveId)
+    }
+
+    override fun deleteSave(saveId: Long): Int = saveRepository.deleteRow(saveId)
+
     override fun insertReview(
         saveId: Long,
         userId: Long,

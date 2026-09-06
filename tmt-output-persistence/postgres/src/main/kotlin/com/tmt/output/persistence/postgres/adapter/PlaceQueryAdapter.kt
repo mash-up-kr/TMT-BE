@@ -96,6 +96,7 @@ class PlaceQueryAdapter(
         userId: Long,
         placeId: Long,
     ) {
+        // ON CONFLICT DO NOTHING이라 0행은 "이미 찜함"이다 — 재요청이 같은 결과를 낸다 (F2)
         placeQueryRepository.addFavorite(userId, placeId)
     }
 
@@ -104,6 +105,7 @@ class PlaceQueryAdapter(
         userId: Long,
         placeId: Long,
     ) {
+        // 찜하지 않은 매장을 해제해도 0행으로 끝난다 (F2)
         placeQueryRepository.removeFavorite(userId, placeId)
     }
 }

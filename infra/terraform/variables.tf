@@ -56,15 +56,17 @@ variable "ami_id" {
 }
 
 variable "was_instance_type" {
+  # 라이브가 t3.micro다. 기본값이 t3.small이던 동안 실제 구성은 개인 tfvars가 정하고 있었다 —
+  # 코드가 라이브를 설명하지 못하는 상태였다 (TMT-257·#63 리뷰)
   description = "WAS 인스턴스 타입. x86(t3) 고정 — TMT-61 아키텍처 결정"
   type        = string
-  default     = "t3.small"
+  default     = "t3.micro"
 }
 
 variable "db_instance_type" {
   description = "DB 인스턴스 타입"
   type        = string
-  default     = "t3.small"
+  default     = "t3.micro"
 }
 
 variable "db_data_volume_size" {
@@ -83,8 +85,12 @@ variable "ssh_public_key" {
   description = <<-EOT
     EC2에 등록할 SSH 공개키 (ssh-ed25519 AAAA... 형식).
     평상시 접속은 SSM Session Manager를 쓰고, SSH는 비상용으로만 남긴다.
+
+    **공개키라 시크릿이 아니다** — 기본값으로 둬서 tfvars 없이도 plan/apply가 된다.
+    개인 키로 바꾸려면 terraform.tfvars에서 덮어쓴다.
   EOT
   type        = string
+  default     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIBTG/T+rMAHeNlEnjC5nZzY5A55RGVp/btbjm9nKjfb team@tmt"
 }
 
 # SSH 허용 대역은 WAS와 DB를 따로 둔다.

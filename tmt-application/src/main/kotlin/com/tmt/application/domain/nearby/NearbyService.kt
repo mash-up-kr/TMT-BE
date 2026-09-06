@@ -71,7 +71,14 @@ class NearbyService(
         return NearbyPlacesResult(
             pins =
                 rows.take(MAX_PINS).map {
-                    NearbyPlacesResult.Pin(it.placeId, it.name, it.latitude, it.longitude, it.reviewCount)
+                    NearbyPlacesResult.Pin(
+                        placeId = it.placeId,
+                        name = it.name,
+                        latitude = it.latitude,
+                        longitude = it.longitude,
+                        categoryId = it.categoryId,
+                        reviewCount = it.reviewCount,
+                    )
                 },
             truncated = truncated,
         )

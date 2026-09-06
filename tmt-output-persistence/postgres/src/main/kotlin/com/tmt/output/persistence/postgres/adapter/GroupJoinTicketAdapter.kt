@@ -33,4 +33,16 @@ class GroupJoinTicketAdapter(
             )
         groupJoinTicketRepository.save(GroupJoinTicketEntity(userId = userId, rewardGrantId = grant.id))
     }
+
+    override fun revokeOneForReview(
+        userId: Long,
+        reviewId: Long,
+    ): Boolean = groupJoinTicketRepository.revokeOneForReview(userId, reviewId) > 0
+
+    override fun consumeOne(
+        userId: Long,
+        groupId: Long,
+    ): Boolean = groupJoinTicketRepository.consumeOne(userId, groupId) > 0
+
+    override fun countConsumable(userId: Long): Int = groupJoinTicketRepository.countConsumable(userId)
 }

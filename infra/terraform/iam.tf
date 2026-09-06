@@ -44,11 +44,13 @@ data "aws_iam_policy_document" "db_secret_read" {
       # /address/* juso 승인키·addressId 서명키 (TMT-187)
       # /ai/*      Groq·Gemini 요약 키 (TMT-232) — 키 등록 완료로 이번에 연다
       # /auth/*    카카오 로그인 키·JWT 서명 키 (TMT-271·TMT-272)
+      # /sentry/*  Sentry DSN (TMT-325) — 온콜 봇이 폴링할 에러 수집처
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/db/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/media/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/address/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/ai/*",
       "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/auth/*",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/sentry/*",
     ]
   }
 
@@ -62,6 +64,26 @@ data "aws_iam_policy_document" "db_secret_read" {
       values   = ["ssm.${var.region}.amazonaws.com"]
     }
   }
+}
+
+# 스왑·메모리 지표 발행 (TMT-303). 네임스페이스를 TMT/Memory로 못박아 다른 지표를 못 만든다.
+data "aws_iam_policy_document" "metrics_put" {
+  statement {
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["TMT/Memory"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "metrics_put" {
+  name   = "${local.name}-metrics-put"
+  role   = aws_iam_role.instance.id
+  policy = data.aws_iam_policy_document.metrics_put.json
 }
 
 resource "aws_iam_role_policy" "db_secret_read" {

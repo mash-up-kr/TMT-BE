@@ -65,6 +65,10 @@ erDiagram
 ### D6. 삭제는 두 종류다 (R6)
 
 - `save.deleted_at`·`review.deleted_at` — soft delete. 티켓 회수 이력·집계 정합성의 근거를 남긴다
+  - **예외: 리뷰가 되지 않은 임시저장은 hard delete다** (명세 F·G·I §5-2, `DELETE /v1/saves/{saveId}`).
+    드래프트는 티켓도 집계도 건드린 적이 없어 남길 근거가 없다. 자식(`save_photo`·`save_tag`)은
+    스키마에 CASCADE가 없어 애플리케이션이 같은 트랜잭션에서 먼저 지우고, `media_asset`은
+    `STAGED`로 되돌려 TTL(M4)에 맡긴다
 - `media_asset` 행과 S3 오브젝트 — **실제 삭제** (commit 이후, 재시도 가능 M5)
 - 그 외 모든 테이블은 hard delete (공유 해제, 찜 해제 등)
 
@@ -105,7 +109,7 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 
 - ~~공공데이터 적재 파이프라인용 스테이징 테이블~~ — TMT-162에서 확정: 적재 중간 테이블은 UNLOGGED 임시(`place_staging`, 적재 후 DROP), 소분류 원문은 `place_semas_category`(V3)에 보존해 매핑 수정 시 재적재 없이 UPDATE로 반영한다
 - `users` 상세 (카카오 OAuth 필드 — 토큰 저장 여부는 인증 구현 이슈에서)
-- 미결 정책 반영분: 매장 직접 등록이 P0에 들어오면 `place.external_source`에 `USER_SUBMITTED` 추가 (도메인 §7-1), heic 허용 여부(M3)
+- 미결 정책 반영분: 매장 직접 등록이 P0에 들어오면 `place.external_source`에 `USER_SUBMITTED` 추가 (도메인 §7-1). ~~heic 허용 여부(M3)~~ — M8로 허용 확정 (2026-09-04, TMT-349)
 
 ## 변경 이력
 
@@ -114,3 +118,4 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 | 2026-08-16 | 최초 작성 — 도메인 설계 v2 + API 명세 v2 기준 | 이준표 |
 | 2026-08-21 | DDL을 Flyway 마이그레이션 `V1__init.sql`로 이관 | 장민서 |
 | 2026-08-23 | `place_semas_category` 추가 (V3, TMT-162) — 상가정보 소분류 원문 보존. 카테고리 매핑(43종→14종)을 재적재 없이 UPDATE로 재계산하기 위한 파이프라인 참조 테이블. 앱은 읽지 않는다 | 이준표 |
+| 2026-09-04 | `users.nickname` 폭·CHECK를 **2~20자**로 (V6, TMT-350) — U3가 8/23에 20자로 확정됐는데 DDL이 V1의 10자 그대로였다. 지금 들어 있는 값은 시드 7건뿐이라 안 터지지만, 카카오 로그인(TMT-271·272)이 붙으면 20자 닉네임이 거절된다. 넓히는 방향이라 테이블 재작성·검증 스캔이 없고, **CHECK가 폭과 따로 걸려 있어 함께 바꿔야** 11자가 통과한다 | 이준표 |

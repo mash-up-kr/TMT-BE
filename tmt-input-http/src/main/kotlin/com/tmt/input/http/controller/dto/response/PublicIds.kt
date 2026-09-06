@@ -15,6 +15,8 @@ object PublicIds {
 
     fun user(id: Long) = "user_$id"
 
+    fun group(id: Long) = "group_$id"
+
     fun save(id: Long) = "save_$id"
 
     fun savePhoto(id: Long) = "sp_$id"
@@ -23,4 +25,17 @@ object PublicIds {
     fun parsePlaceId(publicId: String): Long =
         publicId.removePrefix("place_").toLongOrNull()
             ?: throw TmtException(ErrorCode.PLACE_NOT_FOUND)
+
+    fun parseReviewId(publicId: String): Long =
+        publicId.removePrefix("rv_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
+
+    fun parseGroupId(publicId: String): Long =
+        publicId.removePrefix("group_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
+
+    /** 표기(`user_7`)와 숫자(`7`) 둘 다 받는다 — FE가 카드의 `author.userId`를 그대로 경로에 넣는다. */
+    fun parseUserId(publicId: String): Long =
+        publicId.removePrefix("user_").toLongOrNull()
+            ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
 }

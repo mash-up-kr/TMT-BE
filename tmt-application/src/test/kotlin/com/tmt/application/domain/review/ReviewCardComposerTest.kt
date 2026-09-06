@@ -1,5 +1,6 @@
 package com.tmt.application.domain.review
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.output.persistence.PhotoRow
 import com.tmt.application.port.output.persistence.ReviewCardLookupPort
 import com.tmt.application.port.output.persistence.ReviewCardRow
@@ -15,7 +16,7 @@ import kotlin.test.assertTrue
 
 class ReviewCardComposerTest {
     private val lookup = mockk<ReviewCardLookupPort>()
-    private val composer = ReviewCardComposer(lookup, mediaBaseUrl = "https://media.example/")
+    private val composer = ReviewCardComposer(lookup, MediaUrlResolver("https://media.example/"))
 
     private fun row(
         reviewId: Long,

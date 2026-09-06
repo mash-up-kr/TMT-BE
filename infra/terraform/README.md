@@ -10,11 +10,11 @@
       ┌───┴────┐  IGW
       │  VPC 10.0.0.0/16  (ap-northeast-2a 단일 AZ)
       │
-      ├── 10.0.1.0/24  was  ── EC2 t3.small  [EIP]  :8080
+      ├── 10.0.1.0/24  was  ── EC2 t3.micro  [EIP]  :8080
       │                            │
       │                            │ 5432 (SG 참조로만 허용)
       │                            ▼
-      └── 10.0.2.0/24  db   ── EC2 t3.small
+      └── 10.0.2.0/24  db   ── EC2 t3.micro
                                    └── EBS gp3 20GiB  /mnt/pgdata  (prevent_destroy)
                                         └── docker: postgis/postgis:16-3.4
 ```
@@ -25,15 +25,15 @@
 
 ## 사전 준비
 
-1. AWS 자격증명 (`aws configure` 또는 `AWS_PROFILE`)
-2. state 버킷 최초 1회 생성:
-   ```bash
-   cd bootstrap && terraform init && terraform apply
-   ```
-3. 변수 파일:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars   # ssh_public_key 필수
-   ```
+**AWS 자격증명만 있으면 된다** (`aws configure` 또는 `AWS_PROFILE`). state는 S3에 있고 변수는
+기본값이 채워져 있어서, 받아서 바로 `init` → `plan`이 된다.
+
+```bash
+aws sts get-caller-identity   # 393286882141 계정인지 확인
+```
+
+state 버킷(`ttalkkak-tmt-tfstate`)은 이미 만들어져 있다. `bootstrap/`은 **최초 1회용이라 다시
+실행하지 않는다** — 이미 있는 버킷에 대고 돌리면 안 된다.
 
 ## 실행
 
@@ -42,6 +42,34 @@ terraform init
 terraform plan     # 리뷰 후
 terraform apply
 ```
+
+**`plan`이 `No changes`로 나오는 것이 정상이다.** 뭔가 잡히면 둘 중 하나다 — 내가 방금 코드를
+고쳤거나, **콘솔에서 직접 바꾼 것이 코드에 안 들어와 있거나**(drift). 후자면 코드부터 맞춘 뒤에
+apply한다. 자기 변경이 아닌 것이 plan에 섞여 있으면 그대로 나가므로 반드시 전부 읽는다.
+
+## 여럿이 함께 쓸 때
+
+state는 S3 원격 백엔드에 있고 **락이 걸린다**(`use_lockfile = true`). 누군가 apply 중이면
+다른 사람은 락 대기로 막히므로, 동시에 두 명이 밀어 넣는 사고는 나지 않는다.
+
+- **누가 언제 바꿨는지**는 버킷 버저닝으로 남는다 (`prod/infra.tfstate`)
+- 락이 안 풀린 채 프로세스가 죽었다면 `terraform force-unlock <ID>` — **상대가 실제로 안 돌리는 것을
+  확인한 뒤에만** 쓴다
+- 인프라 변경은 코드 리뷰를 거친다. `apply`는 머지 전후 어느 쪽이든 좋지만, **apply한 사람이 PR에
+  plan 결과를 남긴다** (TMT-252에서 "1 to change"로 적힌 것이 실제로는 5건이었던 적이 있다)
+
+### 변수는 코드가 정본이다 — tfvars 파일을 만들지 않는다
+
+state가 하나뿐이라 "개인 override"라는 것이 성립하지 않는다 — 누가 apply하든 결과는 같은 운영
+인프라다. **임시 변경은 `terraform plan -var 'key=value'`로, 영구 변경은 `variables.tf`의 기본값
+수정 PR로** 한다. `.gitignore`의 `terraform.tfvars`는 파일을 쓰라는 뜻이 아니라, Terraform이 이
+파일을 자동으로 읽는 것을 끌 방법이 없어서 누가 만들어도 커밋만은 막아주는 안전망이다.
+
+> 기본값에 들어 있는 `ssh_public_key`는 **공개키라 시크릿이 아니다.** 예전에는 이 값이 개인
+> tfvars에만 있어서, 그 파일을 가진 사람만 apply할 수 있었고 실제 구성이 코드에 안 남아 있었다.
+> 이 값을 덮어 apply하면 키페어 리소스가 교체될 뿐(`public_key`는 ForceNew), 이미 떠 있는
+> 인스턴스의 `authorized_keys`는 바뀌지 않는다 — cloud-init ssh 모듈은 인스턴스 최초 부팅에만
+> 돈다. 즉 **키 교체는 인스턴스 교체와 함께 계획해야 한다.**
 
 ## 접속
 
@@ -86,6 +114,46 @@ aws ssm put-parameter --name /tmt-prod/db/password --type SecureString \
 
 **DB 서브넷은 퍼블릭이다.** NAT Gateway를 안 쓰기로 한 이상 아웃바운드 경로는 IGW뿐이다. VPC 인터페이스 엔드포인트라는 선택지도 있지만, 필요한 것만 세도 ECR 2개 + SSM 3개 + KMS 1개로 6개이고 엔드포인트당 시간 과금이 붙어 월 $45 정도가 된다. NAT Gateway와 비슷한 금액이라 실익이 없어서 쓰지 않는다. 인바운드는 보안그룹에서 WAS 보안그룹 소스의 5432만 허용하므로 외부에서 DB에 직접 닿을 수는 없다. 나중에 NAT를 도입하면 `db` 서브넷의 라우팅 테이블만 갈아끼우면 된다 — 그러라고 서브넷을 갈라뒀다.
 
+## 스왑 관측 (TMT-303 · 336)
+
+스왑 2GiB(TMT-298)는 메모리 스파이크를 "동결"에서 "느린 채 살아 있음"으로 바꾼다. 그 대신 **열화를 아무도
+모르는 상태**가 생길 수 있어, 두 인스턴스가 5분마다 CloudWatch `TMT/Memory`에 지표를 올린다
+(`user_data/swap_metrics.sh.tftpl`의 `tmt-swap-metrics.timer` — WAS·DB가 한 파일을 공유하고 `Role`만 다르다).
+
+**커스텀 지표는 8개다** — 이름 4종 × `Role` 차원 2개다. CloudWatch는 (이름, 차원) 조합마다 과금하므로
+이름만 세면 절반으로 잘못 센다. 알람 4개와 함께 무료 한도(지표 10개·알람 10개) 안이고 API 호출은 월 $0.2 미만이다.
+
+| 지표 | 뜻 |
+|---|---|
+| `SwapUsedPercent` | 스왑 사용률. 한 번 밀려나고 안 쓰이는 페이지는 사용량만 높고 무해하다 |
+| `SwapInPages` · `SwapOutPages` | 직전 5분 동안의 스왑 in/out 페이지 수. **실제 열화에 가까운 지표** |
+| `MemAvailableMB` | `MemAvailable` — 스왑 없이 쓸 수 있는 여유 |
+
+**판단 기준** (PR #83 리뷰에서 정한 값):
+
+- **관측**: `SwapUsedPercent >= 25%`(≈512MB)가 5분 지속 — 알람 `tmt-prod-{was,db}-swap-used-25pct`
+- **밀려남**: 직전 5분에 스왑아웃이 한 페이지라도 있으면 — 알람 `tmt-prod-{was,db}-swap-out`.
+  사용률만 보면 첫 열화를 놓친다. 실측 첫 스왑아웃이 226페이지(≈0.9MB)였는데 사용률로는 0%로 반올림돼
+  25% 알람이 침묵했다. **이 알람의 히스토리가 곧 아래 "주 2회" 카운트다**
+- **교체 판단**: 상시 트래픽에서 스왑아웃이 **주 2회 이상 반복**되면 인스턴스 상향(TMT-298 재론). 배포·시드 적재처럼
+  예정된 순간의 일시 스왑은 근거에서 뺀다 — 반복성이 기준이다
+
+알람 넷 다 **알림 액션이 없다.** 콘솔에서 상태와 히스토리를 본다.
+
+**`INSUFFICIENT_DATA`는 정상이 아니라 관측이 끊긴 것이다.** `treat_missing_data`가 `missing`이라
+지표가 안 올라오면 OK로 덮이지 않고 그대로 드러난다 — 타이머·IAM(`metrics_put`)·IMDS 중 하나를 의심한다.
+
+확인:
+
+```bash
+# 최근 24시간 WAS 스왑 out 합계 (5분 버킷)
+aws cloudwatch get-metric-statistics --namespace TMT/Memory --metric-name SwapOutPages \
+  --dimensions Name=Role,Value=was --statistics Sum --period 300 \
+  --start-time "$(date -u -v-24H +%FT%TZ)" --end-time "$(date -u +%FT%TZ)" \
+  --query 'sort_by(Datapoints,&Timestamp)[?Sum>`0`].[Timestamp,Sum]' --output table
+aws cloudwatch describe-alarms --alarm-name-prefix tmt-prod- --query 'MetricAlarms[].[AlarmName,StateValue]' --output table
+```
+
 ## 백업 · 복구
 
 RDS 자동 스냅샷이 없으므로 `pg_dump`를 직접 돌린다. EBS 분리(`prevent_destroy`)는 인스턴스 교체를 견디게 해줄 뿐이고, 볼륨이 깨지거나 데이터를 잘못 지운 경우의 복구 수단은 이 덤프뿐이다.
@@ -121,6 +189,11 @@ docker exec -it postgres bash -c \
 - **CI 자격** — 배포 IAM 사용자에 붙일 정책이 `ci.tf`에 있다. 사용자 자체는 state에 두지 않으므로 부착은 수동: `aws iam attach-user-policy --user-name <ci-user> --policy-arn "$(terraform output -raw ci_deploy_policy_arn)"`
 - **배포 경로** — `cicd-release.yml`이 SSM Run Command로 WAS에 명령을 보낸다. SSH 전면 차단과 충돌하지 않고, 인스턴스는 `Name=tmt-prod-was` 태그로 찾는다
 - **DB 접속 정보** — 정본은 SSM 파라미터 `/tmt-prod/db/*`. 배포 시 WAS가 읽어 앱 컨테이너에 주입하므로 GitHub Secrets에 비밀번호가 없다
+- **Sentry DSN** — 정본은 SSM 파라미터 `/tmt-prod/sentry/dsn`. 값 등록은 수동이다:
+  ```bash
+  aws ssm put-parameter --name /tmt-prod/sentry/dsn --type String --value "<DSN>" --overwrite
+  ```
+  등록 전에는 빈 값으로 배포되고 SDK가 no-op으로 뜬다 — 앱은 정상이고 에러 수집만 안 된다
 
 ## 아직 없는 것
 

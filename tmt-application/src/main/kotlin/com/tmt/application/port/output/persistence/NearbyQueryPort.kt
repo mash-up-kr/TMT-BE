@@ -49,5 +49,7 @@ data class PinRow(
     val name: String,
     val latitude: Double,
     val longitude: Double,
+    /** 14종 매핑에 실패하면 null (E11) */
+    val categoryId: String?,
     val reviewCount: Int,
 )
