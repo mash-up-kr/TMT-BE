@@ -47,6 +47,9 @@ aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awsSdk"
 spring-web = { group = "org.springframework", name = "spring-web" }
 flyway-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql" }
 
+# Sentry
+sentry-logback = { group = "io.sentry", name = "sentry-logback", version = "8.16.0" }
+
 # Test
 spring-boot-annotation-processor = { group = "org.springframework.boot", name = "spring-boot-configuration-processor" }
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }

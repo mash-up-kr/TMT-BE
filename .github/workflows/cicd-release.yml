@@ -27,6 +27,7 @@ env:
   SSM_MEDIA_PREFIX: /tmt-prod/media
   SSM_AI_PREFIX: /tmt-prod/ai
   SSM_ADDRESS_PREFIX: /tmt-prod/address
+  SSM_SENTRY_PREFIX: /tmt-prod/sentry
 
 jobs:
   build-and-deploy:
@@ -137,6 +138,8 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
           PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
+          # Sentry 이벤트의 릴리즈 — 어느 커밋에서 난 에러인지 이 값으로 갈린다 (TMT-325)
+          SENTRY_RELEASE: ${{ github.sha }}
         run: |
           # compose 파일은 scp 대신 명령 페이로드에 실어 보낸다. Run Command 인라인
           # 파라미터 한도(약 8KB) 안에 넉넉히 들어가는 크기다.
@@ -177,6 +180,9 @@ jobs:
           JUSO_COORD_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-coord-key --with-decryption --query Parameter.Value --output text)
           # addressId 서명 키 (TMT-191). 외부 발급이 아니라 우리가 만든 HMAC 시크릿이다
           ADDRESS_TOKEN_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/token-secret --with-decryption --query Parameter.Value --output text)
+          # Sentry DSN (TMT-325) — 미등록이면 빈 값으로 두고 SDK가 no-op으로 뜬다.
+          # 수집이 끊기는 편이 기동이 막히는 것보다 낫다
+          SENTRY_DSN=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_SENTRY_PREFIX}/dsn --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
 
           # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
           # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252).
@@ -212,6 +218,8 @@ jobs:
           JUSO_SEARCH_KEY=\$JUSO_SEARCH_KEY
           JUSO_COORD_KEY=\$JUSO_COORD_KEY
           ADDRESS_TOKEN_SECRET=\$ADDRESS_TOKEN_SECRET
+          SENTRY_DSN=\$SENTRY_DSN
+          SENTRY_RELEASE=${SENTRY_RELEASE}
           ENV
 
           cd "\$DEPLOY_DIR"

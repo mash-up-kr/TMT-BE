@@ -36,6 +36,10 @@ services:
       - JUSO_SEARCH_KEY=${JUSO_SEARCH_KEY}
       - JUSO_COORD_KEY=${JUSO_COORD_KEY}
       - ADDRESS_TOKEN_SECRET=${ADDRESS_TOKEN_SECRET}
+      # 에러 수집 (TMT-325). 정본은 SSM /tmt-prod/sentry/dsn — 빈 값이면 SDK가 no-op이다.
+      # release는 CI가 배포 커밋 SHA로 채운다
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_RELEASE=${SENTRY_RELEASE}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
