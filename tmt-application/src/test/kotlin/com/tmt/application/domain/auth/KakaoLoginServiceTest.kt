@@ -1,7 +1,7 @@
 package com.tmt.application.domain.auth
 
-import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.domain.save.FakeGroupJoinTicketPort
+import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.output.auth.KakaoAuthPort
 import com.tmt.application.port.output.auth.KakaoProfile
 import com.tmt.application.port.output.persistence.UserAccount
