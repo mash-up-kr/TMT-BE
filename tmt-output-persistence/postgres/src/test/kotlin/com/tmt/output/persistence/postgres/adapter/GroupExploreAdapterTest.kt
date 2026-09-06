@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Import
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * 그룹 탐색 쿼리에서 TMT-305로 바뀐 두 가지를 실제 DB에서 확인한다.
@@ -118,6 +119,51 @@ class GroupExploreAdapterTest : PersistenceTest() {
                 limit = 500,
             ),
         ).rows
+
+    @Test
+    fun `검색어의 퍼센트는 와일드카드가 아니라 글자다 (TMT-296)`() {
+        val owner = fixtures.newUser()
+        val literal = newNamedGroup(owner, "100% 국내산만 쓰는 집")
+        val other = newNamedGroup(owner, "무관한 모임")
+
+        val rows =
+            adapter
+                .findGroupCards(
+                    GroupCardsQuery(
+                        viewerId = null,
+                        query = "100%",
+                        queryFoodCategoryIds = emptyList(),
+                        queryRegionTagIds = emptyList(),
+                        foodCategoryId = CATEGORY,
+                        regionTagIds = emptyList(),
+                        sort = "RECOMMENDED",
+                        after = null,
+                        limit = 500,
+                    ),
+                ).rows
+                .map { it.groupId }
+
+        // ESCAPE가 빠지면 `%`가 전 그룹을 잡아 무관한 모임까지 나온다
+        assertEquals(listOf(literal), rows)
+        assertTrue(other !in rows)
+    }
+
+    /** 이름을 정해야 하는 검색 테스트용 — 공용 픽스처는 이름을 자동 생성한다. */
+    private fun newNamedGroup(
+        ownerId: Long,
+        name: String,
+    ): Long =
+        jdbcTemplate.queryForObject(
+            """
+            INSERT INTO groups (name, one_line_description, food_category_id, owner_id)
+            VALUES (?, '한 줄 소개', ?, ?)
+            RETURNING id
+            """.trimIndent(),
+            Long::class.java,
+            "$name ${System.nanoTime()}",
+            CATEGORY,
+            ownerId,
+        )!!
 
     private fun s3KeyOf(mediaAssetId: Long): String? =
         jdbcTemplate.queryForObject("SELECT s3_key FROM media_asset WHERE id = ?", String::class.java, mediaAssetId)
