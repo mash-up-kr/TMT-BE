@@ -1,35 +1,15 @@
-#!/bin/bash
-set -euo pipefail
-
-# --- 스왑 2GiB (TMT-298) ---
-# t3.micro(916MB)는 스왑이 없으면 메모리 스파이크가 곧 유저랜드 동결이다 — SSM 에이전트까지
-# 죽어 복구 수단이 사라진다 (2026-09-01 v0.1.0 배포 장애). 스왑은 동결을 일시 지연으로 바꾼다.
-# swappiness=10 — 평상시에는 안 쓰고 압박 시에만 밀어낸다.
-if ! swapon --show --noheadings | grep -q /swapfile; then
-  fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
-  chmod 600 /swapfile
-  mkswap /swapfile
-  swapon /swapfile
-fi
-grep -q "^/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab
-echo "vm.swappiness=10" > /etc/sysctl.d/99-tmt-swap.conf
-sysctl -p /etc/sysctl.d/99-tmt-swap.conf
-
-dnf install -y docker
-systemctl enable --now docker
-
-# 애플리케이션 자체는 여기서 띄우지 않는다. 릴리즈 태그 트리거 CI가
-# 이미지를 배포하는 구조이므로(TMT-62), 부트스트랩은 런타임 준비까지만 한다.
-mkdir -p /opt/tmt
-
 # --- 스왑 관측 (TMT-303) ---
 # 스왑(TMT-298)은 장애를 "죽음"에서 "느린 채 살아 있음"으로 바꾼다 — 관측이 없으면 열화를 아무도 모른다.
 # 5분마다 CloudWatch TMT/Memory에 4개 지표를 올린다: SwapUsedPercent · MemAvailableMB ·
 # SwapInPages · SwapOutPages(직전 실행 이후 델타). 상향 판단 기준은 infra/terraform/README.md §스왑 관측.
+#
+# **WAS와 DB가 이 파일 하나를 공유한다** (TMT-336). 전에는 두 user_data에 같은 60여 줄이 복제돼 있어
+# 한쪽만 고쳐질 위험이 있었다 — 다른 것은 Role 차원뿐이라 templatefile 변수로 뺐다.
+# 지표 이름·차원을 바꾸면 monitoring.tf의 알람과 README §스왑 관측을 함께 봐야 한다.
 cat > /usr/local/bin/tmt-swap-metrics.sh <<'EOS'
 #!/bin/bash
 set -euo pipefail
-ROLE="was"
+ROLE="${role}"
 STATE=/var/lib/tmt/swap-metrics.state
 mkdir -p "$(dirname "$STATE")"
 
