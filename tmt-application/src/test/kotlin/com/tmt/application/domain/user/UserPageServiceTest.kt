@@ -1,11 +1,11 @@
 package com.tmt.application.domain.user
 
 import com.tmt.application.domain.media.MediaUrlResolver
+import com.tmt.application.domain.save.FakeGroupJoinTicketPort
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.TicketHistoryItemType
 import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.output.persistence.FavoritePlaceRow
-import com.tmt.application.port.output.persistence.GroupJoinTicketPort
 import com.tmt.application.port.output.persistence.JoinedGroupRow
 import com.tmt.application.port.output.persistence.ProfileHeaderRow
 import com.tmt.application.port.output.persistence.ReviewGridRow
@@ -31,7 +31,7 @@ class UserPageServiceTest {
     fun `내 프로필에는 티켓 수가 실리고 타인 프로필에는 실리지 않는다`() {
         queryPort.header =
             ProfileHeaderRow(7L, "준형이", null, reviewCount = 3, joinedGroupCount = 2, favoritePlaceCount = 5)
-        ticketPort.available = 4
+        ticketPort.seed(7L, 4)
 
         assertEquals(4, service.getMine(7L).availableTicketCount)
         assertNull(service.getOther(7L).availableTicketCount)
@@ -147,7 +147,7 @@ class UserPageServiceTest {
                 ),
             )
         queryPort.inProgressSaveCount = 2
-        ticketPort.available = 4
+        ticketPort.seed(7L, 4)
 
         val slice = service.list(7L, NO_TICKET_CURSOR, limit = 20)
 
@@ -307,21 +307,5 @@ class UserPageServiceTest {
         override fun findTicketLedgerRows(userId: Long): List<TicketLedgerRow> = ledgerRows
 
         override fun countInProgressSaves(userId: Long): Int = inProgressSaveCount
-    }
-
-    private class FakeGroupJoinTicketPort : GroupJoinTicketPort {
-        var available = 0
-
-        override fun countAvailable(userId: Long): Int = available
-
-        override fun grantForReview(
-            userId: Long,
-            reviewId: Long,
-        ) = error("이 테스트에서 쓰지 않는다")
-
-        override fun revokeOneForReview(
-            userId: Long,
-            reviewId: Long,
-        ): Boolean = error("이 테스트에서 쓰지 않는다")
     }
 }
