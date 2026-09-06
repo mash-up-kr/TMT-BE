@@ -68,12 +68,12 @@ class KakaoLoginServiceTest {
     @Test
     fun `카카오 닉네임이 20자를 넘으면 20자로 자른다`() {
         // 상한은 V6에서 10자 → 20자로 늘었다 (U3 확정, TMT-350)
-        authPort.profile =
-            KakaoProfile(kakaoId = 1L, nickname = "스무자를넘는아주아주긴카카오닉네임입니다", profileImageUrl = null)
+        authPort.profile = KakaoProfile(kakaoId = 1L, nickname = "가나다라마바사아자차카타파하거너더러머버서어저처커", profileImageUrl = null)
 
         val result = service.login(command())
 
-        assertEquals("스무자를넘는아주아주긴카카오닉네임입니", result.nickname)
+        assertEquals("가나다라마바사아자차카타파하거너더러머버", result.nickname)
+        assertEquals(20, result.nickname.length)
     }
 
     @Test
