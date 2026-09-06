@@ -4,6 +4,12 @@ package com.tmt.application.port.output.persistence
 interface GroupJoinTicketPort {
     fun countAvailable(userId: Long): Int
 
+    /**
+     * 회원가입을 근거로 티켓 1장을 발급한다 (T2). 근거의 source_id가 user_id라
+     * 같은 사용자로 두 번 부르면 UNIQUE 제약이 막는다 (T8) — 재시도가 안전하다.
+     */
+    fun grantForSignup(userId: Long)
+
     /** 리뷰 1건을 근거로 티켓 1장을 발급한다. 같은 리뷰로 두 번 부르면 UNIQUE 제약이 막는다 (T8). */
     fun grantForReview(
         userId: Long,

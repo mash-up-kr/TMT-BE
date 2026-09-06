@@ -22,6 +22,8 @@ enum class ErrorCode(
     // 인증
     AUTH_KAKAO_CODE_INVALID(ErrorType.UNAUTHORIZED, "카카오 인가 코드가 유효하지 않습니다."),
     AUTH_KAKAO_UNAVAILABLE(ErrorType.EXTERNAL_UNAVAILABLE, "카카오 로그인 서비스가 응답하지 않습니다."),
+    AUTH_TOKEN_INVALID(ErrorType.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+    AUTH_TOKEN_EXPIRED(ErrorType.UNAUTHORIZED, "만료된 토큰입니다."),
 
     // 매장
     PLACE_NOT_FOUND(ErrorType.NOT_FOUND, "매장을 찾을 수 없습니다."),

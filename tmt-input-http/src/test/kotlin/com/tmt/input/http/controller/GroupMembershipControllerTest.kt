@@ -86,7 +86,7 @@ class GroupMembershipControllerTest {
         groupId: String = "group_1",
     ) = mockMvc.perform(
         post("/v1/groups/$groupId/memberships")
-            .header(UserIdArgumentResolver.HEADER, "1")
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
             .header(IdempotencyKeyArgumentResolver.HEADER, key)
             .contentType(MediaType.APPLICATION_JSON)
             .apply { body?.let { content(it) } },
@@ -95,7 +95,7 @@ class GroupMembershipControllerTest {
     @Test
     fun `가입 팝업이 mock과 같은 형태로 나간다 — group_ 접두·blockedReason null`() {
         mockMvc
-            .perform(get("/v1/groups/group_1/join-preview").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/groups/group_1/join-preview").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.group.groupId").value("group_1"))
             .andExpect(jsonPath("$.group.name").value("성수 커피 탐험대"))
@@ -111,7 +111,7 @@ class GroupMembershipControllerTest {
         preview = preview.copy(availableTicketCount = 0, blockedReason = JoinBlockedReason.TICKET_REQUIRED)
 
         mockMvc
-            .perform(get("/v1/groups/group_1/join-preview").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/groups/group_1/join-preview").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(jsonPath("$.joinable").value(false))
             .andExpect(jsonPath("$.blockedReason").value("TICKET_REQUIRED"))
     }
@@ -214,7 +214,7 @@ class GroupMembershipControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups/group_1/memberships")
-                    .header(UserIdArgumentResolver.HEADER, "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON),
             ).andExpect(status().isBadRequest)
     }
@@ -233,8 +233,10 @@ class GroupMembershipControllerTest {
     @Test
     fun `탈퇴는 204이고 group_ 접두를 풀어 넘긴다`() {
         mockMvc
-            .perform(delete("/v1/groups/group_7/memberships/me").header(UserIdArgumentResolver.HEADER, "1"))
-            .andExpect(status().isNoContent)
+            .perform(
+                delete("/v1/groups/group_7/memberships/me")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+            ).andExpect(status().isNoContent)
 
         assertEquals(listOf(7L to 1L), leaves)
     }

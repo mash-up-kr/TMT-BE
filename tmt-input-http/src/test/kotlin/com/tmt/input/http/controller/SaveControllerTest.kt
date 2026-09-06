@@ -96,7 +96,7 @@ class SaveControllerTest {
         idempotencyKey: String? = "key-1",
     ) = mockMvc.perform(
         post("/v1/saves")
-            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, userId)
             .apply { idempotencyKey?.let { header(IdempotencyKeyArgumentResolver.HEADER, it) } }
             .contentType(MediaType.APPLICATION_JSON)
             .content(body),
@@ -249,7 +249,7 @@ class SaveControllerTest {
         idempotencyKey: String = "key-put",
     ) = mockMvc.perform(
         put("/v1/saves/$saveId")
-            .header(UserIdArgumentResolver.HEADER, userId.toString())
+            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, userId)
             .header(IdempotencyKeyArgumentResolver.HEADER, idempotencyKey)
             .contentType(MediaType.APPLICATION_JSON)
             .content(body),
@@ -312,7 +312,7 @@ class SaveControllerTest {
     @Test
     fun `임시저장 버리기는 204다`() {
         mockMvc
-            .perform(delete("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/saves/save_9").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isNoContent)
 
         assertEquals(listOf(1L to 9L), deleteSaveUseCase.deleted)
@@ -323,7 +323,7 @@ class SaveControllerTest {
         deleteSaveUseCase.error = ErrorCode.SAVE_ALREADY_REVIEWED
 
         mockMvc
-            .perform(delete("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/saves/save_9").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("SAVE_ALREADY_REVIEWED"))
     }
@@ -331,7 +331,7 @@ class SaveControllerTest {
     @Test
     fun `본인 상세는 mock과 같은 형태로 내려간다`() {
         mockMvc
-            .perform(get("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/saves/save_9").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.saveId").value("save_9"))
             .andExpect(jsonPath("$.place.placeId").value("place_1"))
@@ -346,7 +346,7 @@ class SaveControllerTest {
     @Test
     fun `남의 저장 조회는 없는 저장과 같게 404다 (S8)`() {
         mockMvc
-            .perform(get("/v1/saves/save_9").header(UserIdArgumentResolver.HEADER, "2"))
+            .perform(get("/v1/saves/save_9").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("SAVE_NOT_FOUND"))
     }
@@ -362,7 +362,7 @@ class SaveControllerTest {
                 mockMvc
                     .perform(
                         get("/v1/saves")
-                            .header(UserIdArgumentResolver.HEADER, "1")
+                            .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                             .param("limit", "2")
                             .apply { cursor?.let { param("cursor", it) } },
                     ).andExpect(status().isOk)
@@ -381,14 +381,14 @@ class SaveControllerTest {
         listMySavesUseCase.seed(count = 5)
         val cursor =
             mockMvc
-                .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "1").param("limit", "2"))
+                .perform(get("/v1/saves").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L).param("limit", "2"))
                 .andReturn()
                 .response
                 .contentAsString
                 .let { Regex("\"nextCursor\":\"([^\"]+)\"").find(it)!!.groupValues[1] }
 
         mockMvc
-            .perform(get("/v1/saves").header(UserIdArgumentResolver.HEADER, "2").param("cursor", cursor))
+            .perform(get("/v1/saves").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L).param("cursor", cursor))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }

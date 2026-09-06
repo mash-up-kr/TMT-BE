@@ -95,7 +95,9 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
 - **mock 코드는 한시적이다.** `tmt-input-http/src/main/kotlin/com/tmt/input/http/mock/`의 컨트롤러·store는
   FE 병렬 개발을 위한 인메모리 구현이고(TMT-149), 실구현이 리소스별로 들어오면 **해당 컨트롤러와 빈만 지운다.**
   mock 코드가 `application`·`persistence` 모듈로 새지 않게 전부 `mock` 패키지 안에 가둔다
-- 인증은 카카오 로그인 전까지 `X-User-Id` 헤더 스텁이다. `@UserId Long`은 필수(없으면 401), `@UserId Long?`은 선택
+- 인증은 카카오 로그인 + JWT다(TMT-271·272). 로그인(`POST /v1/auth/login/kakao`) 응답의 accessToken을
+  `Authorization: Bearer`로 보낸다. `@UserId Long`은 필수(없으면 401), `@UserId Long?`은 선택.
+  X-User-Id 헤더 스텁(TMT-150)은 제거됐다
 - **배포는 릴리즈 태그(vX.Y.Z) 발행 기준이다 — main 머지는 배포하지 않는다.** mock 기간 한정으로 켜 뒀던
   main 자동 배포(TMT-155)는 UT2 뒤 되돌렸다. mock 서버: `https://3-39-38-23.sslip.io/api` (TMT-175,
   Caddy TLS 종단 — `docker/Caddyfile`)

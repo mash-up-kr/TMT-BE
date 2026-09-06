@@ -54,7 +54,7 @@ class UserControllerTest {
     @Test
     fun `마이페이지 상단은 표기 접두와 티켓 수를 내린다`() {
         mockMvc
-            .perform(get("/v1/users/me").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.userId").value("user_7"))
             .andExpect(jsonPath("$.nickname").value("준형이"))
@@ -65,7 +65,7 @@ class UserControllerTest {
     @Test
     fun `내 리뷰 탭 항목에 saveId가 있고 접두 표기를 쓴다`() {
         mockMvc
-            .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_1"))
             .andExpect(jsonPath("$.items[0].saveId").value("save_11"))
@@ -128,7 +128,7 @@ class UserControllerTest {
     @Test
     fun `내 그룹 탭은 본인이 viewer다`() {
         mockMvc
-            .perform(get("/v1/users/me/groups").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
 
         assertEquals(7L, stub.groupCalls.single())
@@ -137,7 +137,7 @@ class UserControllerTest {
     @Test
     fun `좋아요 탭은 PlaceCard 모양으로 내린다`() {
         mockMvc
-            .perform(get("/v1/users/me/favorites").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me/favorites").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].placeId").value("place_5"))
             .andExpect(jsonPath("$.items[0].isFavorite").value(true))
@@ -148,7 +148,7 @@ class UserControllerTest {
     @Test
     fun `내 티켓은 잔액·작성 중 건수·이력을 함께 내리고 이력 행은 증감이 있다`() {
         mockMvc
-            .perform(get("/v1/users/me/tickets").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me/tickets").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.availableCount").value(4))
             .andExpect(jsonPath("$.inProgressSaveCount").value(1))
@@ -165,7 +165,7 @@ class UserControllerTest {
         stub.reviewThumbnail = null
 
         mockMvc
-            .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_1"))
             .andExpect(jsonPath("$.items[0].thumbnailUrl").value(null))
@@ -176,7 +176,7 @@ class UserControllerTest {
         stub.reviewHasNext = true
         val cursor =
             mockMvc
-                .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
+                .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
                 .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn()
                 .response.contentAsString
@@ -186,7 +186,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 get("/v1/users/me/reviews")
-                    .header(UserIdArgumentResolver.HEADER, "7")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L)
                     .param("cursor", cursor),
             ).andExpect(status().isOk)
 
@@ -198,7 +198,7 @@ class UserControllerTest {
         stub.reviewHasNext = true
         val cursor =
             mockMvc
-                .perform(get("/v1/users/me/reviews").header(UserIdArgumentResolver.HEADER, "7"))
+                .perform(get("/v1/users/me/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
                 .andReturn()
                 .response.contentAsString
                 .substringAfter("\"nextCursor\":\"")

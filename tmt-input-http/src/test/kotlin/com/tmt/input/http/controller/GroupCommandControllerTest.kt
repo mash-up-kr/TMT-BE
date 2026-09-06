@@ -46,7 +46,7 @@ class GroupCommandControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body(imageAssetId = "\"42\"")),
             ).andExpect(status().isCreated)
@@ -65,7 +65,7 @@ class GroupCommandControllerTest {
         mockMvc
             .perform(
                 post("/v1/groups")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body(imageAssetId = "\"asset_42\"")),
             ).andExpect(status().isForbidden)
@@ -77,7 +77,7 @@ class GroupCommandControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/group_7")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body()),
             ).andExpect(status().isOk)
@@ -86,7 +86,7 @@ class GroupCommandControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/g7")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body()),
             ).andExpect(status().isNotFound)

@@ -40,7 +40,7 @@ class GroupQueryControllerTest {
     @Test
     fun `상세가 mock과 같은 형태로 나간다 — 라벨·접두 ID·커버`() {
         mockMvc
-            .perform(get("/v1/groups/group_7").header("X-User-Id", "1"))
+            .perform(get("/v1/groups/group_7").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.groupId").value("group_7"))
             .andExpect(jsonPath("$.foodCategory.label").value("한식"))
@@ -70,7 +70,7 @@ class GroupQueryControllerTest {
         reviewsResult = GroupReviewsResult(items = listOf(card()), gated = false, hasNext = false)
 
         mockMvc
-            .perform(get("/v1/groups/group_7/reviews").header("X-User-Id", "1"))
+            .perform(get("/v1/groups/group_7/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].content").value("본문입니다"))
             .andExpect(jsonPath("$.items[0].aiSummary.cons").value("아쉬워요"))
@@ -83,21 +83,27 @@ class GroupQueryControllerTest {
 
         val body =
             mockMvc
-                .perform(get("/v1/groups/group_7/reviews").header("X-User-Id", "1"))
+                .perform(get("/v1/groups/group_7/reviews").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn()
                 .response.contentAsString
         val cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)!!.groupValues[1]
 
         mockMvc
-            .perform(get("/v1/groups/group_7/reviews").header("X-User-Id", "1").param("cursor", cursor))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups/group_7/reviews")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isOk)
         assertEquals(9L, requireNotNull(requireNotNull(lastRequest).after).reviewId)
 
         // 다른 그룹에서 쓰면 무효
         mockMvc
-            .perform(get("/v1/groups/group_8/reviews").header("X-User-Id", "1").param("cursor", cursor))
-            .andExpect(status().isBadRequest)
+            .perform(
+                get("/v1/groups/group_8/reviews")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 

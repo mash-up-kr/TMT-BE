@@ -49,7 +49,7 @@ class GroupShareControllerTest {
         listResult = ReviewSharesResult(items = listOf(item()), sharedCount = 2, hasNext = false)
 
         mockMvc
-            .perform(get("/v1/groups/group_1/review-shares").header("X-User-Id", "1"))
+            .perform(get("/v1/groups/group_1/review-shares").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_9"))
             .andExpect(jsonPath("$.items[0].isShared").value(true))
@@ -70,7 +70,7 @@ class GroupShareControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/group_1/review-shares")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"reviewIds":["rv_1","rv_5"]}"""),
             ).andExpect(status().isOk)
@@ -86,7 +86,7 @@ class GroupShareControllerTest {
         mockMvc
             .perform(
                 put("/v1/groups/group_1/review-shares")
-                    .header("X-User-Id", "1")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"reviewIds":["review_1"]}"""),
             ).andExpect(status().isNotFound)
@@ -99,20 +99,28 @@ class GroupShareControllerTest {
 
         val body =
             mockMvc
-                .perform(get("/v1/groups/group_1/review-shares").header("X-User-Id", "1"))
-                .andReturn()
+                .perform(
+                    get("/v1/groups/group_1/review-shares")
+                        .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
+                ).andReturn()
                 .response.contentAsString
         val cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)!!.groupValues[1]
 
         mockMvc
-            .perform(get("/v1/groups/group_1/review-shares").header("X-User-Id", "1").param("cursor", cursor))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups/group_1/review-shares")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isOk)
         assertEquals(9L, requireNotNull(requireNotNull(lastListRequest).after).reviewId)
 
         // 다른 사용자가 쓰면 무효 — 목록이 조회자 것이다
         mockMvc
-            .perform(get("/v1/groups/group_1/review-shares").header("X-User-Id", "2").param("cursor", cursor))
-            .andExpect(status().isBadRequest)
+            .perform(
+                get("/v1/groups/group_1/review-shares")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 

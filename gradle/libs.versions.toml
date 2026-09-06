@@ -7,6 +7,7 @@ querydsl = "5.1.0"
 testcontainers = "1.21.3"
 ktLintPlugin = "14.2.0"
 javaVersion = "21"
+jjwt = "0.12.6"
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
@@ -47,6 +48,10 @@ aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awsSdk"
 spring-web = { group = "org.springframework", name = "spring-web" }
 flyway-postgresql = { group = "org.flywaydb", name = "flyway-database-postgresql" }
 
+# JWT (TMT-272)
+jjwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jjwt" }
+jjwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jjwt" }
+jjwt-jackson = { group = "io.jsonwebtoken", name = "jjwt-jackson", version.ref = "jjwt" }
 # Sentry
 sentry-logback = { group = "io.sentry", name = "sentry-logback", version = "8.16.0" }
 

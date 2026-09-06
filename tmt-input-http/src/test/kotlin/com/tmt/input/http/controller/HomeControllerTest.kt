@@ -52,7 +52,7 @@ class HomeControllerTest {
         homeResult = HomeResult(nickname = "하아얀", myGroups = emptyList(), recommendedGroups = listOf(groupCard(3)))
 
         mockMvc
-            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.nickname").value("하아얀"))
             .andExpect(jsonPath("$.myGroups").isEmpty)
@@ -70,7 +70,7 @@ class HomeControllerTest {
             )
 
         mockMvc
-            .perform(get("/v1/home").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.myGroups[0].groupId").value("group_1"))
             .andExpect(jsonPath("$.myGroups[0].imageUrl").value("https://cdn.example/a.jpg"))
@@ -96,7 +96,8 @@ class HomeControllerTest {
 
         mockMvc
             .perform(
-                get("/v1/home/feed?latitude=37.4857&longitude=126.8887").header(UserIdArgumentResolver.HEADER, "1"),
+                get("/v1/home/feed?latitude=37.4857&longitude=126.8887")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].reviewId").value("rv_7"))
             .andExpect(jsonPath("$.items[0].author.userId").value("user_901"))
@@ -114,7 +115,7 @@ class HomeControllerTest {
         mockMvc
             .perform(
                 get("/v1/home/feed?latitude=37.4857&longitude=126.8887&cursor=$cursor")
-                    .header(UserIdArgumentResolver.HEADER, "1"),
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isOk)
 
         // 다음 페이지는 마지막 행 다음부터 — 경계에서 중복·누락이 없다
@@ -128,7 +129,7 @@ class HomeControllerTest {
         val cursor = nextCursorOf("/v1/home/feed")
 
         mockMvc
-            .perform(get("/v1/home/feed?cursor=$cursor").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home/feed?cursor=$cursor").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
 
         assertEquals(Instant.parse("2026-08-20T00:00:00Z"), lastFeedRequest?.after?.createdAt)
@@ -144,20 +145,20 @@ class HomeControllerTest {
         mockMvc
             .perform(
                 get("/v1/home/feed?latitude=37.5000&longitude=126.9000&cursor=$cursor")
-                    .header(UserIdArgumentResolver.HEADER, "1"),
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
 
         // 정렬 자체가 갈리므로 좌표를 빼고 이어붙이는 것도 막는다
         mockMvc
-            .perform(get("/v1/home/feed?cursor=$cursor").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get("/v1/home/feed?cursor=$cursor").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
     private fun nextCursorOf(url: String): String =
         mockMvc
-            .perform(get(url).header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(get(url).requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.hasNext").value(true))
             .andReturn()

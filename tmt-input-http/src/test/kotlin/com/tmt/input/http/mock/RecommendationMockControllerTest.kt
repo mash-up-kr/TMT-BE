@@ -26,7 +26,7 @@ class RecommendationMockControllerTest {
         MockFixtures.place(placeStore, "델리스피자")
 
         mockMvc
-            .perform(post("/v1/recommendations/places").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(post("/v1/recommendations/places").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("RECOMMENDATION_UNAVAILABLE"))
     }
@@ -45,7 +45,7 @@ class RecommendationMockControllerTest {
         aiSummaryStore.put("review_2", pros = "분위기가 좋아요", cons = "웨이팅이 길어요")
 
         mockMvc
-            .perform(post("/v1/recommendations/places").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(post("/v1/recommendations/places").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.place.placeId").value(other.placeId))
             .andExpect(jsonPath("$.summary.reviewId").value("review_2"))
@@ -60,7 +60,7 @@ class RecommendationMockControllerTest {
         MockFixtures.review(saveStore, other.placeId, ownerId = 999, reviewId = "review_2")
 
         mockMvc
-            .perform(post("/v1/recommendations/places").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(post("/v1/recommendations/places").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.summary").doesNotExist())
     }
@@ -74,12 +74,12 @@ class RecommendationMockControllerTest {
 
         val first =
             mockMvc
-                .perform(post("/v1/recommendations/places").header(UserIdArgumentResolver.HEADER, "1"))
+                .perform(post("/v1/recommendations/places").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andReturn()
                 .response.contentAsString
         val second =
             mockMvc
-                .perform(post("/v1/recommendations/places").header(UserIdArgumentResolver.HEADER, "1"))
+                .perform(post("/v1/recommendations/places").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andReturn()
                 .response.contentAsString
 

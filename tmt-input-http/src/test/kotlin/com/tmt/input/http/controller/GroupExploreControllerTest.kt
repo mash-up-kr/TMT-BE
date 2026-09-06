@@ -45,7 +45,7 @@ class GroupExploreControllerTest {
         result = GroupsResult(items = listOf(card(groupId = 3)), hasNext = false)
 
         mockMvc
-            .perform(get("/v1/groups").header("X-User-Id", "1"))
+            .perform(get("/v1/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.items[0].groupId").value("group_3"))
             .andExpect(jsonPath("$.items[0].matchedSavedPlaceCount").value(2))
@@ -71,7 +71,7 @@ class GroupExploreControllerTest {
 
         val body =
             mockMvc
-                .perform(get("/v1/groups").header("X-User-Id", "1"))
+                .perform(get("/v1/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.hasNext").value(true))
                 .andReturn()
@@ -80,8 +80,11 @@ class GroupExploreControllerTest {
         assertNotNull(cursor)
 
         mockMvc
-            .perform(get("/v1/groups").header("X-User-Id", "1").param("cursor", cursor))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isOk)
 
         val after = requireNotNull(requireNotNull(lastRequest).after)
         assertEquals(2L, after.k1)
@@ -99,7 +102,7 @@ class GroupExploreControllerTest {
             )
         val body =
             mockMvc
-                .perform(get("/v1/groups").header("X-User-Id", "1"))
+                .perform(get("/v1/groups").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
                 .andReturn()
                 .response.contentAsString
         val cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)!!.groupValues[1]
@@ -107,14 +110,20 @@ class GroupExploreControllerTest {
         // 필터 변경
         mockMvc
             .perform(
-                get("/v1/groups").header("X-User-Id", "1").param("foodCategoryId", "cat_meat").param("cursor", cursor),
+                get("/v1/groups")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("foodCategoryId", "cat_meat")
+                    .param("cursor", cursor),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
 
         // 추천순은 조회자도 조건이다 — 조회자가 바뀌면 무효
         mockMvc
-            .perform(get("/v1/groups").header("X-User-Id", "2").param("cursor", cursor))
-            .andExpect(status().isBadRequest)
+            .perform(
+                get("/v1/groups")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L)
+                    .param("cursor", cursor),
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
@@ -122,8 +131,11 @@ class GroupExploreControllerTest {
     fun `이름 중복 확인은 인증 필수이고 참고값을 돌려준다`() {
         available = false
         mockMvc
-            .perform(get("/v1/groups/name-availability").header("X-User-Id", "1").param("name", "성수 커피 탐험대"))
-            .andExpect(status().isOk)
+            .perform(
+                get("/v1/groups/name-availability")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .param("name", "성수 커피 탐험대"),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.available").value(false))
 
         mockMvc
@@ -131,7 +143,7 @@ class GroupExploreControllerTest {
             .andExpect(status().isUnauthorized)
 
         mockMvc
-            .perform(get("/v1/groups/name-availability").header("X-User-Id", "1"))
+            .perform(get("/v1/groups/name-availability").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isBadRequest)
     }
 

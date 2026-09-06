@@ -96,7 +96,7 @@ class ReviewControllerTest {
             .andExpect(jsonPath("$.isMine").value(false))
 
         mockMvc
-            .perform(get("/v1/reviews/rv_1").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(get("/v1/reviews/rv_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(jsonPath("$.isMine").value(true))
     }
 
@@ -116,7 +116,7 @@ class ReviewControllerTest {
     @Test
     fun `삭제는 204다`() {
         mockMvc
-            .perform(delete("/v1/reviews/rv_1").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(delete("/v1/reviews/rv_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isNoContent)
 
         assertEquals(listOf(7L to 1L), deleted)
@@ -127,7 +127,7 @@ class ReviewControllerTest {
         availableTickets = 0
 
         mockMvc
-            .perform(delete("/v1/reviews/rv_1").header(UserIdArgumentResolver.HEADER, "7"))
+            .perform(delete("/v1/reviews/rv_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("REVIEW_DELETE_TICKET_REQUIRED"))
             .andExpect(jsonPath("$.title").value("리뷰를 삭제하려면 티켓 1장이 필요합니다."))
@@ -139,7 +139,7 @@ class ReviewControllerTest {
     @Test
     fun `타인의 리뷰 삭제도 REVIEW_NOT_FOUND다 — 존재 여부를 감춘다`() {
         mockMvc
-            .perform(delete("/v1/reviews/rv_1").header(UserIdArgumentResolver.HEADER, "1"))
+            .perform(delete("/v1/reviews/rv_1").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("REVIEW_NOT_FOUND"))
     }

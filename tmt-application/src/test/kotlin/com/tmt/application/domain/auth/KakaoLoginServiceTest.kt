@@ -1,5 +1,6 @@
 package com.tmt.application.domain.auth
 
+import com.tmt.application.domain.save.FakeGroupJoinTicketPort
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.output.auth.KakaoAuthPort
 import com.tmt.application.port.output.auth.KakaoProfile
@@ -13,7 +14,8 @@ import kotlin.test.assertTrue
 class KakaoLoginServiceTest {
     private val authPort = FakeKakaoAuthPort()
     private val userPort = FakeUserAccountPort()
-    private val service = KakaoLoginService(authPort, userPort)
+    private val ticketPort = FakeGroupJoinTicketPort()
+    private val service = KakaoLoginService(authPort, userPort, ticketPort)
 
     @Test
     fun `처음 온 카카오 계정이면 사용자를 만들고 isNewUser=true다`() {
@@ -64,12 +66,67 @@ class KakaoLoginServiceTest {
     }
 
     @Test
-    fun `카카오 닉네임이 10자를 넘으면 10자로 자른다`() {
+    fun `카카오 닉네임이 20자를 넘으면 20자로 자른다`() {
+        // 상한은 V6에서 10자 → 20자로 늘었다 (U3 확정, TMT-350)
+        authPort.profile = KakaoProfile(kakaoId = 1L, nickname = "가나다라마바사아자차카타파하거너더러머버서어저처커", profileImageUrl = null)
+
+        val result = service.login(command())
+
+        assertEquals("가나다라마바사아자차카타파하거너더러머버", result.nickname)
+        assertEquals(20, result.nickname.length)
+    }
+
+    @Test
+    fun `20자 이하 닉네임은 그대로 쓴다`() {
         authPort.profile = KakaoProfile(kakaoId = 1L, nickname = "열자를넘는아주긴닉네임", profileImageUrl = null)
 
         val result = service.login(command())
 
-        assertEquals("열자를넘는아주긴닉네", result.nickname)
+        assertEquals("열자를넘는아주긴닉네임", result.nickname)
+    }
+
+    @Test
+    fun `이모지 닉네임을 잘라도 서로게이트가 깨지지 않는다`() {
+        // take()는 UTF-16 코드 유닛이라 21번째 유닛에서 자르면 이모지 반쪽이 남는다.
+        // CHECK(users_nickname_len)는 char_length라 코드포인트로 세므로 절단도 같아야 한다
+        authPort.profile = KakaoProfile(kakaoId = 1L, nickname = "\uD83C\uDF55".repeat(25), profileImageUrl = null)
+
+        val result = service.login(command())
+
+        assertEquals(20, result.nickname.codePointCount(0, result.nickname.length))
+        assertEquals("\uD83C\uDF55".repeat(20), result.nickname)
+    }
+
+    @Test
+    fun `처음 온 계정에는 가입 보상 티켓 1장이 발급된다`() {
+        authPort.profile = KakaoProfile(kakaoId = 12345L, nickname = "준형이", profileImageUrl = null)
+
+        val result = service.login(command())
+
+        // T2 — 가입 선물 1장. 마이페이지의 availableTicketCount가 0이 아닌 근거다
+        assertEquals(listOf(result.userId), ticketPort.signupGrants)
+        assertEquals(1, ticketPort.countAvailable(result.userId))
+    }
+
+    @Test
+    fun `이미 있는 계정으로 다시 로그인해도 티켓을 또 주지 않는다`() {
+        userPort.accounts += UserAccount(id = 7L, kakaoId = 999L, nickname = "준형이", profileImageUrl = null)
+        authPort.profile = KakaoProfile(kakaoId = 999L, nickname = "준형이", profileImageUrl = null)
+
+        service.login(command())
+
+        assertEquals(emptyList(), ticketPort.signupGrants)
+    }
+
+    @Test
+    fun `경쟁에서 진 쪽은 티켓을 발급하지 않는다`() {
+        // 이긴 쪽이 이미 발급했다 — 여기서 또 주면 한 계정에 두 장이 된다
+        authPort.profile = KakaoProfile(kakaoId = 777L, nickname = "준형이", profileImageUrl = null)
+        userPort.rejectCreate = true
+
+        service.login(command())
+
+        assertEquals(emptyList(), ticketPort.signupGrants)
     }
 
     @Test
