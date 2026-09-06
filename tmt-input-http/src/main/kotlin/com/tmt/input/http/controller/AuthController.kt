@@ -6,6 +6,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.input.http.auth.JwtTokenCodec
 import com.tmt.input.http.auth.TokenUse
 import com.tmt.input.http.config.ApiErrorCodes
+import com.tmt.input.http.controller.dto.response.PublicIds
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -46,7 +47,7 @@ class AuthController(
             )
         val tokens = tokenCodec.issue(result.userId)
         return KakaoLoginResponse(
-            userId = result.userId,
+            userId = PublicIds.user(result.userId),
             nickname = result.nickname,
             profileImageUrl = result.profileImageUrl,
             isNewUser = result.isNewUser,
@@ -90,7 +91,8 @@ class AuthController(
     )
 
     data class KakaoLoginResponse(
-        val userId: Long,
+        @field:Schema(description = "사용자 ID 표기 (`user_7`). 다른 응답의 userId와 같은 형식이다", example = "user_7")
+        val userId: String,
         val nickname: String,
         @field:Schema(nullable = true)
         val profileImageUrl: String?,

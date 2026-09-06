@@ -18,17 +18,30 @@ class GroupJoinTicketAdapter(
     override fun countAvailable(userId: Long): Int =
         groupJoinTicketRepository.countByUserIdAndStatus(userId, GroupJoinTicketStatus.AVAILABLE)
 
+    override fun grantForSignup(userId: Long) {
+        grant(userId, RewardSourceType.SIGNUP, sourceId = userId)
+    }
+
     override fun grantForReview(
         userId: Long,
         reviewId: Long,
+    ) {
+        grant(userId, RewardSourceType.REVIEW, sourceId = reviewId)
+    }
+
+    /** 근거 1건 + 티켓 1장. 근거의 (source_type, source_id, reward_type)이 UNIQUE라 중복 발급은 DB가 막는다 (T8) */
+    private fun grant(
+        userId: Long,
+        sourceType: RewardSourceType,
+        sourceId: Long,
     ) {
         val grant =
             rewardGrantRepository.save(
                 RewardGrantEntity(
                     userId = userId,
                     rewardType = RewardType.GROUP_JOIN_TICKET,
-                    sourceType = RewardSourceType.REVIEW,
-                    sourceId = reviewId,
+                    sourceType = sourceType,
+                    sourceId = sourceId,
                 ),
             )
         groupJoinTicketRepository.save(GroupJoinTicketEntity(userId = userId, rewardGrantId = grant.id))

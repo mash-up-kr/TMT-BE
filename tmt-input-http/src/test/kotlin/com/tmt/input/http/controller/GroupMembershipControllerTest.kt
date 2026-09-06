@@ -236,8 +236,7 @@ class GroupMembershipControllerTest {
             .perform(
                 delete("/v1/groups/group_7/memberships/me")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
-            )
-            .andExpect(status().isNoContent)
+            ).andExpect(status().isNoContent)
 
         assertEquals(listOf(7L to 1L), leaves)
     }

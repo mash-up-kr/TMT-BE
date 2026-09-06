@@ -247,6 +247,14 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
 
     override fun countAvailable(userId: Long): Int = counts.getOrDefault(userId, 0)
 
+    /** 가입 발급(T2)을 받은 사용자 — 몇 번 불렸는지까지 봐야 중복 발급을 잡는다 */
+    val signupGrants = mutableListOf<Long>()
+
+    override fun grantForSignup(userId: Long) {
+        signupGrants += userId
+        counts[userId] = counts.getOrDefault(userId, 0) + 1
+    }
+
     override fun grantForReview(
         userId: Long,
         reviewId: Long,

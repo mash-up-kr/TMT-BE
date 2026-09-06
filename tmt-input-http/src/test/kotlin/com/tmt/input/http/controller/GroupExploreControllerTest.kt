@@ -84,8 +84,7 @@ class GroupExploreControllerTest {
                 get("/v1/groups")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
 
         val after = requireNotNull(requireNotNull(lastRequest).after)
         assertEquals(2L, after.k1)
@@ -124,8 +123,7 @@ class GroupExploreControllerTest {
                 get("/v1/groups")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isBadRequest)
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
@@ -137,8 +135,7 @@ class GroupExploreControllerTest {
                 get("/v1/groups/name-availability")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("name", "성수 커피 탐험대"),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.available").value(false))
 
         mockMvc

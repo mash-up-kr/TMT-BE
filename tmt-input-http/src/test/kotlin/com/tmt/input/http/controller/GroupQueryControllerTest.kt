@@ -94,8 +94,7 @@ class GroupQueryControllerTest {
                 get("/v1/groups/group_7/reviews")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
         assertEquals(9L, requireNotNull(requireNotNull(lastRequest).after).reviewId)
 
         // 다른 그룹에서 쓰면 무효
@@ -104,8 +103,7 @@ class GroupQueryControllerTest {
                 get("/v1/groups/group_8/reviews")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isBadRequest)
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 

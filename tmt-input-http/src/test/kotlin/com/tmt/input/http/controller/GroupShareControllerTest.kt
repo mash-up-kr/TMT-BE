@@ -102,8 +102,7 @@ class GroupShareControllerTest {
                 .perform(
                     get("/v1/groups/group_1/review-shares")
                         .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L),
-                )
-                .andReturn()
+                ).andReturn()
                 .response.contentAsString
         val cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)!!.groupValues[1]
 
@@ -112,8 +111,7 @@ class GroupShareControllerTest {
                 get("/v1/groups/group_1/review-shares")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
         assertEquals(9L, requireNotNull(requireNotNull(lastListRequest).after).reviewId)
 
         // 다른 사용자가 쓰면 무효 — 목록이 조회자 것이다
@@ -122,8 +120,7 @@ class GroupShareControllerTest {
                 get("/v1/groups/group_1/review-shares")
                     .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 2L)
                     .param("cursor", cursor),
-            )
-            .andExpect(status().isBadRequest)
+            ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 

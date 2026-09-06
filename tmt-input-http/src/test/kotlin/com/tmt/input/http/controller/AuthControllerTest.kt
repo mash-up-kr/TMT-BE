@@ -35,7 +35,7 @@ class AuthControllerTest {
             mockMvc
                 .perform(login("""{"code":"auth-code","redirectUri":"http://localhost:3000/cb"}"""))
                 .andExpect(status().isOk)
-                .andExpect(jsonPath("$.userId").value(7))
+                .andExpect(jsonPath("$.userId").value("user_7"))
                 .andExpect(jsonPath("$.nickname").value("준형이"))
                 .andExpect(jsonPath("$.isNewUser").value(true))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty)
