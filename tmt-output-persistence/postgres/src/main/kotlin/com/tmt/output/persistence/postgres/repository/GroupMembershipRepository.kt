@@ -40,6 +40,24 @@ interface GroupMembershipRepository : JpaRepository<GroupMembershipEntity, Long>
         @Param("joinedAt") joinedAt: Instant,
     ): Int
 
+    /**
+     * ACTIVE 멤버십 행 잠금 (TMT-351) — 공유 교체가 탈퇴와 서로를 기다리게 하는 상호배제다.
+     * 탈퇴가 먼저 커밋하면 READ COMMITTED의 재평가로 LEFT 행이 걸러져 null이 온다.
+     * 행 잠금 순서는 멤버십 → 공유 → 그룹으로 leave와 같아야 교착이 없다 (PR #99 리뷰).
+     */
+    @Query(
+        value = """
+            SELECT id FROM group_membership
+            WHERE group_id = :groupId AND user_id = :userId AND status = 'ACTIVE'
+            FOR UPDATE
+        """,
+        nativeQuery = true,
+    )
+    fun lockActiveMembership(
+        @Param("groupId") groupId: Long,
+        @Param("userId") userId: Long,
+    ): Long?
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = """
