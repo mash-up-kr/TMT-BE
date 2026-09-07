@@ -53,6 +53,11 @@ class GroupMembershipServiceTest {
                 groupId: Long,
                 userId: Long,
             ): Boolean = leaveRows.also { if (it) members -= userId }
+
+            override fun lockActiveMembership(
+                groupId: Long,
+                userId: Long,
+            ): Boolean = userId in members
         }
 
     private val reviewQueryPort =
