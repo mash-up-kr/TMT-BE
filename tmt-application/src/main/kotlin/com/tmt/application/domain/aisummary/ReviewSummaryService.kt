@@ -31,13 +31,23 @@ class ReviewSummaryService(
         if (pending.isEmpty()) return 0
 
         var filled = 0
-        pending.groupBy { it.placeId }.forEach { (placeId, reviews) ->
+        var failed = 0
+        var lastError: Throwable? = null
+        val places = pending.groupBy { it.placeId }
+        places.forEach { (placeId, reviews) ->
             runCatching { summarizePlace(reviews) }
                 .onSuccess { filled += it }
                 .onFailure { e ->
                     // 한 매장의 실패가 배치 전체를 죽이면 안 된다 — 남은 매장은 계속 진행
+                    failed++
+                    lastError = e
                     logger.warn(e) { "리뷰 요약 실패 - placeId=$placeId, reviews=${reviews.size}" }
                 }
+        }
+        // 한 매장만 실패한 것은 그 매장 데이터 문제일 수 있지만, 전부 실패한 것은 기능이 멈춘 것이다.
+        // 응답이 없는 배치라 여기서 남기지 않으면 아무도 모른다 (docs/LOGGING.md §3-2)
+        if (failed == places.size) {
+            logger.error(lastError) { "리뷰 요약 배치가 전부 실패했다 - places=$failed" }
         }
         if (filled > 0) logger.info { "리뷰 요약 채움 - filled=$filled / pending=${pending.size}" }
         return filled

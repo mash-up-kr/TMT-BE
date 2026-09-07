@@ -1,6 +1,8 @@
 package com.tmt.output.llm
 
 import com.tmt.application.port.output.llm.PlaceReviewsToSummarize
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -81,6 +83,15 @@ class ChainedReviewSummaryLlmAdapterTest {
         val adapter = ChainedReviewSummaryLlmAdapter(listOf(client("groq/x") { error("boom") }))
 
         assertFailsWith<IllegalStateException> { adapter.summarize(request) }
+    }
+
+    /** 키 누락은 쿼터 소진·장애와 달리 시간이 지나도 낫지 않는다 — 503으로 내면 안 된다 (TMT-354) */
+    @Test
+    fun `활성 프로바이더가 없으면 설정 결함으로 끊는다`() {
+        val adapter = ChainedReviewSummaryLlmAdapter(listOf(client("groq/x", enabled = false) { ok }))
+
+        val e = assertFailsWith<TmtException> { adapter.summarize(request) }
+        assertEquals(ErrorCode.LLM_MISCONFIGURED, e.errorCode)
     }
 
     @Test
