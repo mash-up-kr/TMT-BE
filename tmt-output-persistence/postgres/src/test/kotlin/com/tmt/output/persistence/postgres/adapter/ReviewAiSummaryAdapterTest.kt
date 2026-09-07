@@ -66,8 +66,7 @@ class ReviewAiSummaryAdapterTest : PersistenceTest() {
 
     private fun isPending(reviewId: Long) = pending().any { it.reviewId == reviewId }
 
-    private fun pendingOf(reviewId: Long) =
-        pending().single { it.reviewId == reviewId }
+    private fun pendingOf(reviewId: Long) = pending().single { it.reviewId == reviewId }
 
     private companion object {
         /** 전역 쿼리라 앞선 실행분이 쌓여 있다 — 전량을 받아 내 id로만 좁힌다 */
