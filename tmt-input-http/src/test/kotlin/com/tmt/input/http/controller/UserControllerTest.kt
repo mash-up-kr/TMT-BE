@@ -19,14 +19,18 @@ import com.tmt.application.port.input.TicketHistoryItemType
 import com.tmt.application.port.input.TicketHistoryItemView
 import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.input.TicketHistorySlice
+import com.tmt.application.port.input.UpdateUserProfileCommand
+import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.application.port.input.UserProfileView
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Test
+import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
@@ -39,10 +43,51 @@ class UserControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(UserController(stub, stub, stub, stub, stub))
+            .standaloneSetup(UserController(stub, stub, stub, stub, stub, stub))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
+
+    @Test
+    fun `가입 완결은 닉네임과 사진 assetId를 유스케이스로 넘긴다`() {
+        mockMvc
+            .perform(
+                put("/v1/users/me/profile")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"nickname":"준형이","profileImageAssetId":"12"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.nickname").value("준형이"))
+            .andExpect(jsonPath("$.profileCompleted").value(true))
+
+        assertEquals(
+            UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImageAssetId = 12L),
+            stub.profileUpdates.single(),
+        )
+    }
+
+    @Test
+    fun `가입 완결에 사진을 안 보내면 assetId가 null이다`() {
+        mockMvc
+            .perform(
+                put("/v1/users/me/profile")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"nickname":"준형이"}"""),
+            ).andExpect(status().isOk)
+
+        assertNull(stub.profileUpdates.single().profileImageAssetId)
+    }
+
+    @Test
+    fun `가입 완결은 인증이 없으면 401이다`() {
+        mockMvc
+            .perform(
+                put("/v1/users/me/profile")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"nickname":"준형이"}"""),
+            ).andExpect(status().isUnauthorized)
+    }
 
     @Test
     fun `마이페이지 상단은 인증이 없으면 401이다`() {
@@ -215,7 +260,9 @@ class UserControllerTest {
         GetUserReviewGridUseCase,
         GetUserGroupsUseCase,
         GetUserFavoritesUseCase,
-        GetTicketHistoryUseCase {
+        GetTicketHistoryUseCase,
+        UpdateUserProfileUseCase {
+        val profileUpdates = mutableListOf<UpdateUserProfileCommand>()
         var profileError: TmtException? = null
         var reviewHasNext = false
         var reviewThumbnail: String? = "https://media.example.com/m.jpg"
@@ -242,7 +289,13 @@ class UserControllerTest {
             favoritePlaceCount = 5,
             availableTicketCount = if (mine) 4 else null,
             email = null,
+            profileCompleted = true,
         )
+
+        override fun update(command: UpdateUserProfileCommand): UserProfileView {
+            profileUpdates += command
+            return profile(command.userId, mine = true)
+        }
 
         override fun list(
             targetUserId: Long,

@@ -137,6 +137,7 @@ class AuthControllerTest {
                 nickname = "준형이",
                 profileImageUrl = null,
                 isNewUser = true,
+                profileCompleted = false,
             )
 
         override fun login(command: KakaoLoginCommand): KakaoLoginResult {

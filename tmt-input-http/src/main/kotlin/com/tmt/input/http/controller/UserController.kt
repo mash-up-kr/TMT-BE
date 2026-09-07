@@ -13,6 +13,8 @@ import com.tmt.application.port.input.ReviewGridItemView
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.TicketHistoryItemView
 import com.tmt.application.port.input.TicketHistoryKey
+import com.tmt.application.port.input.UpdateUserProfileCommand
+import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
@@ -25,9 +27,14 @@ import com.tmt.input.http.controller.paging.CursorCondition
 import com.tmt.input.http.controller.paging.CursorSpec
 import com.tmt.input.http.controller.paging.PageLimit
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotBlank
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -47,6 +54,7 @@ class UserController(
     private val getUserGroupsUseCase: GetUserGroupsUseCase,
     private val getUserFavoritesUseCase: GetUserFavoritesUseCase,
     private val getTicketHistoryUseCase: GetTicketHistoryUseCase,
+    private val updateUserProfileUseCase: UpdateUserProfileUseCase,
 ) {
     @Operation(summary = "마이페이지 상단", description = "프로필·티켓 배너·칩 카운트 3종. 칩 숫자는 탭을 열기 전에 보이므로 여기 함께 싣는다 (J §2).")
     @GetMapping("/me")
@@ -63,6 +71,42 @@ class UserController(
             reviewCount = profile.reviewCount,
             joinedGroupCount = profile.joinedGroupCount,
             favoritePlaceCount = profile.favoritePlaceCount,
+            profileCompleted = profile.profileCompleted,
+        )
+    }
+
+    @Operation(
+        summary = "가입 완결·프로필 수정",
+        description =
+            "닉네임과 프로필 사진을 저장한다 (TMT-370). 카카오 로그인 직후에는 닉네임이 카카오 값이라 " +
+                "이 요청을 마쳐야 `profileCompleted=true`가 되고 다른 API를 쓸 수 있다.\n\n" +
+                "`profileImageAssetId`는 `POST /v1/media/upload-intents`로 받은 것이고, 보내지 않으면 " +
+                "사진 없는 상태가 된다. 가입 후에도 같은 요청으로 프로필을 수정한다.",
+    )
+    @ApiErrorCodes(ErrorCode.VALIDATION_FAILED, ErrorCode.MEDIA_NOT_OWNED, ErrorCode.MEDIA_ALREADY_ATTACHED)
+    @PutMapping("/me/profile")
+    fun updateMyProfile(
+        @UserId userId: Long,
+        @Valid @RequestBody request: UpdateProfileRequest,
+    ): MyProfileResponse {
+        val profile =
+            updateUserProfileUseCase.update(
+                UpdateUserProfileCommand(
+                    userId = userId,
+                    nickname = request.nickname,
+                    profileImageAssetId = request.profileImageAssetId?.toLongOrNull(),
+                ),
+            )
+        return MyProfileResponse(
+            userId = PublicIds.user(profile.userId),
+            nickname = profile.nickname,
+            email = profile.email,
+            profileImageUrl = profile.profileImageUrl,
+            availableTicketCount = profile.availableTicketCount ?: 0,
+            reviewCount = profile.reviewCount,
+            joinedGroupCount = profile.joinedGroupCount,
+            favoritePlaceCount = profile.favoritePlaceCount,
+            profileCompleted = profile.profileCompleted,
         )
     }
 
@@ -318,6 +362,19 @@ class UserController(
         val reviewCount: Int,
         val joinedGroupCount: Int,
         val favoritePlaceCount: Int,
+        @field:Schema(description = "가입 화면을 끝냈는지 (TMT-370)")
+        val profileCompleted: Boolean,
+    )
+
+    data class UpdateProfileRequest(
+        @field:NotBlank
+        @field:Schema(description = "2~20자 (U3)", example = "또맛또")
+        val nickname: String,
+        @field:Schema(
+            description = "업로드 발급(POST /v1/media/upload-intents)으로 받은 assetId. 없으면 사진 없는 상태가 된다",
+            nullable = true,
+        )
+        val profileImageAssetId: String?,
     )
 
     /** 타인 프로필에는 email·availableTicketCount가 없다 (U7). */

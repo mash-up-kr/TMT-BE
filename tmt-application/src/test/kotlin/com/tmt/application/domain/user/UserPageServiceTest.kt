@@ -30,7 +30,16 @@ class UserPageServiceTest {
     @Test
     fun `내 프로필에는 티켓 수가 실리고 타인 프로필에는 실리지 않는다`() {
         queryPort.header =
-            ProfileHeaderRow(7L, "준형이", null, reviewCount = 3, joinedGroupCount = 2, favoritePlaceCount = 5)
+            ProfileHeaderRow(
+                userId = 7L,
+                nickname = "준형이",
+                profileImageUrl = null,
+                profileImageS3Key = null,
+                profileCompletedAt = null,
+                reviewCount = 3,
+                joinedGroupCount = 2,
+                favoritePlaceCount = 5,
+            )
         ticketPort.seed(7L, 4)
 
         assertEquals(4, service.getMine(7L).availableTicketCount)
@@ -39,7 +48,7 @@ class UserPageServiceTest {
 
     @Test
     fun `이메일은 수집하지 않으므로 항상 null이다`() {
-        queryPort.header = ProfileHeaderRow(7L, "준형이", null, 0, 0, 0)
+        queryPort.header = ProfileHeaderRow(7L, "준형이", null, null, null, 0, 0, 0)
 
         assertNull(service.getMine(7L).email)
     }

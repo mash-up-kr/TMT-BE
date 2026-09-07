@@ -1,5 +1,6 @@
 package com.tmt.application.domain.auth
 
+import com.tmt.application.port.input.GetMediaUrlsUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.input.KakaoLoginResult
 import com.tmt.application.port.input.LoginWithKakaoUseCase
@@ -15,14 +16,17 @@ import org.springframework.stereotype.Service
 private val logger = KotlinLogging.logger {}
 
 /**
- * 카카오 로그인 (TMT-271) — 인가 코드로 프로필을 확보하고 kakao_id로 사용자를 찾거나 만든다.
- * 세션·토큰 발급은 TMT-272에서 붙는다.
+ * 카카오 로그인 (TMT-271) — 인가 코드로 kakao_id를 확보하고 사용자를 찾거나 만든다.
+ *
+ * 카카오 닉네임은 새 행의 초깃값으로만 쓴다. 확정 닉네임과 프로필 사진은 가입 완결에서
+ * 받고(TMT-370), 카카오 프로필 사진은 저장하지 않는다.
  */
 @Service
 class KakaoLoginService(
     private val kakaoAuthPort: KakaoAuthPort,
     private val userAccountPort: UserAccountPort,
     private val groupJoinTicketPort: GroupJoinTicketPort,
+    private val getMediaUrlsUseCase: GetMediaUrlsUseCase,
 ) : LoginWithKakaoUseCase {
     override fun login(command: KakaoLoginCommand): KakaoLoginResult {
         val profile = kakaoAuthPort.fetchProfile(command.code, command.redirectUri)
@@ -33,7 +37,6 @@ class KakaoLoginService(
             userAccountPort.create(
                 kakaoId = profile.kakaoId,
                 nickname = normalizeNickname(profile.nickname),
-                profileImageUrl = profile.profileImageUrl,
             )
         if (created != null) {
             // T2 — 가입 선물 1장. 근거의 source_id가 user_id라 두 번 불려도 UNIQUE가 막는다.
@@ -56,7 +59,7 @@ class KakaoLoginService(
 
     /**
      * U3: 닉네임은 2~20자. 카카오 닉네임이 없거나 2자 미만이면 기본값, 20자를 넘으면 자른다 —
-     * 확정 닉네임은 온보딩(TMT-273)에서 받는다.
+     * 확정 닉네임은 가입 완결(TMT-370)에서 받는다.
      *
      * 길이는 코드포인트로 센다. `String.length`·`take`는 UTF-16 코드 유닛이라 이모지 닉네임을
      * 자르면 서로게이트 반쪽이 남아 DB 인코딩 오류가 난다 — CHECK(users_nickname_len)도
@@ -74,8 +77,14 @@ class KakaoLoginService(
         KakaoLoginResult(
             userId = id,
             nickname = nickname,
-            profileImageUrl = profileImageUrl,
+            profileImageUrl =
+                profileImageAssetId?.let {
+                    getMediaUrlsUseCase.urlsOf(
+                        listOf(it),
+                    )[it]
+                } ?: profileImageUrl,
             isNewUser = isNewUser,
+            profileCompleted = profileCompletedAt != null,
         )
 
     companion object {

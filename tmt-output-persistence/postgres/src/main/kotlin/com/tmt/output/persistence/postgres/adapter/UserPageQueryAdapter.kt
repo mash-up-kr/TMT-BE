@@ -25,6 +25,8 @@ class UserPageQueryAdapter(
                 userId = it.getUserId(),
                 nickname = it.getNickname(),
                 profileImageUrl = it.getProfileImageUrl(),
+                profileImageS3Key = it.getProfileImageS3Key(),
+                profileCompletedAt = it.getProfileCompletedAt(),
                 reviewCount = it.getReviewCount(),
                 joinedGroupCount = it.getJoinedGroupCount(),
                 favoritePlaceCount = it.getFavoritePlaceCount(),
