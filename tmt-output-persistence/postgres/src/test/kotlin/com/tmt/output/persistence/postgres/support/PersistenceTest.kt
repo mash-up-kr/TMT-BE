@@ -6,8 +6,10 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * persistence 어댑터 통합 테스트의 바닥 (TMT-295).
@@ -25,7 +27,15 @@ import org.springframework.transaction.annotation.Transactional
  * `spring-boot-starter-data-jpa-test`에 있고, `@AutoConfigureTestDatabase`는 또 다른 jdbc 쪽이다 —
  * import 경로가 Boot 3 문서와 다르다.
  */
-@DataJpaTest(properties = ["spring.jpa.hibernate.ddl-auto=validate"])
+@DataJpaTest(
+    properties = [
+        "spring.jpa.hibernate.ddl-auto=validate",
+        // @Import 조합이 다르면 Spring이 컨텍스트를 새로 띄우고 캐시에 쌓아둔다 — 테스트가 끝나도
+        // 닫지 않으므로 풀도 그만큼 살아 있다. 어댑터 테스트가 늘면서 컨테이너의 max_connections를
+        // 넘겨 뒤에 뜨는 컨텍스트가 통째로 죽었다 (TMT-348). 슬라이스 하나가 커넥션을 많이 쥘 이유가 없다
+        "spring.datasource.hikari.maximum-pool-size=2",
+    ],
+)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class PersistenceTest {
@@ -34,6 +44,19 @@ abstract class PersistenceTest {
 
     /** 테스트가 쓸 행을 만드는 곳. 규칙은 [PersistenceFixtures] 참고. */
     protected val fixtures: PersistenceFixtures by lazy { PersistenceFixtures(jdbcTemplate) }
+
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
+
+    /**
+     * 쓰기를 트랜잭션 안에서 부른다.
+     *
+     * 롤백을 껐으므로(위 참고) 테스트 자체는 트랜잭션 밖이다. 어댑터가 스스로 `@Transactional`을
+     * 달고 있으면 그대로 부르면 되지만, **호출부가 연 트랜잭션에 참여하도록 설계된 어댑터**는
+     * (예: [com.tmt.output.persistence.postgres.adapter.GroupJoinTicketAdapter]) 여기서 감싸야
+     * `TransactionRequiredException`이 나지 않는다.
+     */
+    protected fun <T> inTransaction(block: () -> T): T = TransactionTemplate(transactionManager).execute { block() }!!
 
     companion object {
         @JvmStatic

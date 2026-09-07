@@ -13,6 +13,9 @@ import kotlin.test.assertTrue
  *
  * 소비(`consumeOne`)는 동시성 테스트가 덮고 있는데 회수만 비어 있었다. 회수는
  * **조건부 UPDATE 한 문장**이라 "회수할 AVAILABLE이 없다"는 0행 판정이 SQL에서만 드러난다.
+ *
+ * 이 어댑터는 `@Transactional`을 달지 않는다 — 호출부(리뷰 삭제 TX-5)가 연 트랜잭션에
+ * 참여하는 설계라서다. 그래서 쓰기를 [inTransaction]으로 감싼다.
  */
 @Import(GroupJoinTicketAdapter::class)
 class GroupJoinTicketAdapterTest : PersistenceTest() {
@@ -23,10 +26,10 @@ class GroupJoinTicketAdapterTest : PersistenceTest() {
     fun `리뷰로 받은 티켓을 회수한다`() {
         val user = fixtures.newUser()
         val review = fixtures.newPublishedReview(fixtures.newPlace(), user)
-        adapter.grantForReview(user, review.reviewId)
+        inTransaction { adapter.grantForReview(user, review.reviewId) }
         assertEquals(1, adapter.countAvailable(user))
 
-        assertTrue(adapter.revokeOneForReview(user, review.reviewId))
+        assertTrue(inTransaction { adapter.revokeOneForReview(user, review.reviewId) })
         assertEquals(0, adapter.countAvailable(user))
     }
 
@@ -36,17 +39,17 @@ class GroupJoinTicketAdapterTest : PersistenceTest() {
         val user = fixtures.newUser()
         val review = fixtures.newPublishedReview(fixtures.newPlace(), user)
 
-        assertFalse(adapter.revokeOneForReview(user, review.reviewId))
+        assertFalse(inTransaction { adapter.revokeOneForReview(user, review.reviewId) })
     }
 
     @Test
     fun `같은 리뷰로 두 번 회수하면 두 번째는 false다`() {
         val user = fixtures.newUser()
         val review = fixtures.newPublishedReview(fixtures.newPlace(), user)
-        adapter.grantForReview(user, review.reviewId)
+        inTransaction { adapter.grantForReview(user, review.reviewId) }
 
-        assertTrue(adapter.revokeOneForReview(user, review.reviewId))
-        assertFalse(adapter.revokeOneForReview(user, review.reviewId))
+        assertTrue(inTransaction { adapter.revokeOneForReview(user, review.reviewId) })
+        assertFalse(inTransaction { adapter.revokeOneForReview(user, review.reviewId) })
     }
 
     @Test
@@ -55,9 +58,9 @@ class GroupJoinTicketAdapterTest : PersistenceTest() {
         val user = fixtures.newUser()
         val granted = fixtures.newPublishedReview(fixtures.newPlace(), user)
         val other = fixtures.newPublishedReview(fixtures.newPlace(), user)
-        adapter.grantForReview(user, granted.reviewId)
+        inTransaction { adapter.grantForReview(user, granted.reviewId) }
 
-        assertTrue(adapter.revokeOneForReview(user, other.reviewId))
+        assertTrue(inTransaction { adapter.revokeOneForReview(user, other.reviewId) })
         assertEquals(0, adapter.countAvailable(user))
     }
 
@@ -66,9 +69,9 @@ class GroupJoinTicketAdapterTest : PersistenceTest() {
         val me = fixtures.newUser()
         val other = fixtures.newUser()
         val review = fixtures.newPublishedReview(fixtures.newPlace(), other)
-        adapter.grantForReview(other, review.reviewId)
+        inTransaction { adapter.grantForReview(other, review.reviewId) }
 
-        assertFalse(adapter.revokeOneForReview(me, review.reviewId))
+        assertFalse(inTransaction { adapter.revokeOneForReview(me, review.reviewId) })
         assertEquals(1, adapter.countAvailable(other), "남의 잔고는 그대로다")
     }
 }
