@@ -27,6 +27,10 @@ interface GroupJoinTicketRepository : JpaRepository<GroupJoinTicketEntity, Long>
      * 동시 가입이 잡은 장을 기다렸다 0행을 받으면 남은 장이 있어도 삭제가 거부된다(오탐).
      * "이 리뷰가 발급한 장 우선"은 잠기지 않은 장 안에서만 지키는 best-effort다 — 잠긴 선호 장은
      * 상대가 커밋하면 어차피 소비돼 사라질 장이고, 티켓은 서로 구분되지 않는다 (T3).
+     *
+     * 반대 방향의 좁은 창이 하나 있다 — 유일한 장을 잡은 가입이 **롤백**되면, 예전에는 기다렸다
+     * 회수했지만 지금은 건너뛰어 거부된다. 재시도 시점엔 잠긴 장이 없어 성공하므로 회복되고,
+     * 없앤 오탐(커밋 경로)보다 훨씬 좁은 창이라 감수한 트레이드다 (PR 리뷰).
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
