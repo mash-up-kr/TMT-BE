@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController
  * `addressId`가 서명 토큰. 좌표를 빼는 이유는 SSOT가 서버에만 있어야 클라이언트가
  * 임의 좌표로 매장을 만들 수 없기 때문이다 (F §2-2).
  */
-@Tag(name = "주소 검색 (mock)", description = "명세 v2 — F §2-2")
+@Tag(name = "주소 검색", description = "명세 v2 — F §2-2")
 @RestController
 @RequestMapping("/v1/addresses/search")
 class AddressSearchController(
