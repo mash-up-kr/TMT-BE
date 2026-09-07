@@ -22,6 +22,12 @@ enum class ErrorCode(
     // 인증
     AUTH_KAKAO_CODE_INVALID(ErrorType.UNAUTHORIZED, "카카오 인가 코드가 유효하지 않습니다."),
     AUTH_KAKAO_UNAVAILABLE(ErrorType.EXTERNAL_UNAVAILABLE, "카카오 로그인 서비스가 응답하지 않습니다."),
+
+    /**
+     * 우리 설정 결함이다. 카카오 장애([AUTH_KAKAO_UNAVAILABLE])와 코드를 가르는 이유는
+     * 502가 "잠시 뒤 다시"라는 뜻이라 재시도해도 되는 줄 알기 때문이다 (docs/LOGGING.md §4-3)
+     */
+    AUTH_KAKAO_MISCONFIGURED(ErrorType.INTERNAL, "로그인 기능을 사용할 수 없습니다."),
     AUTH_TOKEN_INVALID(ErrorType.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
     AUTH_TOKEN_EXPIRED(ErrorType.UNAUTHORIZED, "만료된 토큰입니다."),
 
@@ -30,6 +36,9 @@ enum class ErrorCode(
     PLACE_CATEGORY_NOT_FOUND(ErrorType.VALIDATION, "음식 카테고리가 목록에 없습니다."),
     ADDRESS_NOT_FOUND(ErrorType.NOT_FOUND, "주소를 찾을 수 없습니다."),
     ADDRESS_PROVIDER_UNAVAILABLE(ErrorType.EXTERNAL_UNAVAILABLE, "주소 서비스가 응답하지 않습니다."),
+
+    /** 승인키 누락 — 우리 설정 결함이다 (docs/LOGGING.md §4-3) */
+    ADDRESS_PROVIDER_MISCONFIGURED(ErrorType.INTERNAL, "주소 검색 기능을 사용할 수 없습니다."),
 
     // 미디어
     MEDIA_FILE_TOO_LARGE(ErrorType.VALIDATION, "파일이 허용 크기를 초과했습니다."),
@@ -60,4 +69,7 @@ enum class ErrorCode(
     USER_NOT_FOUND(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     RECOMMENDATION_UNAVAILABLE(ErrorType.UNPROCESSABLE, "추천할 만한 새 매장이 없습니다."),
     RECOMMENDATION_FAILED(ErrorType.SERVICE_UNAVAILABLE, "매장 추천에 실패했습니다."),
+
+    /** 프로바이더 키가 하나도 없다 — 쿼터 소진·장애와 달리 시간이 지나도 낫지 않는다 (docs/LOGGING.md §4-3) */
+    LLM_MISCONFIGURED(ErrorType.INTERNAL, "AI 기능을 사용할 수 없습니다."),
 }

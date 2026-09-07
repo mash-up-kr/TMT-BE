@@ -43,7 +43,7 @@ class JusoCircuitBreaker(
         val failures = consecutiveFailures.incrementAndGet()
         if (failures >= failureThreshold) {
             openedUntil.set(clock.instant().plus(Duration.ofSeconds(openSeconds)))
-            logger.error { "juso 차단기 open - consecutiveFailures=$failures, ${openSeconds}초 동안 호출을 멈춘다" }
+            logger.warn { "juso 차단기 open - consecutiveFailures=$failures, ${openSeconds}초 동안 호출을 멈춘다" }
         }
     }
 }

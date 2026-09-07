@@ -30,8 +30,8 @@ class JusoAddressSearchAdapter(
     ): AddressPage {
         val sanitized = AddressQuerySanitizer.sanitizeOrThrow(query)
         if (confmKey.isBlank()) {
-            logger.error { "juso 검색 승인키가 없다 - tmt.address.juso.search-key 설정 확인" }
-            throw TmtException(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)
+            logger.warn { "juso 검색 승인키가 없다 - tmt.address.juso.search-key 설정 확인" }
+            throw TmtException(ErrorCode.ADDRESS_PROVIDER_MISCONFIGURED)
         }
         if (circuitBreaker.isOpen) {
             logger.warn { "juso 차단기가 열려 있어 호출을 건너뛴다" }
@@ -61,7 +61,7 @@ class JusoAddressSearchAdapter(
         if (errorCode != SUCCESS_CODE) {
             circuitBreaker.recordFailure()
             // 차단과 일반 오류를 구분할 수 있게 공급자 코드를 그대로 남긴다 (F §2-3)
-            logger.error {
+            logger.warn {
                 "juso 검색 오류 - errorCode=$errorCode, errorMessage=${common.path("errorMessage").asString()}"
             }
             throw TmtException(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)

@@ -28,8 +28,8 @@ class KakaoAuthAdapter(
         redirectUri: String,
     ): KakaoProfile {
         if (restApiKey.isBlank() || clientSecret.isBlank()) {
-            logger.error { "카카오 키가 없다 - tmt.auth.kakao.rest-api-key·client-secret 설정 확인" }
-            throw TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
+            logger.warn { "카카오 키가 없다 - tmt.auth.kakao.rest-api-key·client-secret 설정 확인" }
+            throw TmtException(ErrorCode.AUTH_KAKAO_MISCONFIGURED)
         }
         return fetchUser(exchangeToken(code, redirectUri))
     }
@@ -53,7 +53,7 @@ class KakaoAuthAdapter(
             }.getOrElse { throw tokenFailure(it) }
 
         return response.path("access_token").asString().orEmpty().ifBlank {
-            logger.error { "카카오 토큰 응답에 access_token이 없다" }
+            logger.warn { "카카오 토큰 응답에 access_token이 없다" }
             throw TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
         }
     }
@@ -81,8 +81,9 @@ class KakaoAuthAdapter(
             logger.warn { "카카오 인가 코드 거절 - error_code=$errorCode" }
             return TmtException(ErrorCode.AUTH_KAKAO_CODE_INVALID)
         }
-        // 예외를 함께 넘긴다 — 스택 없이 메시지만 올라가면 Sentry 이벤트에서 호출 지점을 짚지 못한다 (TMT-354)
-        logger.error(e) { "카카오 토큰 교환 거절 - status=${e.status}, error=$error, error_code=$errorCode" }
+        // 이벤트는 ExceptionAdvice가 낸다. 여기서는 공급자가 준 사유만 breadcrumb으로 남긴다
+        // (docs/LOGGING.md §4-1) — 같은 장애를 두 곳에서 남기면 이슈가 둘로 갈린다
+        logger.warn(e) { "카카오 토큰 교환 거절 - status=${e.status}, error=$error, error_code=$errorCode" }
         return TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
     }
 
@@ -96,7 +97,7 @@ class KakaoAuthAdapter(
 
         val kakaoId = response.path("id").asLong(0L)
         if (kakaoId <= 0L) {
-            logger.error { "카카오 사용자 응답에 id가 없다" }
+            logger.warn { "카카오 사용자 응답에 id가 없다" }
             throw TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
         }
         val profile = response.path("kakao_account").path("profile")

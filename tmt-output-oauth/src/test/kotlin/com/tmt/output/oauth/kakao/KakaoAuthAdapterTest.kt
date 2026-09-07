@@ -30,12 +30,13 @@ class KakaoAuthAdapterTest {
     }
 
     @Test
-    fun `키가 설정돼 있지 않으면 AUTH_KAKAO_UNAVAILABLE이고 카카오를 부르지 않는다`() {
+    fun `키가 설정돼 있지 않으면 설정 결함으로 끊고 카카오를 부르지 않는다`() {
         val bare = KakaoAuthAdapter(httpClient, restApiKey = "", clientSecret = "")
 
         val e = assertFailsWith<TmtException> { bare.fetchProfile("c", "r") }
 
-        assertEquals(ErrorCode.AUTH_KAKAO_UNAVAILABLE, e.errorCode)
+        // 카카오 장애(502)와 코드를 가른다 — 우리 키가 없는 것은 시간이 지나도 낫지 않는다 (TMT-354)
+        assertEquals(ErrorCode.AUTH_KAKAO_MISCONFIGURED, e.errorCode)
         assertEquals(0, httpClient.postCalls.size)
     }
 
