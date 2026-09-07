@@ -7,12 +7,14 @@ import com.tmt.common.exception.TmtException
 import com.tmt.input.http.filter.RequestIdFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.validation.ConstraintViolationException
+import org.apache.catalina.connector.ClientAbortException
 import org.springframework.http.ProblemDetail
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import java.time.Instant
@@ -96,6 +98,18 @@ class ExceptionAdvice {
     fun handleNoResourceFound(e: NoResourceFoundException): ProblemDetail {
         logger.warn { "리소스를 찾을 수 없음 - ${e.resourcePath}" }
         return problemDetail(ErrorCode.RESOURCE_NOT_FOUND, e.resourcePath)
+    }
+
+    /**
+     * 클라이언트가 응답을 받다 연결을 끊은 경우다 (모바일 화면 이탈·새로고침). 서버가 고칠 것이 없고
+     * 이미 나가던 응답이라 본문을 다시 쓸 수도 없는데, 맨 아래 [handleException]이 받으면
+     * ERROR로 남아 Sentry 이벤트가 된다 — 온콜 봇이 조치할 수 없는 건을 매번 분석하게 된다 (TMT-354).
+     *
+     * 응답을 만들지 않는다. 받을 상대가 이미 없다.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException::class, ClientAbortException::class)
+    fun handleClientAbort(e: Exception) {
+        logger.warn { "클라이언트가 응답 수신 중 연결을 끊었다 - ${e.javaClass.simpleName}" }
     }
 
     @ExceptionHandler(Exception::class)

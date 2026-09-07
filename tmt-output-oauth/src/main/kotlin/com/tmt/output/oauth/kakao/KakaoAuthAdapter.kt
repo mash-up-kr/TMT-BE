@@ -81,7 +81,8 @@ class KakaoAuthAdapter(
             logger.warn { "카카오 인가 코드 거절 - error_code=$errorCode" }
             return TmtException(ErrorCode.AUTH_KAKAO_CODE_INVALID)
         }
-        logger.error { "카카오 토큰 교환 거절 - status=${e.status}, error=$error, error_code=$errorCode" }
+        // 예외를 함께 넘긴다 — 스택 없이 메시지만 올라가면 Sentry 이벤트에서 호출 지점을 짚지 못한다 (TMT-354)
+        logger.error(e) { "카카오 토큰 교환 거절 - status=${e.status}, error=$error, error_code=$errorCode" }
         return TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
     }
 

@@ -1,6 +1,12 @@
 package com.tmt.input.http.exception
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -13,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException
 
 /**
  * 요청을 해석하지 못한 경우가 400으로 나가는지 본다 (TMT-343).
@@ -76,11 +83,30 @@ class ExceptionAdviceTest {
             .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
     }
 
+    /** 조치할 수 없는 건이 ERROR로 남으면 Sentry 이벤트가 되어 온콜 봇이 매번 분석한다 (TMT-354). */
+    @Test
+    fun `클라이언트가 연결을 끊은 것은 500 에러로 남기지 않는다`() {
+        val logs = captureAdviceLogs()
+
+        mockMvc.perform(get("/probe/client-gone"))
+
+        assertThat(logs.list.map { it.level }).containsExactly(Level.WARN)
+    }
+
     @Test
     fun `정상 요청은 그대로 통과한다`() {
         mockMvc
             .perform(get("/probe/params").param("size", "3"))
             .andExpect(status().isOk)
+    }
+
+    /** 남긴 레벨이 곧 Sentry 이벤트 경계라, 응답이 아니라 레벨을 본다. */
+    private fun captureAdviceLogs(): ListAppender<ILoggingEvent> {
+        val logger = LoggerFactory.getLogger(ExceptionAdvice::class.java) as Logger
+        return ListAppender<ILoggingEvent>().apply {
+            start()
+            logger.addAppender(this)
+        }
     }
 
     @RestController
@@ -98,6 +124,9 @@ class ExceptionAdviceTest {
 
         @GetMapping("/probe/boom")
         fun boom(): Nothing = throw IllegalStateException("예상 못 한 실패")
+
+        @GetMapping("/probe/client-gone")
+        fun clientGone(): Nothing = throw AsyncRequestNotUsableException("ServletOutputStream failed to write")
 
         data class Payload(
             val name: String,
