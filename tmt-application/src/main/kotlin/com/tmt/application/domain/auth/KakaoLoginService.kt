@@ -48,7 +48,7 @@ class KakaoLoginService(
         val existing =
             userAccountPort.findByKakaoId(profile.kakaoId)
                 ?: run {
-                    logger.error { "카카오 사용자 생성 경쟁 후 재조회 실패 - kakaoId=${profile.kakaoId}" }
+                    logger.warn { "카카오 사용자 생성 경쟁 후 재조회 실패 - kakaoId=${profile.kakaoId}" }
                     throw TmtException(ErrorCode.INTERNAL_ERROR)
                 }
         return existing.toResult(isNewUser = false)

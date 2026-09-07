@@ -1,6 +1,8 @@
 package com.tmt.input.http.exception
 
 import ch.qos.logback.classic.Level
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
@@ -93,6 +95,22 @@ class ExceptionAdviceTest {
         assertThat(logs.list.map { it.level }).containsExactly(Level.WARN)
     }
 
+    /**
+     * 레벨이 곧 Sentry 이벤트 경계다 (docs/LOGGING.md §3-1). 5xx는 원인이 밖에 있어도 ERROR고,
+     * 예상된 4xx는 서버가 제 일을 한 결과라 INFO다.
+     */
+    @Test
+    fun `레벨은 ErrorType으로 갈린다`() {
+        val logs = captureAdviceLogs()
+
+        mockMvc.perform(get("/probe/not-found"))
+        mockMvc.perform(get("/probe/kakao-down"))
+        mockMvc.perform(get("/probe/params"))
+
+        assertThat(logs.list.map { it.level })
+            .containsExactly(Level.INFO, Level.ERROR, Level.WARN)
+    }
+
     @Test
     fun `정상 요청은 그대로 통과한다`() {
         mockMvc
@@ -124,6 +142,13 @@ class ExceptionAdviceTest {
 
         @GetMapping("/probe/boom")
         fun boom(): Nothing = throw IllegalStateException("예상 못 한 실패")
+
+        @GetMapping("/probe/not-found")
+        fun notFound(): Nothing = throw TmtException(ErrorCode.USER_NOT_FOUND)
+
+        /** 남의 장애로 5xx가 나간 경우 — 우리가 고칠 수 없어도 알아야 한다 */
+        @GetMapping("/probe/kakao-down")
+        fun kakaoDown(): Nothing = throw TmtException(ErrorCode.AUTH_KAKAO_UNAVAILABLE)
 
         @GetMapping("/probe/client-gone")
         fun clientGone(): Nothing = throw AsyncRequestNotUsableException("ServletOutputStream failed to write")
