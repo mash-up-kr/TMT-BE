@@ -7,6 +7,7 @@ import com.tmt.application.port.input.ReplaceSharesResult
 import com.tmt.application.port.input.ReviewShareItemView
 import com.tmt.application.port.input.ReviewSharesRequest
 import com.tmt.application.port.input.ReviewSharesResult
+import com.tmt.application.port.output.persistence.GroupMembershipPort
 import com.tmt.application.port.output.persistence.GroupReviewQueryPort
 import com.tmt.application.port.output.persistence.GroupReviewSharePort
 import com.tmt.application.port.output.persistence.GroupShareQueryPort
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 class GroupShareService(
     private val groupShareQueryPort: GroupShareQueryPort,
     private val groupReviewQueryPort: GroupReviewQueryPort,
+    private val groupMembershipPort: GroupMembershipPort,
     private val groupReviewSharePort: GroupReviewSharePort,
     private val groupStatsPort: GroupStatsPort,
     private val mediaUrlResolver: MediaUrlResolver,
@@ -55,7 +57,13 @@ class GroupShareService(
         )
     }
 
-    /** 교체와 집계 반영이 한 트랜잭션이다 (TX-4) — 중간에 끊기면 지표가 공유 집합과 어긋난다. */
+    /**
+     * 교체와 집계 반영이 한 트랜잭션이다 (TX-4) — 중간에 끊기면 지표가 공유 집합과 어긋난다.
+     *
+     * 멤버십은 조회가 아니라 **행 잠금으로** 확인한다 (TMT-351) — 잠그지 않으면 확인 직후 탈퇴가
+     * 커밋해도 공유 INSERT가 막히지 않아, LEFT인데 공유가 남는다 (G10). 탈퇴가 잠금을 쥐고 있으면
+     * 여기서 기다렸다 LEFT를 보고 거절되고, 이쪽이 먼저면 탈퇴가 기다렸다 새 공유까지 내린다.
+     */
     @Transactional
     override fun replace(
         groupId: Long,
@@ -63,7 +71,9 @@ class GroupShareService(
         reviewIds: List<Long>,
     ): ReplaceSharesResult {
         if (!groupReviewQueryPort.existsGroup(groupId)) throw TmtException(ErrorCode.GROUP_NOT_FOUND)
-        if (!groupReviewQueryPort.isMember(groupId, userId)) throw TmtException(ErrorCode.GROUP_MEMBERSHIP_REQUIRED)
+        if (!groupMembershipPort.lockActiveMembership(groupId, userId)) {
+            throw TmtException(ErrorCode.GROUP_MEMBERSHIP_REQUIRED)
+        }
 
         val distinct = reviewIds.distinct()
         groupShareQueryPort.findNotMine(userId, distinct).firstOrNull()?.let {
