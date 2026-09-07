@@ -40,7 +40,8 @@ data class ReviewShareRows(
 data class ReviewShareRow(
     val reviewId: Long,
     val placeName: String,
-    val thumbnailS3Key: String,
+    /** 사진 0장 리뷰(C4-1)면 null (TMT-352) */
+    val thumbnailS3Key: String?,
     val content: String,
     val isShared: Boolean,
     val createdAt: Instant,

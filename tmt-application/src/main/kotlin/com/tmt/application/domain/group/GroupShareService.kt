@@ -46,7 +46,7 @@ class GroupShareService(
                     ReviewShareItemView(
                         reviewId = it.reviewId,
                         placeName = it.placeName,
-                        thumbnailUrl = mediaUrlResolver.urlOf(it.thumbnailS3Key),
+                        thumbnailUrl = it.thumbnailS3Key?.let(mediaUrlResolver::urlOf),
                         contentPreview = it.content,
                         isShared = it.isShared,
                         createdAt = it.createdAt,
