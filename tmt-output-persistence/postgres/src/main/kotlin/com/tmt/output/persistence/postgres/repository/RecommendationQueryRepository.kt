@@ -113,7 +113,8 @@ interface RecommendationQueryRepository : JpaRepository<PlaceEntity, Long> {
     }
 
     /**
-     * 후보 — 조회자가 아직 리뷰하지 않은 매장이다. 씨앗과 같은 카테고리를 앞에 두고 리뷰 많은 순이다.
+     * 후보 — 조회자가 아직 리뷰하지 않은, **리뷰가 1건 이상 있는** 매장이다.
+     * 씨앗과 같은 카테고리를 앞에 두고 리뷰 많은 순이다.
      *
      * 카테고리 일치는 `COALESCE(..., FALSE)`로 감싼다. `category_id`가 NULL이면 `IN`이 NULL을 주고,
      * `ORDER BY ... DESC`는 NULL을 **가장 앞에** 두므로(Postgres 기본 NULLS FIRST) 카테고리 없는
@@ -130,7 +131,8 @@ interface RecommendationQueryRepository : JpaRepository<PlaceEntity, Long> {
                         THEN ROUND(p.rating_sum::numeric / p.review_count, 2)
                    END            AS averageRating
             FROM place p
-            WHERE NOT EXISTS (SELECT 1 FROM review r
+            WHERE p.review_count > 0
+              AND NOT EXISTS (SELECT 1 FROM review r
                                WHERE r.place_id = p.id
                                  AND r.user_id = :userId
                                  AND r.deleted_at IS NULL)
@@ -164,8 +166,9 @@ interface RecommendationQueryRepository : JpaRepository<PlaceEntity, Long> {
     }
 
     /**
-     * 결과 카드 재료. 썸네일은 **그 매장 최신 리뷰의 첫 사진**(P7)이고, 요약은 최신 리뷰의
-     * `ReviewAiSummary`다 (A3).
+     * 결과 카드 재료. 요약은 그 매장 **최신 리뷰**의 `ReviewAiSummary`이고(A3),
+     * 썸네일은 **사진이 있는 리뷰 중 최신 것**의 첫 사진이다 — 최신 리뷰에 사진이 없으면
+     * 그 다음 리뷰로 넘어간다 (기존 P7 구현과 같은 모양).
      *
      * `summaryReviewId`는 요약 행이 있을 때만 채워진다 — 리뷰는 있는데 요약이 아직 없는 경우가
      * `summary: null`의 두 갈래 중 하나다 (A2). 리뷰 자체가 없는 경우와 결과가 같다.

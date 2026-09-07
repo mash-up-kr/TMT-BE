@@ -28,11 +28,15 @@ class ChainedPlaceRecommendationLlmAdapter(
         check(active.isNotEmpty()) { "활성 LLM 프로바이더가 없다 — GROQ_API_KEY/GEMINI_API_KEY 설정 확인" }
 
         val allowed = request.candidates.map { it.placeId }.toSet()
-        val userPrompt = mapper.writeValueAsString(request)
+        // 재추천이 같은 매장만 내놓지 않게 두 군데를 흔든다 (PR #106 리뷰).
+        // 후보 30개를 고르는 SQL은 결정적이라(카테고리 우선·리뷰 많은 순) 순서까지 그대로 넘기면
+        // 프롬프트가 완전히 같아진다 — 어느 30개인지는 SQL이 정하고, 보여주는 순서는 여기서 섞는다
+        val shuffled = request.copy(candidates = request.candidates.shuffled())
+        val userPrompt = mapper.writeValueAsString(shuffled)
         var lastError: Throwable? = null
         active.forEach { client ->
             runCatching {
-                val json = client.completeJson(SYSTEM_PROMPT, userPrompt)
+                val json = client.completeJson(SYSTEM_PROMPT, userPrompt, ChatJsonClient.CHOICE_TEMPERATURE)
                 val picked = mapper.readValue<LlmPayload>(json).placeId
                 // 후보 밖 id는 지어낸 것이다 — 삼키고 첫 후보로 때우면 "추천했다"는 사실만 남고
                 // 근거가 사라진다. 다음 프로바이더에 기회를 주고, 전부 실패하면 503이 정직하다

@@ -35,8 +35,11 @@ interface RecommendationQueryPort {
 
     /**
      * 추천 후보 — 조회자가 **아직 리뷰하지 않은** 매장이다. 씨앗 매장의 카테고리를 먼저 담고,
-     * 리뷰가 많은 순으로 [limit]개까지 준다. 리뷰 0건 매장을 걸러내지는 않는다 —
-     * 후보를 비우면 UNAVAILABLE이 되는데, 요약 없는 카드라도 내리는 편이 낫다 (A2).
+     * 리뷰가 많은 순으로 [limit]개까지 준다.
+     *
+     * **리뷰 0건 매장은 뺀다** (PR #106 리뷰). 요약도 썸네일도 없는 카드는 "추천했다"는 사실만
+     * 남고 사용자가 갈 이유를 판단할 근거가 없다. 그만큼 UNAVAILABLE이 늘지만, 리뷰 있는 매장이
+     * 하나도 안 남은 상황이면 추천을 안 하는 쪽이 맞는 응답이다.
      */
     fun findCandidatePlaces(
         userId: Long,
@@ -44,7 +47,14 @@ interface RecommendationQueryPort {
         limit: Int,
     ): List<CandidatePlaceRow>
 
-    /** 고른 매장 1곳의 카드 재료. 요약·썸네일은 그 매장 **최신 리뷰**에서 온다 (A3·P7). */
+    /**
+     * 고른 매장 1곳의 카드 재료.
+     *
+     * 요약은 그 매장 **최신 리뷰**의 것이고(A3), 썸네일은 **사진이 있는 리뷰 중 최신 것**의 첫 사진이다 —
+     * 최신 리뷰에 사진이 없으면 그 다음 리뷰로 넘어간다. 추천 카드는 안 가본 매장을 설득하는 화면이라
+     * 사진이 있는 매장인데 빈 이미지가 나오는 것보다 낫고, 기존 P7 구현(`PlaceQueryRepository`·
+     * `PlaceSearchRepository`)과도 같은 모양이다.
+     */
     fun findRecommendedPlace(placeId: Long): RecommendedPlaceRow?
 }
 

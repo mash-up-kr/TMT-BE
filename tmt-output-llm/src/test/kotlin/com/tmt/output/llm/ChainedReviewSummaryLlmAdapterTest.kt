@@ -24,6 +24,7 @@ class ChainedReviewSummaryLlmAdapterTest {
         override fun completeJson(
             systemPrompt: String,
             userPrompt: String,
+            temperature: Double,
         ): String = behavior()
     }
 

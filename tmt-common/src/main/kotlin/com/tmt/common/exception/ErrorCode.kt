@@ -58,6 +58,6 @@ enum class ErrorCode(
 
     // 사용자·추천
     USER_NOT_FOUND(ErrorType.NOT_FOUND, "사용자를 찾을 수 없습니다."),
-    RECOMMENDATION_UNAVAILABLE(ErrorType.UNPROCESSABLE, "추천의 근거가 될 리뷰가 없습니다."),
+    RECOMMENDATION_UNAVAILABLE(ErrorType.UNPROCESSABLE, "추천할 만한 새 매장이 없습니다."),
     RECOMMENDATION_FAILED(ErrorType.SERVICE_UNAVAILABLE, "매장 추천에 실패했습니다."),
 }

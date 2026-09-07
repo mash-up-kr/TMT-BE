@@ -152,8 +152,9 @@ class RecommendationQueryAdapterTest : PersistenceTest() {
 
     @Test
     fun `후보에는 내가 리뷰한 매장이 나오지 않는다`() {
+        // review_count를 줘서 "리뷰 0건이라 빠진 것"과 구분한다 — 내가 썼다는 사실이 제외 사유다
         val user = fixtures.newUser()
-        val reviewed = fixtures.newPlace()
+        val reviewed = fixtures.newPlace(reviewCount = 5, ratingSum = 20)
         fixtures.newPublishedReview(reviewed, user)
 
         val candidates = adapter.findCandidatePlaces(user, listOf(reviewed), ALL)
@@ -167,6 +168,7 @@ class RecommendationQueryAdapterTest : PersistenceTest() {
         val user = fixtures.newUser()
         val seed = fixtures.newPlace(categoryId = "cat_meat")
         fixtures.newPublishedReview(seed, user)
+        // 둘 다 리뷰가 있어야 후보에 남는다 — 리뷰 0건은 걸러진다
         val noCategory = fixtures.newPlace(categoryId = null, reviewCount = 99)
         val sameCategory = fixtures.newPlace(categoryId = "cat_meat", reviewCount = 1)
 
@@ -180,15 +182,16 @@ class RecommendationQueryAdapterTest : PersistenceTest() {
     }
 
     @Test
-    fun `후보의 평균 별점은 리뷰가 없으면 null이다`() {
+    fun `리뷰 0건 매장은 후보에 없다`() {
+        // 요약도 썸네일도 없는 카드는 "추천했다"는 사실만 남는다 (PR #106 리뷰)
         val user = fixtures.newUser()
         val seed = fixtures.newPlace()
         fixtures.newPublishedReview(seed, user)
         val fresh = fixtures.newPlace(reviewCount = 0, ratingSum = 0)
 
-        val candidate = adapter.findCandidatePlaces(user, listOf(seed), ALL).single { it.placeId == fresh }
+        val candidates = adapter.findCandidatePlaces(user, listOf(seed), ALL)
 
-        assertNull(candidate.averageRating)
+        assertFalse(candidates.any { it.placeId == fresh })
     }
 
     @Test
