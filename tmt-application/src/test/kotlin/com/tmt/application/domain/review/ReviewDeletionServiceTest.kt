@@ -99,6 +99,20 @@ class ReviewDeletionServiceTest {
     }
 
     @Test
+    fun `회수가 경합으로 밀리면 잔여 수를 집을 수 있는 장 기준으로 알린다 (TMT-351)`() {
+        tickets.seed(ownerId, 1)
+        // 동시 가입이 유일한 장을 잡아 회수가 건너뛴 상황 — 겉보기 잔고는 1, 집을 수 있는 장은 0
+        tickets.revokeFails = true
+        tickets.consumable = 0
+
+        val e = assertThrows<TicketShortageException> { service.delete(ownerId, reviewId) }
+
+        assertEquals(ErrorCode.REVIEW_DELETE_TICKET_REQUIRED, e.errorCode)
+        // countAvailable로 세면 "보유 1장인데 삭제 불가"라는 자기모순 응답이 나간다
+        assertEquals(0, e.availableCount)
+    }
+
+    @Test
     fun `이미 지워진 리뷰를 다시 지우면 REVIEW_NOT_FOUND다`() {
         // 티켓 2장 — 이 리뷰가 발급한 장이 이미 회수됐어도 회수는 다른 장으로 성공한다.
         // 그래서 갱신 행 수를 안 보면 두 번째 삭제가 끝까지 진행돼 집계가 두 번 깎인다
