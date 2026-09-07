@@ -14,6 +14,7 @@ import com.tmt.input.http.controller.paging.CursorCondition
 import com.tmt.input.http.controller.paging.CursorSpec
 import com.tmt.input.http.controller.paging.PageLimit
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -111,7 +112,8 @@ class GroupShareController(
         data class Item(
             val reviewId: String,
             val placeName: String,
-            val thumbnailUrl: String,
+            @field:Schema(description = "리뷰의 첫 사진. 사진 0장 리뷰면 null이고 화면이 기본 일러스트를 그린다", nullable = true)
+            val thumbnailUrl: String?,
             val contentPreview: String,
             val isShared: Boolean,
             val createdAt: String,

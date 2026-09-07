@@ -41,8 +41,11 @@ data class ReviewSharesResult(
 data class ReviewShareItemView(
     val reviewId: Long,
     val placeName: String,
-    /** 리뷰의 첫 사진 — 리뷰는 사진이 필수라 비지 않는다 (C4). */
-    val thumbnailUrl: String,
+    /**
+     * 리뷰의 첫 사진. **사진 0장 리뷰(C4-1)면 null**이고 화면이 기본 일러스트를 그린다 —
+     * 서버가 대체 이미지를 채우지 않는다 (R11). 마이페이지 리뷰 탭(J §3-1)과 같은 규칙이다
+     */
+    val thumbnailUrl: String?,
     /** 본문 전체 — 화면이 두 줄로 자른다. */
     val contentPreview: String,
     val isShared: Boolean,

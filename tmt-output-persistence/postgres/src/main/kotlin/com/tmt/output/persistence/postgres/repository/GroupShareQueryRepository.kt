@@ -10,7 +10,11 @@ import java.time.Instant
 interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long> {
     /**
      * 내 리뷰 최신순 (created_at, review_id) 내림차순 키셋 + 이 그룹 공유 여부.
-     * 썸네일은 리뷰의 첫 사진 — 리뷰는 사진이 필수라 INNER JOIN이다 (C4).
+     *
+     * 썸네일은 리뷰의 첫 사진이고 **없을 수 있다** — `LEFT JOIN LATERAL`이어야 한다 (TMT-352).
+     * INNER였을 때는 "리뷰는 사진이 필수"(C4)를 근거로 삼았는데, C4-1(TMT-268)로 사진 0장
+     * 리뷰가 성립하면서 그 전제가 깨졌다. 500이 아니라 **행이 조용히 사라져** 사진 없이 쓴
+     * 리뷰를 공유할 방법이 없어지고, `PUT`이 전체 교체라 이미 공유돼 있던 것까지 풀렸다.
      */
     @Query(
         value = """
@@ -26,7 +30,7 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
             FROM review r
             JOIN save sv ON sv.id = r.save_id
             JOIN place p ON p.id = r.place_id
-            JOIN LATERAL (
+            LEFT JOIN LATERAL (
                 SELECT ma.s3_key
                 FROM save_photo sp
                 JOIN media_asset ma ON ma.id = sp.media_asset_id
@@ -102,7 +106,8 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
 
         fun getPlaceName(): String
 
-        fun getThumbnailS3Key(): String
+        /** 사진 0장 리뷰(C4-1)면 null — LEFT JOIN LATERAL이라 행은 남고 값만 빈다 */
+        fun getThumbnailS3Key(): String?
 
         fun getContent(): String
 

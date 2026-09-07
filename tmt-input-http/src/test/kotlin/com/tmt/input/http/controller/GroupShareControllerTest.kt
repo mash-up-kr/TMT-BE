@@ -57,6 +57,18 @@ class GroupShareControllerTest {
     }
 
     @Test
+    fun `사진 0장 리뷰는 thumbnailUrl이 null로 나간다 (TMT-352)`() {
+        // 서버가 대체 이미지를 채우지 않는다 — 화면이 기본 일러스트를 그린다 (R11)
+        listResult = ReviewSharesResult(items = listOf(item(thumbnailUrl = null)), sharedCount = 0, hasNext = false)
+
+        mockMvc
+            .perform(get("/v1/groups/group_1/review-shares").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].reviewId").value("rv_9"))
+            .andExpect(jsonPath("$.items[0].thumbnailUrl").doesNotExist())
+    }
+
+    @Test
     fun `비로그인이면 401이다`() {
         mockMvc
             .perform(get("/v1/groups/group_1/review-shares"))
@@ -124,11 +136,11 @@ class GroupShareControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
-    private fun item() =
+    private fun item(thumbnailUrl: String? = "https://m/t.jpg") =
         ReviewShareItemView(
             reviewId = 9L,
             placeName = "가게",
-            thumbnailUrl = "https://m/t.jpg",
+            thumbnailUrl = thumbnailUrl,
             contentPreview = "본문",
             isShared = true,
             createdAt = Instant.parse("2026-08-20T00:00:00Z"),
