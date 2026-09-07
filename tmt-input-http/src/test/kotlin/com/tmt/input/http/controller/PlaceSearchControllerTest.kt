@@ -8,6 +8,8 @@ import com.tmt.application.port.input.SearchPlacesUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserIdArgumentResolver
+import com.tmt.input.http.controller.paging.CursorCodec
+import com.tmt.input.http.controller.paging.CursorCondition
 import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -174,6 +176,24 @@ class PlaceSearchControllerTest {
                     .param("longitude", "127.0")
                     .param("cursor", nextCursor),
             ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
+    }
+
+    @Test
+    fun `관련도 산식이 바뀌기 전에 발급된 커서는 INVALID_CURSOR다 (TMT-300)`() {
+        // 커서에 실리는 sortValue가 산식의 결과다. 티어 정렬로 척도가 0~1000에서 0~11000으로
+        // 바뀌었는데 커서 조건이 그대로였다면, 옛 커서가 해시 검증을 통과한 채 새 척도를 잘라
+        // 에러 없이 엉뚱한 페이지가 나간다 — 판을 올려 400으로 끊는 것이 이 테스트의 대상이다
+        val oldVersionCursor =
+            CursorCodec.encode(
+                PlaceSearchController.PlaceSearchCursorSpec,
+                PlaceSearchKey(sortValue = 700, placeId = 3),
+                CursorCondition.of("PLACE_SEARCH", "델리스", null, null, null, false),
+            )
+
+        mockMvc
+            .perform(get("/v1/places/search").param("query", "델리스").param("cursor", oldVersionCursor))
+            .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 

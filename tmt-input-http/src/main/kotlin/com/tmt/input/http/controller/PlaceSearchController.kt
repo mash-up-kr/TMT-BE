@@ -46,10 +46,13 @@ class PlaceSearchController(
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): CursorPage<PlaceCardResponse> {
-        // 검색 조건이 하나라도 바뀌면 정렬 축까지 바뀔 수 있으므로 이전 커서는 무효다 (규약 §5-3)
+        // 검색 조건이 하나라도 바뀌면 정렬 축까지 바뀔 수 있으므로 이전 커서는 무효다 (규약 §5-3).
+        // 조건뿐 아니라 **관련도 산식이 바뀔 때도** 이전 커서는 무효다 — 커서에 실리는 sortValue가
+        // 그 산식의 결과라, 옛 척도의 값으로 새 척도를 자르면 조용히 엉뚱한 페이지가 나간다.
+        // 그래서 산식을 고치면 아래 판을 함께 올린다 (V2: 티어 정렬, TMT-300)
         val condition =
             CursorCondition.of(
-                "PLACE_SEARCH",
+                RELEVANCE_RANKING_VERSION,
                 query?.takeIf { it.isNotBlank() },
                 curationTagId,
                 latitude,
@@ -100,8 +103,11 @@ class PlaceSearchController(
     }
 
     /**
-     * (sortValue, placeId) — 앞자리는 거리 미터 또는 유사도×1000 정수이고, 마지막 키인
-     * placeId가 유일해 같은 점수가 경계에 걸려도 중복·누락이 없다 (TMT-178·TMT-195).
+     * (sortValue, placeId) — 앞자리는 거리 미터 또는 **관련도 정수**(등급+앞매칭+유사도, TMT-300)이고,
+     * 마지막 키인 placeId가 유일해 같은 점수가 경계에 걸려도 중복·누락이 없다 (TMT-178·TMT-195).
+     *
+     * 앞자리의 **의미가 바뀌면 [RELEVANCE_RANKING_VERSION]을 함께 올린다** — 값만 바뀌고 커서 조건이
+     * 그대로면 옛 커서가 새 척도에 섞인다.
      */
     internal object PlaceSearchCursorSpec : CursorSpec<PlaceSearchKey> {
         override fun toKeys(key: PlaceSearchKey) = listOf(key.sortValue.toString(), key.placeId.toString())
@@ -110,5 +116,15 @@ class PlaceSearchController(
             require(keys.size == 2) { "정렬 키 2개가 필요하다" }
             return PlaceSearchKey(keys[0].toInt(), keys[1].toLong())
         }
+    }
+
+    companion object {
+        /**
+         * 관련도 산식의 판. 커서에 실리는 `sortValue`의 **척도가 바뀌면 반드시 올린다** —
+         * 올리지 않으면 배포 전에 발급된 커서가 해시 검증을 통과한 채 새 척도에 섞여
+         * 에러 없이 잘못된 페이지를 준다. 올리면 `INVALID_CURSOR` 400이라 클라이언트가
+         * 첫 페이지부터 다시 연다 (F §2-1).
+         */
+        private const val RELEVANCE_RANKING_VERSION = "PLACE_SEARCH_V2"
     }
 }

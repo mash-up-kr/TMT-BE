@@ -71,8 +71,19 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
     ): List<PlaceSearchRowView>
 
     /**
-     * (similarity×1000, id) 내림차순 키셋 — 좌표가 없을 때. 검색어가 없으면(칩만 온 경우)
+     * (relevance, id) 내림차순 키셋 — 좌표가 없을 때. 검색어가 없으면(칩만 온 경우)
      * 점수가 전부 0이라 사실상 `id DESC` 한 축이고, 그래도 tie-breaker가 유일해 경계가 안전하다.
+     *
+     * **정렬 기준 셋을 정수 한 칸에 자릿수로 나눠 담는다** (TMT-300). 커서가 `(sortValue, placeId)`
+     * 두 축이라 `ORDER BY`에 컬럼을 늘리면 페이징 경계가 어긋나기 때문이다.
+     *
+     * ```
+     * 등급(이름 8000 · 주소 4000 · 카테고리 0) + 이름 앞매칭 2000 + 유사도 0~1000
+     * ```
+     *
+     * **자릿수를 바꿀 때 지켜야 하는 것** — 아랫자리 합이 윗자리 간격을 넘으면 안 된다.
+     * 앞매칭(2000)이 유사도 만점(1000)보다 커야 앞매칭이 이기고, 등급 간격(4000)이
+     * 등급 안 최대치(2000+1000)보다 커야 주소 1등이 이름 꼴찌를 못 넘는다.
      */
     @Query(
         value = """
@@ -85,7 +96,19 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                        p.rating_sum   AS ratingSum,
                        p.review_count AS reviewCount,
                        CAST(NULL AS int) AS distanceMeters,
-                       CAST(round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000) AS int) AS sortValue,
+                       CAST(
+                           CASE
+                               WHEN CAST(:queryPattern AS text) IS NULL THEN 0
+                               WHEN p.name ILIKE :queryPattern ESCAPE '\' THEN
+                                   8000
+                                   + CASE WHEN p.name ILIKE :queryPrefixPattern ESCAPE '\' THEN 2000 ELSE 0 END
+                                   + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
+                               WHEN p.road_address ILIKE :queryPattern ESCAPE '\' THEN
+                                   4000 + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
+                               ELSE
+                                   round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
+                           END AS int
+                       ) AS sortValue,
                        EXISTS(
                            SELECT 1 FROM place_favorite f
                            WHERE f.user_id = CAST(:viewerId AS bigint) AND f.place_id = p.id
@@ -114,6 +137,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
     fun searchByRelevance(
         @Param("query") query: String?,
         @Param("queryPattern") queryPattern: String?,
+        @Param("queryPrefixPattern") queryPrefixPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,

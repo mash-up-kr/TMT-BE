@@ -127,6 +127,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository.searchByRelevance(
                 query = "김밥천국",
                 queryPattern = LikePatterns.contains("김밥천국"),
+                queryPrefixPattern = LikePatterns.startsWith("김밥천국"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -137,11 +138,77 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             )
 
         assertEquals(listOf(exact, partial), rows.map { it.getPlaceId() })
-        // similarity × 1000 반올림 — 커서에 부동소수가 실리지 않는 근거다
-        assertEquals(1000, rows.first().getSortValue())
-        assertTrue(rows.last().getSortValue() < 1000)
+        // 이름 등급(8000) + 앞매칭(2000) + 유사도 만점(1000) — 커서에 부동소수가 실리지 않는다
+        assertEquals(11000, rows.first().getSortValue())
+        // 같은 등급·같은 앞매칭이라 유사도로만 갈린다
+        assertTrue(rows.last().getSortValue() in 10000..10999)
         // 좌표 없는 경로라 거리는 계산하지 않는다
         assertNull(rows.first().getDistanceMeters())
+    }
+
+    @Test
+    fun `이름에 걸린 매장은 유사도가 낮아도 주소·카테고리보다 앞이다 (TMT-300)`() {
+        val region = isolatedRegion()
+        // `피자`는 이름 뒤에 붙어 유사도가 0.125 수준이다 — 등급이 없으면 주소 매칭에 밀린다
+        val nameSuffix = fixtures.newPlace(name = "델리스피자", regionName = region, categoryId = null)
+        val addressHit =
+            fixtures.newPlace(
+                name = "무관한가게",
+                roadAddress = "서울특별시 중구 피자거리 3",
+                regionName = region,
+                categoryId = null,
+            )
+        val categoryHit = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "cat_fastfood")
+
+        val rows =
+            repository.searchByRelevance(
+                query = "피자",
+                queryPattern = LikePatterns.contains("피자"),
+                queryPrefixPattern = LikePatterns.startsWith("피자"),
+                queryCategoryCsv = "cat_fastfood",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 50,
+            )
+
+        assertEquals(listOf(nameSuffix, addressHit, categoryHit), rows.map { it.getPlaceId() })
+        // 등급 간격(4000)이 등급 안 최대치(2000+1000)보다 커서 경계가 겹치지 않는다
+        val byId = rows.associate { it.getPlaceId() to it.getSortValue() }
+        assertTrue(byId.getValue(nameSuffix) in 8000..8999, "이름 등급·앞매칭 없음")
+        assertTrue(byId.getValue(addressHit) in 4000..4999, "주소 등급")
+        assertTrue(byId.getValue(categoryHit) < 4000, "카테고리 등급")
+    }
+
+    @Test
+    fun `같은 이름 등급 안에서는 앞매칭이 유사도를 이긴다 (TMT-300)`() {
+        val region = isolatedRegion()
+        // 유사도만 보면 짧은 `원조본죽`이 이긴다 — 앞매칭 가산점이 그것을 뒤집는다
+        val prefixLongName = fixtures.newPlace(name = "본죽비빔밥카페", regionName = region)
+        val suffixShortName = fixtures.newPlace(name = "원조본죽", regionName = region)
+
+        val rows =
+            repository.searchByRelevance(
+                query = "본죽",
+                queryPattern = LikePatterns.contains("본죽"),
+                queryPrefixPattern = LikePatterns.startsWith("본죽"),
+                queryCategoryCsv = "",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 50,
+            )
+
+        assertEquals(listOf(prefixLongName, suffixShortName), rows.map { it.getPlaceId() })
+        val byId = rows.associate { it.getPlaceId() to it.getSortValue() }
+        assertTrue(byId.getValue(prefixLongName) >= 10000, "앞매칭 가산점 2000이 붙는다")
+        assertTrue(byId.getValue(suffixShortName) < 10000, "앞매칭이 아니면 가산점이 없다")
+        // 가산점(2000)이 유사도 만점(1000)보다 크다는 것이 이 역전의 근거다
+        assertTrue(byId.getValue(prefixLongName) > byId.getValue(suffixShortName))
     }
 
     @Test
@@ -156,6 +223,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
         ) = repository.searchByRelevance(
             query = null,
             queryPattern = null,
+            queryPrefixPattern = null,
             queryCategoryCsv = "",
             categoryId = null,
             regionPrefix = region,
@@ -185,6 +253,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 .searchByRelevance(
                     query = token,
                     queryPattern = LikePatterns.contains(token),
+                    queryPrefixPattern = LikePatterns.startsWith(token),
                     queryCategoryCsv = "",
                     categoryId = "cat_korean",
                     regionPrefix = region,
@@ -210,6 +279,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 .searchByRelevance(
                     query = "한식",
                     queryPattern = LikePatterns.contains("한식"),
+                    queryPrefixPattern = LikePatterns.startsWith("한식"),
                     queryCategoryCsv = "cat_korean",
                     categoryId = null,
                     regionPrefix = region,
@@ -237,6 +307,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 .searchByRelevance(
                     query = null,
                     queryPattern = null,
+                    queryPrefixPattern = null,
                     queryCategoryCsv = "",
                     categoryId = null,
                     regionPrefix = region,
@@ -297,6 +368,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository.searchByRelevance(
                 query = "",
                 queryPattern = null,
+                queryPrefixPattern = null,
                 queryCategoryCsv = "cat_korean",
                 categoryId = null,
                 regionPrefix = region,
@@ -351,6 +423,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             repository.searchByRelevance(
                 query = "100%",
                 queryPattern = LikePatterns.contains("100%"),
+                queryPrefixPattern = LikePatterns.startsWith("100%"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,

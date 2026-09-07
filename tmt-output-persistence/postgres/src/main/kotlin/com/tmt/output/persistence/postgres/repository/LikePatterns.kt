@@ -21,4 +21,7 @@ object LikePatterns {
 
     /** 부분 일치 패턴. null·빈 문자열은 검색 없음이라 그대로 null이다. */
     fun contains(raw: String?): String? = raw?.takeIf { it.isNotEmpty() }?.let { "%${escape(it)}%" }
+
+    /** 앞 일치 패턴. 술어가 아니라 정렬 가산점에 쓴다 (TMT-300). */
+    fun startsWith(raw: String?): String? = raw?.takeIf { it.isNotEmpty() }?.let { "${escape(it)}%" }
 }
