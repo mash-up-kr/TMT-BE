@@ -132,12 +132,13 @@ class GroupReviewShareAdapterTest : PersistenceTest() {
         groupId: Long,
         userId: Long,
     ): List<Long> =
-        jdbcTemplate.queryForList(
-            "SELECT review_id FROM group_review_share WHERE group_id = ? AND user_id = ? ORDER BY review_id",
-            Long::class.java,
-            groupId,
-            userId,
-        )
+        jdbcTemplate
+            .queryForList(
+                "SELECT review_id FROM group_review_share WHERE group_id = ? AND user_id = ? ORDER BY review_id",
+                Long::class.java,
+                groupId,
+                userId,
+            ).filterNotNull()
 
     private fun sharedCount(
         groupId: Long,
