@@ -17,6 +17,17 @@ interface IdempotencyPort {
      */
     fun insert(record: IdempotencyRecord)
 
+    /**
+     * 선점해 둔 레코드의 응답 본문을 채운다 (TMT-351) — 선점과 같은 트랜잭션에서만 부른다.
+     * 대상 행이 없으면 선점 없이 불린 것이라 호출부 결함이다.
+     */
+    fun updateResponseBody(
+        userId: Long,
+        endpoint: String,
+        idemKey: String,
+        responseBody: String,
+    )
+
     /** TTL 정리. 지운 건수를 돌려준다. */
     fun deleteCreatedBefore(threshold: Instant): Int
 }

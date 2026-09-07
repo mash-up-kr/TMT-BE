@@ -262,11 +262,15 @@ class FakeGroupJoinTicketPort : GroupJoinTicketPort {
         counts[userId] = counts.getOrDefault(userId, 0) + 1
     }
 
+    /** SKIP LOCKED가 남의 장을 건너뛴 상황 — 잔고가 있어도 회수가 실패한다 (TMT-351) */
+    var revokeFails = false
+
     /** 회수는 잔고가 있을 때만 성공한다 — 0장이면 삭제가 거절되는 자리다 (R7). */
     override fun revokeOneForReview(
         userId: Long,
         reviewId: Long,
     ): Boolean {
+        if (revokeFails) return false
         val available = counts.getOrDefault(userId, 0)
         if (available <= 0) return false
         counts[userId] = available - 1

@@ -43,6 +43,17 @@ class IdempotencyAdapter(
     }
 
     @Transactional
+    override fun updateResponseBody(
+        userId: Long,
+        endpoint: String,
+        idemKey: String,
+        responseBody: String,
+    ) {
+        val updated = idempotencyKeyRepository.updateResponseBody(userId, endpoint, idemKey, responseBody)
+        check(updated == 1) { "선점된 멱등 레코드가 없다 — insert 없이 update가 불렸다: $endpoint $idemKey" }
+    }
+
+    @Transactional
     override fun deleteCreatedBefore(threshold: Instant): Int = idempotencyKeyRepository.deleteCreatedBefore(threshold)
 
     private fun IdempotencyKeyEntity.toRecord(): IdempotencyRecord =

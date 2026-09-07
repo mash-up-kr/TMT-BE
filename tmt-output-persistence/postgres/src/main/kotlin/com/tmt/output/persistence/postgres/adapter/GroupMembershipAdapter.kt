@@ -33,4 +33,10 @@ class GroupMembershipAdapter(
         groupId: Long,
         userId: Long,
     ): Boolean = membershipRepository.leave(groupId, userId) > 0
+
+    @Transactional
+    override fun lockActiveMembership(
+        groupId: Long,
+        userId: Long,
+    ): Boolean = membershipRepository.lockActiveMembership(groupId, userId) != null
 }

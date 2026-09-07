@@ -44,9 +44,12 @@ class ReviewDeletionService(
         if (review == null || review.userId != userId) throw TmtException(ErrorCode.REVIEW_NOT_FOUND)
 
         if (!groupJoinTicketPort.revokeOneForReview(userId, reviewId)) {
+            // countAvailable로 세면 안 된다 — 회수도 SKIP LOCKED라(TMT-351) 실패의 절반은 "다른
+            // 트랜잭션이 잡은 장을 건너뛴 것"인데, READ COMMITTED라 그 장이 아직 AVAILABLE로 보인다.
+            // "보유 1장인데 삭제 불가"라는 자기모순 응답이 나간다 — 소비 실패(TX-3)와 같은 짝이다
             throw TicketShortageException(
                 errorCode = ErrorCode.REVIEW_DELETE_TICKET_REQUIRED,
-                availableCount = groupJoinTicketPort.countAvailable(userId),
+                availableCount = groupJoinTicketPort.countConsumable(userId),
             )
         }
 

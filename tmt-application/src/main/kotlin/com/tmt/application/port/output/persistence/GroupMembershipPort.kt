@@ -22,6 +22,17 @@ interface GroupMembershipPort {
         groupId: Long,
         userId: Long,
     ): Boolean
+
+    /**
+     * ACTIVE 멤버십을 **행을 잠근 채** 확인한다 (TMT-351). 공유 교체가 탈퇴와 겹칠 때의 상호배제다 —
+     * 탈퇴의 ACTIVE→LEFT 전이가 같은 행을 갱신하므로, 잠금을 쥔 쪽이 커밋할 때까지 상대가 기다린다.
+     * 잠그지 않은 [com.tmt.application.port.output.persistence.GroupReviewQueryPort.isMember]로 가르면
+     * 통과 직후 탈퇴가 커밋해 LEFT인데 공유가 남는다 (G10).
+     */
+    fun lockActiveMembership(
+        groupId: Long,
+        userId: Long,
+    ): Boolean
 }
 
 data class GroupJoinTarget(

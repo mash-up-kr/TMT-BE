@@ -34,6 +34,23 @@ interface IdempotencyKeyRepository : JpaRepository<IdempotencyKeyEntity, Idempot
         @Param("responseBody") responseBody: String,
     ): Int
 
+    /** 선점 레코드(TMT-351)의 본문 채우기 — 선점과 같은 트랜잭션에서만 부른다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE idempotency_key
+            SET response_body = CAST(:responseBody AS jsonb)
+            WHERE user_id = :userId AND endpoint = :endpoint AND idem_key = :idemKey
+        """,
+        nativeQuery = true,
+    )
+    fun updateResponseBody(
+        @Param("userId") userId: Long,
+        @Param("endpoint") endpoint: String,
+        @Param("idemKey") idemKey: String,
+        @Param("responseBody") responseBody: String,
+    ): Int
+
     @Modifying
     @Query("DELETE FROM IdempotencyKeyEntity e WHERE e.createdAt < :threshold")
     fun deleteCreatedBefore(
