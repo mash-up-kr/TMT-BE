@@ -32,8 +32,13 @@ import org.springframework.transaction.support.TransactionTemplate
         "spring.jpa.hibernate.ddl-auto=validate",
         // @Import 조합이 다르면 Spring이 컨텍스트를 새로 띄우고 캐시에 쌓아둔다 — 테스트가 끝나도
         // 닫지 않으므로 풀도 그만큼 살아 있다. 어댑터 테스트가 늘면서 컨테이너의 max_connections를
-        // 넘겨 뒤에 뜨는 컨텍스트가 통째로 죽었다 (TMT-348). 슬라이스 하나가 커넥션을 많이 쥘 이유가 없다
-        "spring.datasource.hikari.maximum-pool-size=2",
+        // 넘겨 뒤에 뜨는 컨텍스트가 통째로 죽었다 (TMT-348). 슬라이스 하나가 커넥션을 많이 쥘 이유가 없다.
+        //
+        // **3이 하한이다.** 동시성 테스트가 두 트랜잭션을 동시에 멈춰 세우고, 겹침 여부를
+        // pg_stat_activity로 확인하는 관측 쿼리가 세 번째를 쓴다. [InterleavedTransactions]는
+        // 관측을 선행 트랜잭션 안에서 해 2개로 되지만, 멱등 선점처럼 **양쪽이 다 막혀 있는** 경합은
+        // 밖에서 봐야 한다 — 2로 두면 관측 쿼리가 풀을 못 얻어 경합이 재현되지 않는다
+        "spring.datasource.hikari.maximum-pool-size=3",
     ],
 )
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
