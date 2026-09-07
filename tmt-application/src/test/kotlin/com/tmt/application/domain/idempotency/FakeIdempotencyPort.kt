@@ -29,6 +29,17 @@ class FakeIdempotencyPort : IdempotencyPort {
         insertedRecords += record
     }
 
+    override fun updateResponseBody(
+        userId: Long,
+        endpoint: String,
+        idemKey: String,
+        responseBody: String,
+    ) {
+        val key = Triple(userId, endpoint, idemKey)
+        val existing = checkNotNull(records[key]) { "선점된 레코드가 없다 — insert 없이 update가 불렸다" }
+        records[key] = existing.copy(responseBody = responseBody)
+    }
+
     override fun deleteCreatedBefore(threshold: Instant): Int {
         deletedBefore = threshold
         return deleteResult

@@ -241,21 +241,38 @@ class GroupMembershipControllerTest {
         assertEquals(listOf(7L to 1L), leaves)
     }
 
-    /** 실제 어댑터와 같이 INSERT가 선점을 판정한다. */
+    /**
+     * 실제 어댑터와 같이 INSERT가 선점을 판정한다. 트랜잭션이 없는 테스트라 롤백을 흉내 낸다 —
+     * 본문이 채워지기 전의 선점(=실패로 롤백됐을 레코드)은 조회에 안 보이고 다음 선점이 덮어쓴다.
+     */
     private class InMemoryIdempotencyPort : IdempotencyPort {
         private val records = mutableMapOf<Triple<Long, String, String>, IdempotencyRecord>()
+        private val committed = mutableSetOf<Triple<Long, String, String>>()
 
         override fun find(
             userId: Long,
             endpoint: String,
             idemKey: String,
-        ): IdempotencyRecord? = records[Triple(userId, endpoint, idemKey)]
+        ): IdempotencyRecord? = Triple(userId, endpoint, idemKey).let { if (it in committed) records[it] else null }
 
         override fun insert(record: IdempotencyRecord) {
             val key = Triple(record.userId, record.endpoint, record.idemKey)
-            if (records.putIfAbsent(key, record) != null) {
+            if (key in committed) {
                 throw IdempotencyRaceLostException(record.endpoint, record.idemKey)
             }
+            records[key] = record
+        }
+
+        override fun updateResponseBody(
+            userId: Long,
+            endpoint: String,
+            idemKey: String,
+            responseBody: String,
+        ) {
+            val key = Triple(userId, endpoint, idemKey)
+            val existing = checkNotNull(records[key]) { "선점된 레코드가 없다" }
+            records[key] = existing.copy(responseBody = responseBody)
+            committed += key
         }
 
         override fun deleteCreatedBefore(threshold: Instant): Int = 0

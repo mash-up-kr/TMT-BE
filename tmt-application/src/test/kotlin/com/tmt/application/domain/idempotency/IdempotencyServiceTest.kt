@@ -127,8 +127,8 @@ class IdempotencyServiceTest {
 
         assertEquals(SaveResult("save_winner", 1), outcome.response)
         assertTrue(outcome.replayed)
-        // 비즈니스 로직은 한 번 돌았지만 그 트랜잭션이 롤백돼 결과는 버려진다
-        assertEquals(1, runCount)
+        // 선점이 로직보다 먼저라(TMT-351) 밀린 쪽은 비즈니스 로직을 아예 돌지 않는다
+        assertEquals(0, runCount)
         assertTrue(port.insertedRecords.isEmpty())
     }
 
