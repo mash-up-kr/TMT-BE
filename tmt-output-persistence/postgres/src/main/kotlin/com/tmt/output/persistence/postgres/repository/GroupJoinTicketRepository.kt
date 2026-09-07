@@ -22,7 +22,11 @@ interface GroupJoinTicketRepository : JpaRepository<GroupJoinTicketEntity, Long>
      *
      * 고르기와 갱신이 한 문장이라 동시 요청이 같은 티켓을 두 번 회수하지 못한다 —
      * `status = 'AVAILABLE'` 술어가 바깥 UPDATE에도 한 번 더 걸려 있는 이유다.
-     * 티켓은 서로 구분되지 않지만 이 리뷰가 발급한 장이 남아 있으면 그것부터 고른다.
+     *
+     * 잠긴 장은 건너뛴다(`FOR UPDATE OF t SKIP LOCKED`, TMT-351) — [consumeOne]과 같은 술어다.
+     * 동시 가입이 잡은 장을 기다렸다 0행을 받으면 남은 장이 있어도 삭제가 거부된다(오탐).
+     * "이 리뷰가 발급한 장 우선"은 잠기지 않은 장 안에서만 지키는 best-effort다 — 잠긴 선호 장은
+     * 상대가 커밋하면 어차피 소비돼 사라질 장이고, 티켓은 서로 구분되지 않는다 (T3).
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
@@ -39,6 +43,7 @@ interface GroupJoinTicketRepository : JpaRepository<GroupJoinTicketEntity, Long>
                       CASE WHEN g.source_type = 'REVIEW' AND g.source_id = :reviewId THEN 0 ELSE 1 END,
                       t.id
                   LIMIT 1
+                  FOR UPDATE OF t SKIP LOCKED
               )
         """,
         nativeQuery = true,
