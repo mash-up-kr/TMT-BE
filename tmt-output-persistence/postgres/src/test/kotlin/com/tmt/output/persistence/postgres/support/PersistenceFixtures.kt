@@ -349,6 +349,18 @@ class PersistenceFixtures(
             revokedAt?.let { java.sql.Timestamp.from(it) },
         )
 
+    /** 지역 태그 (G7) — `(group_id, region_tag_id)`가 PK라 같은 태그를 두 번 넣을 수 없다. */
+    fun addRegionTag(
+        groupId: Long,
+        regionTagId: String,
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO group_region_tag (group_id, region_tag_id) VALUES (?, ?)",
+            groupId,
+            regionTagId,
+        )
+    }
+
     private fun insertReturningId(
         sql: String,
         vararg args: Any?,

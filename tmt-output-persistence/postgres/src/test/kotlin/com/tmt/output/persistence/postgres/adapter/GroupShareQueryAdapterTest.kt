@@ -136,6 +136,56 @@ class GroupShareQueryAdapterTest : PersistenceTest() {
         assertEquals(listOf(r1.reviewId), next.rows.map { it.reviewId })
     }
 
+    @Test
+    fun `목록에 남의 리뷰가 섞이면 그 id를 돌려준다`() {
+        // H §3-2 — 하나라도 있으면 REVIEW_NOT_FOUND다
+        val me = fixtures.newUser()
+        val other = fixtures.newUser()
+        val mine = fixtures.newPublishedReview(fixtures.newPlace(), me)
+        val theirs = fixtures.newPublishedReview(fixtures.newPlace(), other)
+
+        assertEquals(listOf(theirs.reviewId), adapter.findNotMine(me, listOf(mine.reviewId, theirs.reviewId)))
+        assertEquals(emptyList(), adapter.findNotMine(me, listOf(mine.reviewId)))
+    }
+
+    @Test
+    fun `없는 리뷰도 내 것이 아닌 것으로 본다`() {
+        val me = fixtures.newUser()
+
+        assertEquals(listOf(-1L), adapter.findNotMine(me, listOf(-1L)))
+    }
+
+    @Test
+    fun `삭제된 내 리뷰도 내 것이 아닌 것으로 본다`() {
+        val me = fixtures.newUser()
+        val deleted = fixtures.newPublishedReview(fixtures.newPlace(), me, deletedAt = Instant.now())
+
+        assertEquals(listOf(deleted.reviewId), adapter.findNotMine(me, listOf(deleted.reviewId)))
+    }
+
+    @Test
+    fun `빈 목록은 쿼리에 닿지 않는다`() {
+        // IN () 는 SQL 문법 오류라 어댑터가 먼저 끊는다
+        assertEquals(emptyList(), adapter.findNotMine(fixtures.newUser(), emptyList()))
+    }
+
+    @Test
+    fun `현재 내 공유 집합을 돌려준다`() {
+        val me = fixtures.newUser()
+        val other = fixtures.newUser()
+        val group = fixtures.newGroup(me)
+        val a = fixtures.newPublishedReview(fixtures.newPlace(), me)
+        val b = fixtures.newPublishedReview(fixtures.newPlace(), me)
+        val theirs = fixtures.newPublishedReview(fixtures.newPlace(), other)
+        fixtures.shareReview(group, a.reviewId, me)
+        fixtures.shareReview(group, b.reviewId, me)
+        fixtures.shareReview(group, theirs.reviewId, other)
+
+        val ids = adapter.findSharedReviewIds(group, me)
+
+        assertEquals(listOf(a.reviewId, b.reviewId).sorted(), ids.sorted())
+    }
+
     private fun t(seconds: Long): Instant = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(seconds)
 
     private fun s3KeyOf(mediaAssetId: Long): String =
