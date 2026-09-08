@@ -10,6 +10,8 @@ data class UserAccount(
     val profileImageAssetId: Long?,
     /** null이면 가입 화면을 아직 끝내지 않았다 (TMT-370) */
     val profileCompletedAt: Instant?,
+    /** 이 시각 전에 발급된 refresh는 무효 — 로그아웃이 찍는다 (TMT-353). null이면 로그아웃한 적이 없다 */
+    val tokensInvalidBefore: Instant? = null,
 )
 
 interface UserAccountPort {
@@ -30,4 +32,13 @@ interface UserAccountPort {
         profileImageAssetId: Long?,
         completedAt: Instant,
     ): UserAccount?
+
+    /**
+     * [at] 전에 발급된 토큰을 무효로 한다 — 로그아웃 (TMT-353, U8). 토큰을 개별로 저장하지 않으므로
+     * 이 사용자의 전 기기가 함께 로그아웃된다. 사용자가 없으면 false — 폐기할 것이 없다는 뜻이다.
+     */
+    fun invalidateTokensIssuedBefore(
+        userId: Long,
+        at: Instant,
+    ): Boolean
 }

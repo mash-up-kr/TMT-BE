@@ -144,6 +144,11 @@ class UserProfileServiceTest {
             nickname: String,
         ): UserAccount? = null
 
+        override fun invalidateTokensIssuedBefore(
+            userId: Long,
+            at: Instant,
+        ): Boolean = accounts.any { it.id == userId }
+
         override fun updateProfile(
             userId: Long,
             nickname: String,

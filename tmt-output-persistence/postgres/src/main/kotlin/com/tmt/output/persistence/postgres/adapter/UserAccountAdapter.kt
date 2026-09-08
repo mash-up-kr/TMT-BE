@@ -44,6 +44,16 @@ class UserAccountAdapter(
         return user.toAccount()
     }
 
+    @Transactional
+    override fun invalidateTokensIssuedBefore(
+        userId: Long,
+        at: Instant,
+    ): Boolean {
+        val user = userRepository.findById(userId).orElse(null) ?: return false
+        user.tokensInvalidBefore = at
+        return true
+    }
+
     private fun UserEntity.toAccount() =
         UserAccount(
             id = id,
@@ -52,5 +62,6 @@ class UserAccountAdapter(
             profileImageUrl = profileImageUrl,
             profileImageAssetId = profileImageAssetId,
             profileCompletedAt = profileCompletedAt,
+            tokensInvalidBefore = tokensInvalidBefore,
         )
 }
