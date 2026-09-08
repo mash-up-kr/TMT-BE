@@ -1,6 +1,6 @@
 package com.tmt.input.http.controller
 
-import com.tmt.application.port.input.CheckTokenRevokedUseCase
+import com.tmt.application.port.input.CheckRefreshAllowedUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.input.KakaoLoginResult
 import com.tmt.application.port.input.LoginWithKakaoUseCase
@@ -134,7 +134,7 @@ class AuthControllerTest {
     @Test
     fun `로그아웃 이전에 발급된 refresh로는 재발급할 수 없다 (TMT-353)`() {
         val refreshToken = tokenCodec.issue(7L).refreshToken
-        sessions.revoked = true
+        sessions.allowed = false
 
         mockMvc
             .perform(refresh("""{"refreshToken":"$refreshToken"}"""))
@@ -184,21 +184,21 @@ class AuthControllerTest {
 
     private class StubTokenRevocation :
         LogoutUseCase,
-        CheckTokenRevokedUseCase {
+        CheckRefreshAllowedUseCase {
         val logouts = mutableListOf<Long>()
         val checks = mutableListOf<Pair<Long, Instant>>()
-        var revoked = false
+        var allowed = true
 
         override fun logout(userId: Long) {
             logouts += userId
         }
 
-        override fun isRevoked(
+        override fun isRefreshAllowed(
             userId: Long,
             issuedAt: Instant,
         ): Boolean {
             checks += userId to issuedAt
-            return revoked
+            return allowed
         }
     }
 

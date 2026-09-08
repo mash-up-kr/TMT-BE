@@ -130,6 +130,7 @@ class UserProfileServiceTest {
         profileImageUrl = null,
         profileImageAssetId = profileImageAssetId,
         profileCompletedAt = profileCompletedAt,
+        tokensInvalidBefore = null,
     )
 
     private class FakeUserAccountPort : UserAccountPort {

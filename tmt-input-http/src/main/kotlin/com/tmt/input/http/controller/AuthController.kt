@@ -1,6 +1,6 @@
 package com.tmt.input.http.controller
 
-import com.tmt.application.port.input.CheckTokenRevokedUseCase
+import com.tmt.application.port.input.CheckRefreshAllowedUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.input.LoginWithKakaoUseCase
 import com.tmt.application.port.input.LogoutUseCase
@@ -35,7 +35,7 @@ class AuthController(
     private val loginWithKakaoUseCase: LoginWithKakaoUseCase,
     private val tokenCodec: JwtTokenCodec,
     private val logoutUseCase: LogoutUseCase,
-    private val checkTokenRevokedUseCase: CheckTokenRevokedUseCase,
+    private val checkRefreshAllowedUseCase: CheckRefreshAllowedUseCase,
 ) {
     @Operation(
         summary = "카카오 로그인",
@@ -75,7 +75,9 @@ class AuthController(
         description =
             "refresh 토큰으로 access·refresh 토큰을 새로 발급한다.\n\n" +
                 "refresh까지 만료(AUTH_TOKEN_EXPIRED)거나 유효하지 않으면(AUTH_TOKEN_INVALID) 재로그인으로 분기한다. " +
-                "로그아웃(`POST /v1/auth/logout`) 이전에 발급된 refresh도 AUTH_TOKEN_INVALID다 — 서명이 맞아도 거절한다.",
+                "로그아웃(`POST /v1/auth/logout`) 이전에 발급된 refresh도 AUTH_TOKEN_INVALID다 — 서명이 맞아도 거절한다.\n\n" +
+                "재발급은 사용자 행을 한 번 읽는다. DB 장애면 401이 아니라 500이다 — 401로 내면 DB 장애가 곧 전 사용자 " +
+                "로그아웃이 된다. FE는 500을 재시도 대상으로 두고 세션은 유지한다.",
     )
     @ApiErrorCodes(ErrorCode.AUTH_TOKEN_INVALID, ErrorCode.AUTH_TOKEN_EXPIRED)
     @PostMapping("/token/refresh")
@@ -84,7 +86,7 @@ class AuthController(
     ): TokenRefreshResponse {
         val claims = tokenCodec.parse(request.refreshToken, TokenUse.REFRESH)
         // 서명 검증 뒤에 한 번 더 본다 — 로그아웃 이전 발급분과 없는 사용자는 서명이 맞아도 재발급하지 않는다 (TMT-353)
-        if (checkTokenRevokedUseCase.isRevoked(claims.userId, claims.issuedAt)) {
+        if (!checkRefreshAllowedUseCase.isRefreshAllowed(claims.userId, claims.issuedAt)) {
             throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
         }
         val tokens = tokenCodec.issue(claims.userId)

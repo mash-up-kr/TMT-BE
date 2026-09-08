@@ -158,6 +158,7 @@ class KakaoLoginServiceTest {
         profileImageUrl = null,
         profileImageAssetId = null,
         profileCompletedAt = profileCompletedAt,
+        tokensInvalidBefore = null,
     )
 
     private fun command() = KakaoLoginCommand(code = "auth-code", redirectUri = "http://localhost:3000/cb")
@@ -222,6 +223,7 @@ class KakaoLoginServiceTest {
             profileImageUrl = null,
             profileImageAssetId = null,
             profileCompletedAt = null,
+            tokensInvalidBefore = null,
         )
     }
 

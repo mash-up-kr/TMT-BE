@@ -1,6 +1,6 @@
 package com.tmt.application.domain.auth
 
-import com.tmt.application.port.input.CheckTokenRevokedUseCase
+import com.tmt.application.port.input.CheckRefreshAllowedUseCase
 import com.tmt.application.port.input.LogoutUseCase
 import com.tmt.application.port.output.persistence.UserAccountPort
 import org.springframework.stereotype.Service
@@ -21,21 +21,21 @@ import java.time.temporal.ChronoUnit
 class TokenRevocationService(
     private val userAccountPort: UserAccountPort,
 ) : LogoutUseCase,
-    CheckTokenRevokedUseCase {
+    CheckRefreshAllowedUseCase {
     override fun logout(userId: Long) {
         // 결과를 보지 않는다 — 사용자가 없거나 이미 로그아웃했어도 "폐기할 것이 없다"일 뿐, 실패가 아니다 (멱등)
         userAccountPort.invalidateTokensIssuedBefore(userId, Instant.now())
     }
 
-    override fun isRevoked(
+    override fun isRefreshAllowed(
         userId: Long,
         issuedAt: Instant,
     ): Boolean {
         // 사용자가 없으면 발급해 줄 대상도 없다 — 서명만 보던 재발급에 존재 확인이 여기서 붙는다
-        val account = userAccountPort.findById(userId) ?: return true
-        val cutoff = account.tokensInvalidBefore ?: return false
+        val account = userAccountPort.findById(userId) ?: return false
+        val cutoff = account.tokensInvalidBefore ?: return true
         // JWT iat는 초 단위라 초 아래를 버리고 비교한다. 로그아웃과 같은 초에 발급된 토큰은 살려둔다 —
         // 로그아웃 직후 재로그인이 자기 토큰을 스스로 거절하는 쪽이 더 나쁘다
-        return issuedAt.isBefore(cutoff.truncatedTo(ChronoUnit.SECONDS))
+        return !issuedAt.isBefore(cutoff.truncatedTo(ChronoUnit.SECONDS))
     }
 }

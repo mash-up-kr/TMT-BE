@@ -31,8 +31,8 @@ data class TokenClaims(
 
 /**
  * 세션·토큰 (TMT-272) — HS256 JWT, 저장소 없이 서명 검증만으로 동작한다(stateless).
- * refresh는 만료 전까지 서버가 무효화할 수 없다 — 로그아웃은 클라이언트 삭제로 처리하고,
- * 강제 무효화가 필요해지면 그때 저장소를 붙인다.
+ * 무효화도 토큰을 저장해서가 아니라 **발급 시각 컷오프**로 한다 — 로그아웃이 사용자 행에 시각을 찍고,
+ * 재발급이 [TokenClaims.issuedAt]을 그 값과 비교한다 (TMT-353). access는 짧은 만료로 흘려보낸다.
  */
 @Component
 class JwtTokenCodec(

@@ -30,9 +30,12 @@ interface LogoutUseCase {
     fun logout(userId: Long)
 }
 
-/** 재발급이 refresh를 받아줄지 — 로그아웃 이전에 발급된 토큰은 서명이 맞아도 거절한다 (TMT-353). */
-interface CheckTokenRevokedUseCase {
-    fun isRevoked(
+/**
+ * 이 refresh로 재발급해 줘도 되나 (TMT-353). 서명은 이미 검증된 뒤라, 여기서 보는 건 서명 밖의 사유다 —
+ * 로그아웃 이전 발급분, 없는 사용자. 탈퇴·차단이 생기면 같은 자리에 조건이 붙는다.
+ */
+interface CheckRefreshAllowedUseCase {
+    fun isRefreshAllowed(
         userId: Long,
         issuedAt: Instant,
     ): Boolean

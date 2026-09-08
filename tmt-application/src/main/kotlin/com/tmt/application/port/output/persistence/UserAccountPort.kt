@@ -10,8 +10,11 @@ data class UserAccount(
     val profileImageAssetId: Long?,
     /** null이면 가입 화면을 아직 끝내지 않았다 (TMT-370) */
     val profileCompletedAt: Instant?,
-    /** 이 시각 전에 발급된 refresh는 무효 — 로그아웃이 찍는다 (TMT-353). null이면 로그아웃한 적이 없다 */
-    val tokensInvalidBefore: Instant? = null,
+    /**
+     * 이 시각 전에 발급된 refresh는 무효 — 로그아웃이 찍는다 (TMT-353). null이면 로그아웃한 적이 없다.
+     * 기본값을 두지 않는다 — 어댑터가 매핑을 빠뜨리면 "아무도 폐기되지 않음"으로 조용히 실패하는 자리다
+     */
+    val tokensInvalidBefore: Instant?,
 )
 
 interface UserAccountPort {

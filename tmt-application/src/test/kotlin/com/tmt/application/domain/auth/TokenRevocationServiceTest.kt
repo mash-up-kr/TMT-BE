@@ -16,21 +16,21 @@ class TokenRevocationServiceTest {
     fun `로그아웃한 적이 없으면 어떤 발급 시각도 거절하지 않는다`() {
         userPort.put(account(7L, tokensInvalidBefore = null))
 
-        assertFalse(service.isRevoked(7L, Instant.parse("2026-09-08T10:00:00Z")))
+        assertTrue(service.isRefreshAllowed(7L, Instant.parse("2026-09-08T10:00:00Z")))
     }
 
     @Test
     fun `로그아웃 이전에 발급된 refresh는 거절한다`() {
         userPort.put(account(7L, tokensInvalidBefore = Instant.parse("2026-09-08T10:00:00.400Z")))
 
-        assertTrue(service.isRevoked(7L, Instant.parse("2026-09-08T09:59:59Z")))
+        assertFalse(service.isRefreshAllowed(7L, Instant.parse("2026-09-08T09:59:59Z")))
     }
 
     @Test
     fun `로그아웃 이후에 발급된 refresh는 받아준다`() {
         userPort.put(account(7L, tokensInvalidBefore = Instant.parse("2026-09-08T10:00:00.400Z")))
 
-        assertFalse(service.isRevoked(7L, Instant.parse("2026-09-08T10:00:01Z")))
+        assertTrue(service.isRefreshAllowed(7L, Instant.parse("2026-09-08T10:00:01Z")))
     }
 
     @Test
@@ -39,12 +39,12 @@ class TokenRevocationServiceTest {
         // 초 아래를 버리고 비교해야 새 토큰이 통과한다
         userPort.put(account(7L, tokensInvalidBefore = Instant.parse("2026-09-08T10:00:00.400Z")))
 
-        assertFalse(service.isRevoked(7L, Instant.parse("2026-09-08T10:00:00Z")))
+        assertTrue(service.isRefreshAllowed(7L, Instant.parse("2026-09-08T10:00:00Z")))
     }
 
     @Test
     fun `사용자가 없으면 거절한다 - 발급해 줄 대상이 없다`() {
-        assertTrue(service.isRevoked(999L, Instant.parse("2026-09-08T10:00:00Z")))
+        assertFalse(service.isRefreshAllowed(999L, Instant.parse("2026-09-08T10:00:00Z")))
     }
 
     @Test
