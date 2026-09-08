@@ -4,6 +4,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -24,6 +25,19 @@ class JwtTokenCodecTest {
         val tokens = codec.issue(42L)
 
         assertEquals(42L, codec.parseUserId(tokens.refreshToken, TokenUse.REFRESH))
+    }
+
+    @Test
+    fun `parse는 사용자 ID와 발급 시각을 함께 준다 - 발급 시각은 초 단위다 (TMT-353)`() {
+        val before = Instant.now()
+        val tokens = codec.issue(42L)
+
+        val claims = codec.parse(tokens.refreshToken, TokenUse.REFRESH)
+
+        assertEquals(42L, claims.userId)
+        // JWT iat는 초 단위(NumericDate)라 나노초가 잘린다 — 폐기 판정이 이 정밀도를 전제한다
+        assertEquals(0, claims.issuedAt.nano)
+        assertTrue(!claims.issuedAt.isBefore(before.minusSeconds(1)) && !claims.issuedAt.isAfter(Instant.now()))
     }
 
     @Test

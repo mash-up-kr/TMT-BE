@@ -1,10 +1,14 @@
 package com.tmt.input.http.controller
 
+import com.tmt.application.port.input.CheckTokenRevokedUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.input.LoginWithKakaoUseCase
+import com.tmt.application.port.input.LogoutUseCase
 import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.JwtTokenCodec
 import com.tmt.input.http.auth.TokenUse
+import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.PublicIds
 import io.swagger.v3.oas.annotations.Operation
@@ -12,14 +16,17 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
  * 카카오 로그인·토큰 (TMT-271·TMT-272) — 명세 v2 X. 로그인 성공 시 JWT를 발급하고,
  * 이후 요청은 `Authorization: Bearer {accessToken}`으로 인증한다. X-User-Id 스텁은 제거됐다.
+ * 로그아웃(TMT-353)은 그 사용자의 refresh를 폐기해 재발급을 막는다 — access는 짧은 만료로 흘려보낸다.
  */
 @Tag(name = "인증", description = "명세 v2 — X. 로그인·회원가입")
 @RestController
@@ -27,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val loginWithKakaoUseCase: LoginWithKakaoUseCase,
     private val tokenCodec: JwtTokenCodec,
+    private val logoutUseCase: LogoutUseCase,
+    private val checkTokenRevokedUseCase: CheckTokenRevokedUseCase,
 ) {
     @Operation(
         summary = "카카오 로그인",
@@ -65,21 +74,41 @@ class AuthController(
         summary = "토큰 재발급",
         description =
             "refresh 토큰으로 access·refresh 토큰을 새로 발급한다.\n\n" +
-                "refresh까지 만료(AUTH_TOKEN_EXPIRED)거나 유효하지 않으면(AUTH_TOKEN_INVALID) 재로그인으로 분기한다.",
+                "refresh까지 만료(AUTH_TOKEN_EXPIRED)거나 유효하지 않으면(AUTH_TOKEN_INVALID) 재로그인으로 분기한다. " +
+                "로그아웃(`POST /v1/auth/logout`) 이전에 발급된 refresh도 AUTH_TOKEN_INVALID다 — 서명이 맞아도 거절한다.",
     )
     @ApiErrorCodes(ErrorCode.AUTH_TOKEN_INVALID, ErrorCode.AUTH_TOKEN_EXPIRED)
     @PostMapping("/token/refresh")
     fun refreshToken(
         @Valid @RequestBody request: TokenRefreshRequest,
     ): TokenRefreshResponse {
-        // stateless라 서명 검증뿐이다 — 탈퇴·계정 차단이 생기면 여기서 사용자 존재·상태 확인을 추가해야 한다
-        val userId = tokenCodec.parseUserId(request.refreshToken, TokenUse.REFRESH)
-        val tokens = tokenCodec.issue(userId)
+        val claims = tokenCodec.parse(request.refreshToken, TokenUse.REFRESH)
+        // 서명 검증 뒤에 한 번 더 본다 — 로그아웃 이전 발급분과 없는 사용자는 서명이 맞아도 재발급하지 않는다 (TMT-353)
+        if (checkTokenRevokedUseCase.isRevoked(claims.userId, claims.issuedAt)) {
+            throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
+        }
+        val tokens = tokenCodec.issue(claims.userId)
         return TokenRefreshResponse(
             accessToken = tokens.accessToken,
             accessTokenExpiresIn = tokens.accessTokenExpiresIn,
             refreshToken = tokens.refreshToken,
         )
+    }
+
+    @Operation(
+        summary = "로그아웃",
+        description =
+            "이 사용자에게 지금까지 발급된 refresh 토큰을 전부 폐기한다 (U8). 이후 그 refresh로 재발급하면 " +
+                "AUTH_TOKEN_INVALID다. access 토큰은 만료(최대 1시간)까지 유효하다 — 클라이언트가 지운다.\n\n" +
+                "멱등이다 — 이미 로그아웃했어도 204. 토큰이 없으면 401, 만료됐으면 401 AUTH_TOKEN_EXPIRED라 " +
+                "다른 API와 같이 재발급 뒤 한 번 다시 부른다. 가입을 끝내지 않은 사용자도 부를 수 있다.",
+    )
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun logout(
+        @UserId userId: Long,
+    ) {
+        logoutUseCase.logout(userId)
     }
 
     data class KakaoLoginRequest(
