@@ -21,7 +21,8 @@ class WebConfig(
 
     /**
      * 가입 미완료 사용자를 막는다 (TMT-370). 제외 경로는 미완료 상태에서 반드시 부를 수 있어야 하는 것들이다 —
-     * 로그인·재발급, 가입 완결, 내 프로필 조회. 새 경로를 여기 넣기 전에 정말 가입 전에 필요한지 확인한다.
+     * 로그인·재발급, 가입 완결, 내 프로필 조회, **그리고 프로필 사진 업로드 발급**.
+     * 새 경로를 여기 넣기 전에 정말 가입 전에 필요한지 확인하고, [SignupExemptPathsTest]에 근거를 남긴다.
      */
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry
@@ -52,11 +53,15 @@ class WebConfig(
                 "https://ttomatto-*-ttalkkakfe.vercel.app",
             )
 
-        private val SIGNUP_EXEMPT_PATHS =
+        /** 가입 완결 전에 부를 수 있어야 하는 경로. 근거는 [SignupExemptPathsTest]가 경로별로 고정한다 */
+        internal val SIGNUP_EXEMPT_PATHS =
             arrayOf(
                 "/v1/auth/**",
                 "/v1/users/me",
                 "/v1/users/me/profile",
+                // 가입 화면의 프로필 사진은 발급받은 assetId로 저장한다 — 이 발급이 막히면
+                // 사진을 고를 수 없어 가입 완결이 사진 없이만 가능해진다 (TMT-370)
+                "/v1/media/upload-intents",
                 "/health/**",
                 "/api-docs/**",
                 "/v3/api-docs/**",
