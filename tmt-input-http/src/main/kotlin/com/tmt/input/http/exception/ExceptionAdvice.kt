@@ -137,7 +137,10 @@ class ExceptionAdvice {
 
             ErrorType.VALIDATION, ErrorType.RATE_LIMITED -> logger.warn { message() }
 
-            else -> logger.info { message() }
+            // else를 두지 않는다 - 새 ErrorType이 들어오면 컴파일이 막아 레벨을 정하게 한다
+            ErrorType.UNAUTHORIZED, ErrorType.FORBIDDEN, ErrorType.NOT_FOUND,
+            ErrorType.CONFLICT, ErrorType.GONE, ErrorType.UNPROCESSABLE,
+            -> logger.info { message() }
         }
     }
 
