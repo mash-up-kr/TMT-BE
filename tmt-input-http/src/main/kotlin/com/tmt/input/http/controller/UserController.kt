@@ -16,6 +16,7 @@ import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
 import com.tmt.input.http.controller.dto.response.CursorPage
@@ -94,7 +95,7 @@ class UserController(
                 UpdateUserProfileCommand(
                     userId = userId,
                     nickname = request.nickname,
-                    profileImageAssetId = request.profileImageAssetId?.toLongOrNull(),
+                    profileImageAssetId = request.profileImageAssetId?.let(::parseAssetId),
                 ),
             )
         return MyProfileResponse(
@@ -109,6 +110,16 @@ class UserController(
             profileCompleted = profile.profileCompleted,
         )
     }
+
+    /**
+     * 실구현 발급 assetId는 접두 없는 숫자 문자열이다 (TMT-202) — 형식이 다르면 거절한다
+     * (`GroupCommandController`·`SaveController`와 같은 처리).
+     *
+     * **여기서 null로 떨어뜨리면 안 된다.** 이 요청은 프로필 전체 교체라, 형식이 틀린 assetId가
+     * "사진 없음"이 되면 사용자가 지운 적 없는 사진이 지워지고 응답은 200으로 나간다.
+     */
+    private fun parseAssetId(assetId: String): Long =
+        assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED, assetId)
 
     @Operation(
         summary = "내 리뷰 탭",
