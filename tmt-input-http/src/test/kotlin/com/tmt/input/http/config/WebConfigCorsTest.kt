@@ -31,6 +31,12 @@ class WebConfigCorsTest {
     }
 
     @Test
+    fun `실서비스 도메인을 허용한다 (TMT-347)`() {
+        // 여기 빠지면 브라우저에서 로그인부터 모든 API가 CORS로 막힌다 — 도메인 전환의 첫 관문이다
+        assertThat(config.checkOrigin("https://ttomatto.kr")).isEqualTo("https://ttomatto.kr")
+    }
+
+    @Test
     fun `ttomatto 고정 URL과 프리뷰 배포를 허용한다`() {
         listOf(
             "https://ttomatto-web.vercel.app",
@@ -43,6 +49,9 @@ class WebConfigCorsTest {
     fun `같은 vercel 도메인이어도 다른 프로젝트는 거부한다`() {
         assertThat(config.checkOrigin("https://someone-else.vercel.app")).isNull()
         assertThat(config.checkOrigin("https://ttomatto-evil-someoneelse.vercel.app")).isNull()
+        // 실도메인을 흉내 낸 것도 거부한다 — 정확 일치이지 접미 매칭이 아니다
+        assertThat(config.checkOrigin("https://ttomatto.kr.evil.com")).isNull()
+        assertThat(config.checkOrigin("http://ttomatto.kr")).isNull()
     }
 
     @Test
