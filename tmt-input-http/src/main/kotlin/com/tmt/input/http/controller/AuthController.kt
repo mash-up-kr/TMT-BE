@@ -36,7 +36,11 @@ class AuthController(
                 "`redirectUri`는 인가 요청에 사용한 값과 같아야 한다. 이후 요청은 " +
                 "`Authorization: Bearer {accessToken}`으로 보내고, 만료(AUTH_TOKEN_EXPIRED)되면 재발급 API로 갱신한다.",
     )
-    @ApiErrorCodes(ErrorCode.AUTH_KAKAO_CODE_INVALID, ErrorCode.AUTH_KAKAO_UNAVAILABLE)
+    @ApiErrorCodes(
+        ErrorCode.AUTH_KAKAO_CODE_INVALID,
+        ErrorCode.AUTH_KAKAO_UNAVAILABLE,
+        ErrorCode.AUTH_KAKAO_MISCONFIGURED,
+    )
     @PostMapping("/login/kakao")
     fun loginWithKakao(
         @Valid @RequestBody request: KakaoLoginRequest,

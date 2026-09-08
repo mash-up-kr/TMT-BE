@@ -38,7 +38,7 @@ class AddressSearchController(
             "addressId는 서명된 불투명 토큰이다. 해석하지 말고 POST /v1/saves의 newPlace.addressId에 그대로 전달한다.\n\n" +
                 "클라이언트는 400ms 디바운스하고, 2자 미만이면 호출하지 않으며, **502를 자동 재시도하지 않는다** (F §2-3).",
     )
-    @ApiErrorCodes(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)
+    @ApiErrorCodes(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE, ErrorCode.ADDRESS_PROVIDER_MISCONFIGURED)
     @GetMapping
     fun searchAddresses(
         @UserId userId: Long,

@@ -69,6 +69,7 @@ class SaveController(
         ErrorCode.PLACE_CATEGORY_NOT_FOUND,
         ErrorCode.ADDRESS_NOT_FOUND,
         ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE,
+        ErrorCode.ADDRESS_PROVIDER_MISCONFIGURED,
         ErrorCode.REVIEW_TAG_NOT_FOUND,
         ErrorCode.REVIEW_CONTENT_TOO_LONG,
         ErrorCode.MEDIA_NOT_OWNED,
