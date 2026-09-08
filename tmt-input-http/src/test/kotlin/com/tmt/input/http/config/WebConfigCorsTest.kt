@@ -49,7 +49,11 @@ class WebConfigCorsTest {
     fun `같은 vercel 도메인이어도 다른 프로젝트는 거부한다`() {
         assertThat(config.checkOrigin("https://someone-else.vercel.app")).isNull()
         assertThat(config.checkOrigin("https://ttomatto-evil-someoneelse.vercel.app")).isNull()
-        // 실도메인을 흉내 낸 것도 거부한다 — 정확 일치이지 접미 매칭이 아니다
+    }
+
+    @Test
+    fun `실도메인을 흉내 낸 오리진은 거부한다 (TMT-347)`() {
+        // 정확 일치이지 접미 매칭이 아니다 — 하위 도메인으로 감싸도, 스킴이 달라도 거부
         assertThat(config.checkOrigin("https://ttomatto.kr.evil.com")).isNull()
         assertThat(config.checkOrigin("http://ttomatto.kr")).isNull()
     }
