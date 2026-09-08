@@ -1,4 +1,5 @@
 package com.tmt.input.http.controller
+
 import com.tmt.application.port.input.HealthCheckUseCase
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
