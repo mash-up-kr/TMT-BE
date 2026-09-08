@@ -6,6 +6,7 @@ import com.tmt.common.exception.TicketShortageException
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.filter.RequestIdFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
 import org.apache.catalina.connector.ClientAbortException
 import org.springframework.http.HttpStatus
@@ -28,7 +29,7 @@ class ExceptionAdvice {
     @ExceptionHandler(TmtException::class)
     fun handleTmtException(e: TmtException): ProblemDetail {
         logByType(e.errorCode, e) {
-            "TmtException 발생 - ${e.errorCode.name}: ${e.detailMessage ?: e.errorCode.defaultMessage}"
+            "[${e.errorCode.name}] ${e.detailMessage ?: e.errorCode.defaultMessage}"
         }
         return problemDetail(e.errorCode, e.detailMessage)
     }
@@ -36,7 +37,7 @@ class ExceptionAdvice {
     /** 티켓이 걸린 409는 화면 갱신용 티켓 상태를 함께 싣는다 (공통 규약 §3-2, I §6-4). */
     @ExceptionHandler(TicketShortageException::class)
     fun handleTicketShortage(e: TicketShortageException): ProblemDetail {
-        logByType(e.errorCode, e) { "티켓 부족 - ${e.errorCode.name}: available=${e.availableCount}" }
+        logByType(e.errorCode, e) { "[${e.errorCode.name}] available=${e.availableCount}" }
         return problemDetail(e.errorCode, detail = null).apply {
             setProperty(
                 "ticket",
@@ -115,9 +116,16 @@ class ExceptionAdvice {
         logger.warn { "클라이언트가 응답 수신 중 연결을 끊었다 - ${e.javaClass.simpleName}" }
     }
 
+    /**
+     * 요청 경로를 메시지에 싣는다 — 이 자리는 [ErrorCode]가 늘 `INTERNAL_ERROR`라
+     * 넣지 않으면 서로 다른 엔드포인트의 500이 한 이슈로 묶인다. 쿼리스트링은 넣지 않는다 (§4-5).
+     */
     @ExceptionHandler(Exception::class)
-    fun handleException(e: Exception): ProblemDetail {
-        logger.error(e) { "예기치 못한 에러 발생" }
+    fun handleException(
+        e: Exception,
+        request: HttpServletRequest,
+    ): ProblemDetail {
+        logger.error(e) { "예기치 못한 에러 발생 - ${request.method} ${request.requestURI}" }
         return problemDetail(ErrorCode.INTERNAL_ERROR, detail = null)
     }
 
