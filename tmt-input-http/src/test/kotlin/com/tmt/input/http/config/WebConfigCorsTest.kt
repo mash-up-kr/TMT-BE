@@ -1,5 +1,7 @@
 package com.tmt.input.http.config
 
+import com.tmt.application.port.input.CheckSignupCompletedUseCase
+import com.tmt.input.http.auth.SignupCompletionInterceptor
 import com.tmt.input.http.filter.RequestIdFilter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -8,6 +10,10 @@ import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 
 class WebConfigCorsTest {
+    private object AlwaysCompleted : CheckSignupCompletedUseCase {
+        override fun isCompleted(userId: Long) = true
+    }
+
     /** CorsRegistry가 모아둔 설정을 꺼내려면 protected 접근이 필요해 상속으로 연다. */
     private class ProbeRegistry : CorsRegistry() {
         fun configurations(): Map<String, CorsConfiguration> = getCorsConfigurations()
@@ -15,7 +21,7 @@ class WebConfigCorsTest {
 
     private val config: CorsConfiguration =
         ProbeRegistry()
-            .also { WebConfig().addCorsMappings(it) }
+            .also { WebConfig(SignupCompletionInterceptor(AlwaysCompleted)).addCorsMappings(it) }
             .configurations()
             .getValue("/**")
 

@@ -56,12 +56,13 @@ class UserPageService(
         return UserProfileView(
             userId = header.userId,
             nickname = header.nickname,
-            profileImageUrl = header.profileImageUrl,
+            profileImageUrl = header.profileImageS3Key?.let(mediaUrlResolver::urlOf) ?: header.profileImageUrl,
             reviewCount = header.reviewCount,
             joinedGroupCount = header.joinedGroupCount,
             favoritePlaceCount = header.favoritePlaceCount,
             availableTicketCount = null,
             email = null,
+            profileCompleted = header.profileCompletedAt != null,
         )
     }
 

@@ -49,7 +49,11 @@ interface UserPageQueryPort {
 data class ProfileHeaderRow(
     val userId: Long,
     val nickname: String,
+    /** 카카오 값 자리 — [profileImageS3Key]가 있으면 그쪽이 정본이다 (TMT-370) */
     val profileImageUrl: String?,
+    val profileImageS3Key: String?,
+    /** null이면 가입 미완료 */
+    val profileCompletedAt: Instant?,
     val reviewCount: Int,
     val joinedGroupCount: Int,
     val favoritePlaceCount: Int,

@@ -1,21 +1,25 @@
 package com.tmt.application.domain.auth
 
 import com.tmt.application.domain.save.FakeGroupJoinTicketPort
+import com.tmt.application.port.input.GetMediaUrlsUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.output.auth.KakaoAuthPort
 import com.tmt.application.port.output.auth.KakaoProfile
 import com.tmt.application.port.output.persistence.UserAccount
 import com.tmt.application.port.output.persistence.UserAccountPort
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KakaoLoginServiceTest {
     private val authPort = FakeKakaoAuthPort()
     private val userPort = FakeUserAccountPort()
     private val ticketPort = FakeGroupJoinTicketPort()
-    private val service = KakaoLoginService(authPort, userPort, ticketPort)
+    private val mediaUrls = FakeGetMediaUrlsUseCase()
+    private val service = KakaoLoginService(authPort, userPort, ticketPort, mediaUrls)
 
     @Test
     fun `처음 온 카카오 계정이면 사용자를 만들고 isNewUser=true다`() {
@@ -25,7 +29,9 @@ class KakaoLoginServiceTest {
 
         assertTrue(result.isNewUser)
         assertEquals("준형이", result.nickname)
-        assertEquals("https://img", result.profileImageUrl)
+        // 카카오 프로필 사진은 저장하지 않는다 — 가입 완결에서 사용자가 고른 사진만 프로필이 된다 (TMT-370)
+        assertNull(result.profileImageUrl)
+        assertFalse(result.profileCompleted)
         assertEquals(12345L, userPort.accounts.single().kakaoId)
     }
 
@@ -110,7 +116,7 @@ class KakaoLoginServiceTest {
 
     @Test
     fun `이미 있는 계정으로 다시 로그인해도 티켓을 또 주지 않는다`() {
-        userPort.accounts += UserAccount(id = 7L, kakaoId = 999L, nickname = "준형이", profileImageUrl = null)
+        userPort.accounts += account(id = 7L, kakaoId = 999L, nickname = "준형이")
         authPort.profile = KakaoProfile(kakaoId = 999L, nickname = "준형이", profileImageUrl = null)
 
         service.login(command())
@@ -140,6 +146,20 @@ class KakaoLoginServiceTest {
         assertEquals(777L, userPort.accounts.single().kakaoId)
     }
 
+    private fun account(
+        id: Long,
+        kakaoId: Long,
+        nickname: String,
+        profileCompletedAt: Instant? = null,
+    ) = UserAccount(
+        id = id,
+        kakaoId = kakaoId,
+        nickname = nickname,
+        profileImageUrl = null,
+        profileImageAssetId = null,
+        profileCompletedAt = profileCompletedAt,
+    )
+
     private fun command() = KakaoLoginCommand(code = "auth-code", redirectUri = "http://localhost:3000/cb")
 
     private class FakeKakaoAuthPort : KakaoAuthPort {
@@ -164,19 +184,44 @@ class KakaoLoginServiceTest {
 
         override fun findByKakaoId(kakaoId: Long): UserAccount? = accounts.firstOrNull { it.kakaoId == kakaoId }
 
+        override fun findById(userId: Long): UserAccount? = accounts.firstOrNull { it.id == userId }
+
         override fun create(
             kakaoId: Long,
             nickname: String,
-            profileImageUrl: String?,
         ): UserAccount? {
             if (rejectCreate) {
-                accounts += UserAccount(id = nextId++, kakaoId = kakaoId, nickname = "먼저온사람", profileImageUrl = null)
+                accounts += blank(nextId++, kakaoId, "먼저온사람")
                 return null
             }
-            val account =
-                UserAccount(id = nextId++, kakaoId = kakaoId, nickname = nickname, profileImageUrl = profileImageUrl)
+            val account = blank(nextId++, kakaoId, nickname)
             accounts += account
             return account
         }
+
+        override fun updateProfile(
+            userId: Long,
+            nickname: String,
+            profileImageAssetId: Long?,
+            completedAt: Instant,
+        ): UserAccount? = accounts.firstOrNull { it.id == userId }
+
+        private fun blank(
+            id: Long,
+            kakaoId: Long,
+            nickname: String,
+        ) = UserAccount(
+            id = id,
+            kakaoId = kakaoId,
+            nickname = nickname,
+            profileImageUrl = null,
+            profileImageAssetId = null,
+            profileCompletedAt = null,
+        )
+    }
+
+    private class FakeGetMediaUrlsUseCase : GetMediaUrlsUseCase {
+        override fun urlsOf(assetIds: List<Long>): Map<Long, String> =
+            assetIds.associateWith { "https://media.example.com/photo/$it" }
     }
 }

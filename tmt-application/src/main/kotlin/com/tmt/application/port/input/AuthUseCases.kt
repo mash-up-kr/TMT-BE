@@ -10,8 +10,10 @@ data class KakaoLoginResult(
     val userId: Long,
     val nickname: String,
     val profileImageUrl: String?,
-    /** 이번 로그인으로 users 행이 만들어졌는지 — FE 온보딩 분기 기준 (TMT-273) */
+    /** 이번 로그인으로 users 행이 만들어졌는지 */
     val isNewUser: Boolean,
+    /** 가입 화면을 끝냈는지 — false면 FE는 가입 화면으로 보낸다 (TMT-370) */
+    val profileCompleted: Boolean,
 )
 
 interface LoginWithKakaoUseCase {

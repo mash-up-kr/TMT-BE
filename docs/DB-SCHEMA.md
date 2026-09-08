@@ -17,6 +17,7 @@ erDiagram
     users ||--o{ save : "작성"
     users ||--o{ place_favorite : "찜"
     users ||--o{ media_asset : "업로드"
+    media_asset ||--o| users : "프로필 사진"
     users ||--o{ group_join_ticket : "보유"
     users ||--o{ group_membership : "가입"
     place ||--o{ save : "대상"
@@ -119,3 +120,4 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 | 2026-08-21 | DDL을 Flyway 마이그레이션 `V1__init.sql`로 이관 | 장민서 |
 | 2026-08-23 | `place_semas_category` 추가 (V3, TMT-162) — 상가정보 소분류 원문 보존. 카테고리 매핑(43종→14종)을 재적재 없이 UPDATE로 재계산하기 위한 파이프라인 참조 테이블. 앱은 읽지 않는다 | 이준표 |
 | 2026-09-04 | `users.nickname` 폭·CHECK를 **2~20자**로 (V6, TMT-350) — U3가 8/23에 20자로 확정됐는데 DDL이 V1의 10자 그대로였다. 지금 들어 있는 값은 시드 7건뿐이라 안 터지지만, 카카오 로그인(TMT-271·272)이 붙으면 20자 닉네임이 거절된다. 넓히는 방향이라 테이블 재작성·검증 스캔이 없고, **CHECK가 폭과 따로 걸려 있어 함께 바꿔야** 11자가 통과한다 | 이준표 |
+| 2026-09-07 | `users.profile_completed_at`·`users.profile_image_asset_id` 추가 (V7, TMT-370) — 카카오 로그인이 만든 행은 닉네임이 카카오 값이라 사용자가 입력한 값이 들어갈 자리가 없었다. 가입 완결(`PUT /v1/users/me/profile`)이 두 컬럼을 채우고, `profile_completed_at IS NULL`이면 다른 API가 403으로 막힌다. 프로필 사진의 정본은 `profile_image_asset_id`(그룹 대표 이미지와 같은 업로드 경로, M7)로 옮기고 `profile_image_url`(카카오 값)은 신규 쓰기를 멈춘다. 이전 가입자는 `created_at`으로 백필해 완료로 본다 | 장민서 |

@@ -32,7 +32,10 @@ class AuthController(
         summary = "카카오 로그인",
         description =
             "카카오 인가 코드를 교환해 로그인하고 토큰을 발급한다. 처음 온 카카오 계정이면 users 행을 만들고 " +
-                "`isNewUser=true`로 내린다 — FE는 이 값으로 온보딩(TMT-273)에 분기한다.\n\n" +
+                "`isNewUser=true`로 내린다.\n\n" +
+                "`profileCompleted=false`면 가입 화면(`PUT /v1/users/me/profile`)을 끝내야 한다 — 그전까지 다른 API는 " +
+                "SIGNUP_NOT_COMPLETED(403)로 막힌다. 이때 함께 내려가는 `nickname`은 카카오 닉네임이라 입력칸 " +
+                "초깃값으로 쓸 수 있다. `profileImageUrl`은 가입 전에는 항상 null이다.\n\n" +
                 "`redirectUri`는 인가 요청에 사용한 값과 같아야 한다. 이후 요청은 " +
                 "`Authorization: Bearer {accessToken}`으로 보내고, 만료(AUTH_TOKEN_EXPIRED)되면 재발급 API로 갱신한다.",
     )
@@ -51,6 +54,7 @@ class AuthController(
             nickname = result.nickname,
             profileImageUrl = result.profileImageUrl,
             isNewUser = result.isNewUser,
+            profileCompleted = result.profileCompleted,
             accessToken = tokens.accessToken,
             accessTokenExpiresIn = tokens.accessTokenExpiresIn,
             refreshToken = tokens.refreshToken,
@@ -96,8 +100,10 @@ class AuthController(
         val nickname: String,
         @field:Schema(nullable = true)
         val profileImageUrl: String?,
-        @field:Schema(description = "이번 로그인으로 계정이 만들어졌는지 — 온보딩 분기 기준")
+        @field:Schema(description = "이번 로그인으로 계정이 만들어졌는지")
         val isNewUser: Boolean,
+        @field:Schema(description = "가입 화면(닉네임·프로필 사진)을 끝냈는지 — false면 가입 화면으로 보낸다")
+        val profileCompleted: Boolean,
         val accessToken: String,
         @field:Schema(description = "accessToken 만료까지 남은 초")
         val accessTokenExpiresIn: Long,

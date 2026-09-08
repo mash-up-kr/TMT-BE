@@ -17,7 +17,30 @@ data class UserProfileView(
     val availableTicketCount: Int?,
     /** users에 이메일이 없다 — 동의항목을 수집하지 않아 당분간 항상 null (J §2) */
     val email: String?,
+    /** 가입 화면을 끝냈는지 (TMT-370) */
+    val profileCompleted: Boolean,
 )
+
+data class UpdateUserProfileCommand(
+    val userId: Long,
+    /** 2~20자 (U3) */
+    val nickname: String,
+    /** null이면 사진 없는 상태가 된다 */
+    val profileImageAssetId: Long?,
+)
+
+/**
+ * 가입 완결·프로필 수정 (TMT-370). 카카오 값으로 채워져 있던 닉네임을 사용자 입력값으로 덮어쓰고,
+ * 프로필 사진을 사용자가 올린 사진으로 붙인다.
+ */
+interface UpdateUserProfileUseCase {
+    fun update(command: UpdateUserProfileCommand): UserProfileView
+}
+
+/** 가입 완결 여부 — 미완료 사용자의 요청을 막는 데 쓴다 (TMT-370). */
+interface CheckSignupCompletedUseCase {
+    fun isCompleted(userId: Long): Boolean
+}
 
 interface GetUserProfileUseCase {
     fun getMine(userId: Long): UserProfileView

@@ -16,6 +16,8 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
             SELECT u.id                AS userId,
                    u.nickname          AS nickname,
                    u.profile_image_url AS profileImageUrl,
+                   ma.s3_key           AS profileImageS3Key,
+                   u.profile_completed_at AS profileCompletedAt,
                    (SELECT COUNT(*) FROM review r
                      WHERE r.user_id = u.id AND r.deleted_at IS NULL)          AS reviewCount,
                    (SELECT COUNT(*) FROM group_membership m
@@ -23,6 +25,7 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
                    (SELECT COUNT(*) FROM place_favorite f
                      WHERE f.user_id = u.id)                                   AS favoritePlaceCount
             FROM users u
+            LEFT JOIN media_asset ma ON ma.id = u.profile_image_asset_id
             WHERE u.id = :userId
         """,
         nativeQuery = true,
@@ -222,6 +225,10 @@ interface UserPageQueryRepository : JpaRepository<UserEntity, Long> {
         fun getNickname(): String
 
         fun getProfileImageUrl(): String?
+
+        fun getProfileImageS3Key(): String?
+
+        fun getProfileCompletedAt(): Instant?
 
         fun getReviewCount(): Int
 
