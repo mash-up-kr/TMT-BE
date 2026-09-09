@@ -69,6 +69,7 @@ resource "aws_s3_bucket_cors_configuration" "media" {
   cors_rule {
     allowed_origins = [
       "http://localhost:3000",
+      "https://ttomatto.kr", # 실서비스 도메인 (TMT-347) — WebConfig와 같은 줄에 같은 문자열
       "https://ttomatto-web.vercel.app",
       "https://ttomatto-*-ttalkkakfe.vercel.app",
     ]

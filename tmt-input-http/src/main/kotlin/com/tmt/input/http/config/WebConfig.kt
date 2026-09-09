@@ -49,6 +49,9 @@ class WebConfig(
         private val ALLOWED_ORIGIN_PATTERNS =
             arrayOf(
                 "http://localhost:3000",
+                // 실서비스 도메인 (TMT-347). vercel 주소는 프리뷰·롤백 경로로 남겨둔다 —
+                // 여기 없는 오리진은 브라우저에서 전부 막히므로, 도메인이 바뀌면 이 목록이 먼저다
+                "https://ttomatto.kr",
                 "https://ttomatto-web.vercel.app",
                 "https://ttomatto-*-ttalkkakfe.vercel.app",
             )
