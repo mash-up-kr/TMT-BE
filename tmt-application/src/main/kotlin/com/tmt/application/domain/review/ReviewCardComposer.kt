@@ -41,7 +41,11 @@ class ReviewCardComposer(
                             order = photo.photoOrder,
                         )
                     },
-                aiSummary = summaryByReview[row.reviewId]?.let { ReviewCardView.AiSummary(it.pros, it.cons) },
+                // 둘 다 null인 행은 "요약할 내용 없음" 기록 — 미요약과 같게 null (A2, TMT-392)
+                aiSummary =
+                    summaryByReview[row.reviewId]
+                        ?.takeIf { it.pros != null || it.cons != null }
+                        ?.let { ReviewCardView.AiSummary(it.pros, it.cons) },
                 content = row.content,
                 tags = tagsBySave[row.saveId].orEmpty().map { ReviewCardView.Tag(it.tagId, it.label) },
                 placeId = row.placeId,

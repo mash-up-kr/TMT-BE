@@ -25,6 +25,12 @@ class GroqChatClient(
     @param:Value("\${tmt.ai-summary.groq.base-url:https://api.groq.com/openai/v1}") baseUrl: String,
     @param:Value("\${tmt.ai-summary.groq.connect-timeout-seconds:2}") private val connectTimeoutSeconds: Long,
     @param:Value("\${tmt.ai-summary.groq.read-timeout-seconds:15}") private val readTimeoutSeconds: Long,
+    /**
+     * 없으면 Groq가 모델 기본 상한으로 "예상 출력 토큰"을 계산해 무료 티어 OTPM(1,000)에서 **항상 거절**한다
+     * (운영 로그: Requested 1,673~1,979). 요약 JSON은 리뷰당 두 문장이라 800이면 넉넉하고, 넘치면 잘린 JSON이
+     * 파싱에 실패해 다음 프로바이더로 넘어간다 (TMT-392).
+     */
+    @param:Value("\${tmt.ai-summary.groq.max-tokens:800}") private val maxTokens: Int,
 ) : ChatJsonClient {
     /**
      * 타임아웃이 없으면 기본값이 무제한이다. 요약은 배치라 감내됐지만 추천(TMT-289)은
@@ -57,6 +63,7 @@ class GroqChatClient(
         val body =
             mapOf(
                 "model" to model,
+                "max_tokens" to maxTokens,
                 "response_format" to mapOf("type" to "json_object"),
                 "temperature" to temperature,
                 "messages" to

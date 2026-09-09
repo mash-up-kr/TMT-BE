@@ -79,9 +79,37 @@ class ReviewSummaryServiceTest {
     }
 
     @Test
-    fun `pros와 cons가 모두 비면 저장하지 않는다 - 다음 배치가 재시도한다`() {
+    fun `pros와 cons가 모두 비면 요약 불가로 기록한다 - 다음 배치가 다시 부르지 않는다 (TMT-392)`() {
+        // 예전엔 "저장하지 않고 다음 배치가 재시도"였다. 본문이 "ㅂㅈㄷ"이면 다음 배치도 같은 답을 받으므로
+        // 그 전제는 영원히 성립하지 않았고, 운영에서 37건이 10분마다 LLM을 다시 불렀다
         every { summaryPort.findPendingReviews(any()) } returns listOf(pending(1, placeId = 10))
-        every { llmPort.summarize(any()) } returns result(LlmSummaryResult.ReviewSummary(1, null, null))
+        every { llmPort.summarize(any()) } returns
+            result(LlmSummaryResult.ReviewSummary(1, null, null), model = "gemini/flash")
+        val saved = slot<List<NewReviewSummary>>()
+        every { summaryPort.saveSummaries(capture(saved)) } returns Unit
+
+        assertEquals(0, service.summarizePending(), "채운 요약은 0이지만")
+        assertEquals(listOf(NewReviewSummary(1, null, null, "gemini/flash")), saved.captured, "둘 다 null인 행이 기록된다")
+    }
+
+    @Test
+    fun `LLM이 빠뜨린 reviewId도 요약 불가로 기록한다 - 같은 매장을 다시 보내지 않게`() {
+        every { summaryPort.findPendingReviews(any()) } returns
+            listOf(pending(1, placeId = 10), pending(2, placeId = 10))
+        every { llmPort.summarize(any()) } returns result(LlmSummaryResult.ReviewSummary(1, "좋아요", null))
+        val saved = slot<List<NewReviewSummary>>()
+        every { summaryPort.saveSummaries(capture(saved)) } returns Unit
+
+        assertEquals(1, service.summarizePending())
+        assertEquals(setOf(1L, 2L), saved.captured.map { it.reviewId }.toSet())
+        assertEquals("좋아요", saved.captured.single { it.reviewId == 1L }.pros)
+        assertEquals(null to null, saved.captured.single { it.reviewId == 2L }.let { it.pros to it.cons })
+    }
+
+    @Test
+    fun `호출이 실패한 매장은 기록하지 않는다 - 그쪽은 다음 배치가 재시도해야 한다`() {
+        every { summaryPort.findPendingReviews(any()) } returns listOf(pending(1, placeId = 10))
+        every { llmPort.summarize(any()) } throws IllegalStateException("프로바이더 소진")
 
         assertEquals(0, service.summarizePending())
         verify(exactly = 0) { summaryPort.saveSummaries(any()) }
