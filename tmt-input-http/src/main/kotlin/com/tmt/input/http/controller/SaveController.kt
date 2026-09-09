@@ -77,6 +77,9 @@ class SaveController(
         ErrorCode.IDEMPOTENCY_CONFLICT,
     )
     @PostMapping
+    // 실제 상태는 ResponseEntity가 정하고(201, 멱등 재현도 201), 이 선언은 스펙용이다 — 없으면 springdoc이
+    // 200으로 문서화해 orval 응답 타입이 실제와 어긋난다. memberships·groups와 같은 방식 (TMT-393)
+    @ResponseStatus(HttpStatus.CREATED)
     fun createSave(
         @UserId userId: Long,
         @IdempotencyKey key: String,
