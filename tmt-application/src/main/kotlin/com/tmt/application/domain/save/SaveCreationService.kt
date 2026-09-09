@@ -68,14 +68,14 @@ class SaveCreationService(
         saveCommandPort.insertTags(saveId, (command.companionTagIds + command.positivePointTagIds).distinct())
         attachMediaUseCase.attach(command.photoAssetIds)
 
-        val completed =
-            SaveRules.satisfiesReviewCriteria(
+        val missing =
+            SaveRules.missingReviewCriteria(
                 companionTagCount = command.companionTagIds.size,
                 positivePointTagCount = command.positivePointTagIds.size,
                 rating = command.rating,
                 content = command.content,
             )
-        if (!completed) {
+        if (missing.isNotEmpty()) {
             // 집계는 판정을 통과했을 때만 움직인다 — 여기서 돌리면 rating이 null인 저장까지
             // review_count를 올려 매장 평균(P9)과 지도 핀 조건(E6)이 함께 틀어진다
             return SaveResult(
@@ -84,6 +84,7 @@ class SaveCreationService(
                 placeId = placeId,
                 grantedCount = 0,
                 availableCount = saveWriteSupport.availableTicketCount(command.userId),
+                missing = missing,
             )
         }
 
@@ -99,6 +100,7 @@ class SaveCreationService(
             placeId = placeId,
             grantedCount = granted,
             availableCount = saveWriteSupport.availableTicketCount(command.userId),
+            missing = emptyList(),
         )
     }
 

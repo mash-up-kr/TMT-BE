@@ -6,6 +6,7 @@ import com.tmt.application.domain.media.MediaAttachmentService
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
+import com.tmt.application.port.input.ReviewCriterion
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -74,6 +75,7 @@ class SaveCreationServiceTest {
 
         assertNull(result.reviewId)
         assertEquals(0, result.grantedCount)
+        assertEquals(ReviewCriterion.entries.toList(), result.missing)
         assertEquals(1, saveCommandPort.saves.size)
         assertTrue(saveCommandPort.reviews.isEmpty())
     }
@@ -99,6 +101,7 @@ class SaveCreationServiceTest {
 
         assertNotNull(result.reviewId)
         assertEquals(1, result.grantedCount)
+        assertTrue(result.missing.isEmpty())
         assertEquals(1, placeStatsPort.added.size)
     }
 
@@ -118,6 +121,7 @@ class SaveCreationServiceTest {
             )
 
         assertNull(result.reviewId)
+        assertEquals(listOf(ReviewCriterion.CONTENT), result.missing)
         assertTrue(placeStatsPort.added.isEmpty())
     }
 

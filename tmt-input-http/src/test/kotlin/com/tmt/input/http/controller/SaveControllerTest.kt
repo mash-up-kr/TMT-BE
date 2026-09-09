@@ -15,6 +15,7 @@ import com.tmt.application.port.input.MySavesRequest
 import com.tmt.application.port.input.MySavesResult
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.ResolveAddressCoordinateUseCase
+import com.tmt.application.port.input.ReviewCriterion
 import com.tmt.application.port.input.SaveDetailView
 import com.tmt.application.port.input.SaveResult
 import com.tmt.application.port.input.UpdateSaveCommand
@@ -112,6 +113,8 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.reviewId").doesNotExist())
             .andExpect(jsonPath("$.ticket.grantedCount").value(0))
             .andExpect(jsonPath("$.ticket.availableCount").value(1))
+            .andExpect(jsonPath("$.missing.length()").value(1))
+            .andExpect(jsonPath("$.missing[0]").value("CONTENT"))
 
         assertEquals(5, createSaveUseCase.commands.single().rating)
     }
@@ -124,6 +127,7 @@ class SaveControllerTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.reviewId").value("rv_100"))
             .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.missing").isEmpty)
 
         assertEquals(listOf(7L), createSaveUseCase.commands.single().photoAssetIds)
     }
@@ -137,6 +141,20 @@ class SaveControllerTest {
         postSave(body).andExpect(status().isCreated).andExpect(jsonPath("$.saveId").value("save_1"))
 
         assertEquals(1, createSaveUseCase.commands.size)
+    }
+
+    @Test
+    fun `missing이 없던 때 기록된 멱등 응답도 그대로 되돌려준다 (TMT-395)`() {
+        // 배포 직전 기록된 본문에는 missing이 없다. non-null 파라미터에 기본값이 없으면
+        // 리플레이가 역직렬화에서 터져 보관 기간(P1D) 안의 재시도가 500이 된다
+        val recordedBeforeDeploy =
+            """{"saveId":"save_1","reviewId":null,"placeId":"place_1","ticket":{"grantedCount":0,"availableCount":1}}"""
+
+        val replayed =
+            IdempotencyPayloadCodec().deserialize(recordedBeforeDeploy, SaveController.SaveResultResponse::class.java)
+
+        assertEquals(emptyList<ReviewCriterion>(), replayed.missing)
+        assertEquals("save_1", replayed.saveId)
     }
 
     @Test
@@ -264,6 +282,7 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.saveId").value("save_9"))
             .andExpect(jsonPath("$.reviewId").value("rv_100"))
             .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.missing").isEmpty)
 
         val command = updateSaveUseCase.commands.single()
         assertEquals(9L, command.saveId)
@@ -407,6 +426,7 @@ class SaveControllerTest {
                 placeId = command.placeId ?: 1L,
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
+                missing = if (reviewed) emptyList() else listOf(ReviewCriterion.CONTENT),
             )
         }
     }
@@ -500,6 +520,7 @@ class SaveControllerTest {
                 placeId = (command.place as? PlaceSelection.Existing)?.placeId ?: 900L,
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
+                missing = if (reviewed) emptyList() else listOf(ReviewCriterion.CONTENT),
             )
         }
     }

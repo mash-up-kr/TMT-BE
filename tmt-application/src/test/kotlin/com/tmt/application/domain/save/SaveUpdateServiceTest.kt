@@ -6,6 +6,7 @@ import com.tmt.application.domain.media.MediaAttachmentService
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
+import com.tmt.application.port.input.ReviewCriterion
 import com.tmt.application.port.input.UpdateSaveCommand
 import com.tmt.application.port.output.persistence.SaveCommandPort
 import com.tmt.common.exception.ErrorCode
@@ -151,6 +152,7 @@ class SaveUpdateServiceTest {
 
         assertNull(result.reviewId)
         assertEquals(0, result.grantedCount)
+        assertEquals(listOf(ReviewCriterion.COMPANION_TAG, ReviewCriterion.POSITIVE_POINT_TAG), result.missing)
         assertTrue(placeStatsPort.added.isEmpty())
     }
 

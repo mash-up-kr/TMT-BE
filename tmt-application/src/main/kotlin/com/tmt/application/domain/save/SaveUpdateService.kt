@@ -67,20 +67,21 @@ class SaveUpdateService(
         attachMediaUseCase.detach(existingAssetIds - command.photoAssetIds.toSet())
         attachMediaUseCase.attach(command.photoAssetIds, reattachableIds = keptAssetIds)
 
-        val completed =
-            SaveRules.satisfiesReviewCriteria(
+        val missing =
+            SaveRules.missingReviewCriteria(
                 companionTagCount = command.companionTagIds.size,
                 positivePointTagCount = command.positivePointTagIds.size,
                 rating = command.rating,
                 content = command.content,
             )
-        if (!completed) {
+        if (missing.isNotEmpty()) {
             return SaveResult(
                 saveId = command.saveId,
                 reviewId = null,
                 placeId = save.placeId,
                 grantedCount = 0,
                 availableCount = saveWriteSupport.availableTicketCount(command.userId),
+                missing = missing,
             )
         }
 
@@ -96,6 +97,7 @@ class SaveUpdateService(
             placeId = save.placeId,
             grantedCount = granted,
             availableCount = saveWriteSupport.availableTicketCount(command.userId),
+            missing = emptyList(),
         )
     }
 

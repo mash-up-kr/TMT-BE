@@ -11,6 +11,7 @@ import com.tmt.application.port.input.MySaveKey
 import com.tmt.application.port.input.MySavesRequest
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.ResolveAddressCoordinateUseCase
+import com.tmt.application.port.input.ReviewCriterion
 import com.tmt.application.port.input.UpdateSaveCommand
 import com.tmt.application.port.input.UpdateSaveUseCase
 import com.tmt.application.port.output.address.AddressCandidate
@@ -28,6 +29,7 @@ import com.tmt.input.http.controller.paging.CursorSpec
 import com.tmt.input.http.controller.paging.PageLimit
 import com.tmt.input.http.idempotency.IdempotencyKey
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -118,6 +120,7 @@ class SaveController(
                     reviewId = created.reviewId?.let(PublicIds::review),
                     placeId = PublicIds.place(created.placeId),
                     ticket = SaveResultResponse.TicketGrantSummary(created.grantedCount, created.availableCount),
+                    missing = created.missing,
                 )
             }
         return ResponseEntity
@@ -180,6 +183,7 @@ class SaveController(
                     reviewId = updated.reviewId?.let(PublicIds::review),
                     placeId = PublicIds.place(updated.placeId),
                     ticket = SaveResultResponse.TicketGrantSummary(updated.grantedCount, updated.availableCount),
+                    missing = updated.missing,
                 )
             }.response
     }
@@ -330,11 +334,20 @@ class SaveController(
         )
     }
 
+    /**
+     * @param missing 리뷰 성립(C4)에 모자란 항목 — 리뷰가 됐으면 빈 배열 (TMT-395). 사진은 항목이 아니다 (C4-1).
+     *   FE는 이걸로 "별점만 매기면 리뷰가 돼요" 같은 안내 문구를 고른다. 화면 분기 자체는 여전히 reviewId다 (S3).
+     *
+     *   **기본값은 멱등 리플레이 때문이다** — 이 필드가 없던 때 기록된 응답 JSON을 되돌려줄 때
+     *   non-null 파라미터가 비면 역직렬화가 깨진다. 보관이 P1D라 배포 후 하루가 그 창이다 (PR #118 리뷰).
+     */
     data class SaveResultResponse(
         val saveId: String,
         val reviewId: String?,
         val placeId: String,
         val ticket: TicketGrantSummary,
+        @field:Schema(description = "리뷰 성립(C4)에 모자란 항목. 리뷰가 됐으면 빈 배열. 사진은 항목이 아니다 (C4-1)")
+        val missing: List<ReviewCriterion> = emptyList(),
     ) {
         data class TicketGrantSummary(
             val grantedCount: Int,
