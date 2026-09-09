@@ -167,7 +167,9 @@ class ExceptionAdviceTest {
         /** Tomcat이 파라미터 디코딩 실패에 던지는 그 메시지 — 원본 값이 그대로 들어 있다 */
         @GetMapping("/probe/bad-encoding")
         fun badEncoding(): Nothing =
-            throw InvalidParameterException("Character decoding failed. Parameter [cursor] with value [%%%bad] has been ignored.")
+            throw InvalidParameterException(
+                "Character decoding failed. Parameter [cursor] with value [%%%bad] has been ignored.",
+            )
 
         data class Payload(
             val name: String,
