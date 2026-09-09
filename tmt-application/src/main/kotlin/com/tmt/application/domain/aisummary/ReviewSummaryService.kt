@@ -59,7 +59,7 @@ class ReviewSummaryService(
             logger.error(lastError) { "리뷰 요약 배치가 전부 실패했다 - places=$failed" }
         }
         if (filled > 0) logger.info { "리뷰 요약 채움 - filled=$filled / pending=${pending.size}" }
-        if (unsummarizable > 0) logger.info { "요약 불가 기록 - $unsummarizable건 (본문에 요약할 내용 없음)" }
+        if (unsummarizable > 0) logger.info { "요약 불가 기록 - ${unsummarizable}건 (본문에 요약할 내용 없음)" }
         return filled
     }
 
