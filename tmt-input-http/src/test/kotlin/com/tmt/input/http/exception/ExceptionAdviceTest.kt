@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
+import org.apache.tomcat.util.http.InvalidParameterException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -74,6 +75,21 @@ class ExceptionAdviceTest {
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
             .andExpect(jsonPath("$.detail").value("요청 본문을 읽을 수 없습니다."))
+    }
+
+    @Test
+    fun `퍼센트 인코딩이 깨진 파라미터는 400이고 값을 응답에 싣지 않는다 (TMT-394)`() {
+        // 운영에서 `?cursor=%%%bad`가 500 + Sentry ERROR가 되던 자리 — Tomcat이 Spring보다 먼저 던지는 예외다.
+        // 이 PR의 동기가 ERROR 이벤트 제거라 레벨도 함께 본다 (WARN 하나, LOGGING.md §3-1)
+        val logs = captureAdviceLogs()
+
+        mockMvc
+            .perform(get("/probe/bad-encoding"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+            .andExpect(jsonPath("$.detail").value("요청 파라미터를 해석할 수 없습니다."))
+
+        assertThat(logs.list.map { it.level }).containsExactly(Level.WARN)
     }
 
     @Test
@@ -152,6 +168,13 @@ class ExceptionAdviceTest {
 
         @GetMapping("/probe/client-gone")
         fun clientGone(): Nothing = throw AsyncRequestNotUsableException("ServletOutputStream failed to write")
+
+        /** Tomcat이 파라미터 디코딩 실패에 던지는 그 메시지 — 원본 값이 그대로 들어 있다 */
+        @GetMapping("/probe/bad-encoding")
+        fun badEncoding(): Nothing =
+            throw InvalidParameterException(
+                "Character decoding failed. Parameter [cursor] with value [%%%bad] has been ignored.",
+            )
 
         data class Payload(
             val name: String,
