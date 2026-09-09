@@ -2,7 +2,6 @@ package com.tmt.application.domain.save
 
 import com.tmt.application.port.input.ReviewCriterion
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -12,7 +11,6 @@ class SaveRulesTest {
         val missing = SaveRules.missingReviewCriteria(0, 0, rating = null, content = null)
 
         assertEquals(ReviewCriterion.entries.toList(), missing)
-        assertFalse(SaveRules.satisfiesReviewCriteria(0, 0, rating = null, content = null))
     }
 
     @Test
@@ -27,7 +25,6 @@ class SaveRulesTest {
         val missing = SaveRules.missingReviewCriteria(1, 1, rating = 3, content = "맛")
 
         assertTrue(missing.isEmpty())
-        assertTrue(SaveRules.satisfiesReviewCriteria(1, 1, rating = 3, content = "맛"))
     }
 
     @Test

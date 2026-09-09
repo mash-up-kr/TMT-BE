@@ -344,7 +344,9 @@ class SaveController(
         val placeId: String,
         val ticket: TicketGrantSummary,
         @field:Schema(description = "리뷰 성립(C4)에 모자란 항목. 리뷰가 됐으면 빈 배열. 사진은 항목이 아니다 (C4-1)")
-        val missing: List<ReviewCriterion>,
+        // 기본값은 멱등 리플레이 때문이다 — 이 필드가 없던 때 기록된 응답 JSON을 되돌려줄 때
+        // non-null 파라미터가 비면 역직렬화가 깨진다. 보관은 P1D라 배포 후 하루가 그 창이다
+        val missing: List<ReviewCriterion> = emptyList(),
     ) {
         data class TicketGrantSummary(
             val grantedCount: Int,

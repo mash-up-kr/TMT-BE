@@ -18,16 +18,8 @@ object SaveRules {
     /**
      * 동행 1 + 좋은 점 1 + 별점 + 본문(공백 제외 1자 이상)을 전부 충족해야 리뷰다 (C4).
      * 사진은 판정에 넣지 않는다 — 0장이어도 리뷰다 (C4-1).
-     */
-    fun satisfiesReviewCriteria(
-        companionTagCount: Int,
-        positivePointTagCount: Int,
-        rating: Int?,
-        content: String?,
-    ): Boolean = missingReviewCriteria(companionTagCount, positivePointTagCount, rating, content).isEmpty()
-
-    /**
-     * 판정에서 모자란 항목을 선언 순서대로 돌려준다. 비어 있으면 리뷰다.
+     *
+     * 모자란 항목을 선언 순서대로 돌려주고, **비어 있으면 리뷰다** — 판정의 정본은 이 함수 하나다.
      * 저장 응답의 `missing`이 되어 "별점만 매기면 리뷰가 돼요" 같은 안내의 근거가 된다 (TMT-395).
      */
     fun missingReviewCriteria(

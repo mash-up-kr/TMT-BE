@@ -144,6 +144,20 @@ class SaveControllerTest {
     }
 
     @Test
+    fun `missing이 없던 때 기록된 멱등 응답도 그대로 되돌려준다 (TMT-395)`() {
+        // 배포 직전 기록된 본문에는 missing이 없다. non-null 파라미터에 기본값이 없으면
+        // 리플레이가 역직렬화에서 터져 보관 기간(P1D) 안의 재시도가 500이 된다
+        val recordedBeforeDeploy =
+            """{"saveId":"save_1","reviewId":null,"placeId":"place_1","ticket":{"grantedCount":0,"availableCount":1}}"""
+
+        val replayed =
+            IdempotencyPayloadCodec().deserialize(recordedBeforeDeploy, SaveController.SaveResultResponse::class.java)
+
+        assertEquals(emptyList<ReviewCriterion>(), replayed.missing)
+        assertEquals("save_1", replayed.saveId)
+    }
+
+    @Test
     fun `같은 키에 다른 바디면 IDEMPOTENCY_CONFLICT다`() {
         postSave("""{ "placeId": "place_1" }""").andExpect(status().isCreated)
 
