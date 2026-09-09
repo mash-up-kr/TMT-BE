@@ -26,6 +26,8 @@ class SignupExemptPathsTest {
             // 토큰을 받는 곳 — 여기가 막히면 가입을 시작할 수 없다
             "/v1/auth/login/kakao",
             "/v1/auth/token/refresh",
+            // 가입을 끝내지 않은 사람도 나갈 수는 있어야 한다 (TMT-353)
+            "/v1/auth/logout",
             // 가입 완결 그 자체와, 완결 여부를 FE가 확인하는 곳
             "/v1/users/me/profile",
             "/v1/users/me",

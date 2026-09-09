@@ -23,6 +23,8 @@ class UserEntity(
     var profileImageAssetId: Long? = null,
     /** 가입 화면을 끝낸 시각. null이면 미완료다 */
     var profileCompletedAt: Instant? = null,
+    /** 이 시각 전에 발급된 refresh는 무효 — 로그아웃이 찍는다 (TMT-353). null이면 로그아웃한 적이 없다 */
+    var tokensInvalidBefore: Instant? = null,
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

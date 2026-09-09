@@ -130,6 +130,7 @@ class UserProfileServiceTest {
         profileImageUrl = null,
         profileImageAssetId = profileImageAssetId,
         profileCompletedAt = profileCompletedAt,
+        tokensInvalidBefore = null,
     )
 
     private class FakeUserAccountPort : UserAccountPort {
@@ -143,6 +144,11 @@ class UserProfileServiceTest {
             kakaoId: Long,
             nickname: String,
         ): UserAccount? = null
+
+        override fun invalidateTokensIssuedBefore(
+            userId: Long,
+            at: Instant,
+        ): Boolean = accounts.any { it.id == userId }
 
         override fun updateProfile(
             userId: Long,

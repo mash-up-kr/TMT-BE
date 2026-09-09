@@ -23,10 +23,16 @@ data class IssuedTokens(
 /** access를 refresh 자리에(또는 반대로) 꽂는 것을 막는 용도 구분 클레임 */
 enum class TokenUse { ACCESS, REFRESH }
 
+/** 검증을 통과한 토큰의 내용. [issuedAt]은 로그아웃 이전 발급분을 거절하는 데 쓴다 (TMT-353) */
+data class TokenClaims(
+    val userId: Long,
+    val issuedAt: Instant,
+)
+
 /**
  * 세션·토큰 (TMT-272) — HS256 JWT, 저장소 없이 서명 검증만으로 동작한다(stateless).
- * refresh는 만료 전까지 서버가 무효화할 수 없다 — 로그아웃은 클라이언트 삭제로 처리하고,
- * 강제 무효화가 필요해지면 그때 저장소를 붙인다.
+ * 무효화도 토큰을 저장해서가 아니라 **발급 시각 컷오프**로 한다 — 로그아웃이 사용자 행에 시각을 찍고,
+ * 재발급이 [TokenClaims.issuedAt]을 그 값과 비교한다 (TMT-353). access는 짧은 만료로 흘려보낸다.
  */
 @Component
 class JwtTokenCodec(
@@ -51,7 +57,13 @@ class JwtTokenCodec(
     fun parseUserId(
         token: String,
         expectedUse: TokenUse,
-    ): Long {
+    ): Long = parse(token, expectedUse).userId
+
+    /** [parseUserId]와 같은 검증에 발급 시각을 더한다 — 재발급이 로그아웃 이전 발급분을 걸러내는 데 쓴다 */
+    fun parse(
+        token: String,
+        expectedUse: TokenUse,
+    ): TokenClaims {
         val claims =
             try {
                 Jwts
@@ -68,7 +80,10 @@ class JwtTokenCodec(
                 throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
             }
         if (claims[USE_CLAIM] != expectedUse.name) throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
-        return claims.subject?.toLongOrNull() ?: throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
+        val userId = claims.subject?.toLongOrNull() ?: throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
+        // 우리가 발급한 토큰에는 항상 있다 — 없으면 우리 것이 아니다
+        val issuedAt = claims.issuedAt?.toInstant() ?: throw TmtException(ErrorCode.AUTH_TOKEN_INVALID)
+        return TokenClaims(userId, issuedAt)
     }
 
     private fun encode(

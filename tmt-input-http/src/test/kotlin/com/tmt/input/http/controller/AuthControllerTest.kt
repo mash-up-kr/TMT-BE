@@ -1,12 +1,15 @@
 package com.tmt.input.http.controller
 
+import com.tmt.application.port.input.CheckRefreshAllowedUseCase
 import com.tmt.application.port.input.KakaoLoginCommand
 import com.tmt.application.port.input.KakaoLoginResult
 import com.tmt.application.port.input.LoginWithKakaoUseCase
+import com.tmt.application.port.input.LogoutUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.JwtTokenCodec
 import com.tmt.input.http.auth.TokenUse
+import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -16,16 +19,21 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Duration
+import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AuthControllerTest {
     private val useCase = StubLoginWithKakaoUseCase()
     private val tokenCodec =
         JwtTokenCodec("test-jwt-secret-that-is-32-bytes-long", Duration.ofHours(1), Duration.ofDays(30))
 
+    private val sessions = StubTokenRevocation()
+
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(AuthController(useCase, tokenCodec))
+            .standaloneSetup(AuthController(useCase, tokenCodec, sessions, sessions))
+            .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
 
@@ -123,10 +131,76 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.code").value("AUTH_TOKEN_EXPIRED"))
     }
 
+    @Test
+    fun `로그아웃 이전에 발급된 refresh로는 재발급할 수 없다 (TMT-353)`() {
+        val refreshToken = tokenCodec.issue(7L).refreshToken
+        sessions.allowed = false
+
+        mockMvc
+            .perform(refresh("""{"refreshToken":"$refreshToken"}"""))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("AUTH_TOKEN_INVALID"))
+
+        // 서명 검증을 통과한 뒤, 누구의 언제 발급된 토큰인지로 물어야 한다
+        val (userId, issuedAt) = sessions.checks.single()
+        assertEquals(7L, userId)
+        assertTrue(Duration.between(issuedAt, Instant.now()).abs() < Duration.ofMinutes(1))
+    }
+
+    @Test
+    fun `로그아웃은 204를 돌려주고 사용자의 토큰을 폐기한다`() {
+        mockMvc
+            .perform(post("/v1/auth/logout").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+            .andExpect(status().isNoContent)
+
+        assertEquals(listOf(7L), sessions.logouts)
+    }
+
+    @Test
+    fun `로그아웃은 인증이 없으면 401이다`() {
+        mockMvc
+            .perform(post("/v1/auth/logout"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+
+        assertEquals(emptyList(), sessions.logouts)
+    }
+
+    @Test
+    fun `로그아웃을 두 번 해도 204다 - 멱등`() {
+        repeat(2) {
+            mockMvc
+                .perform(post("/v1/auth/logout").requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L))
+                .andExpect(status().isNoContent)
+        }
+
+        assertEquals(listOf(7L, 7L), sessions.logouts)
+    }
+
     private fun login(body: String) = post("/v1/auth/login/kakao").contentType(MediaType.APPLICATION_JSON).content(body)
 
     private fun refresh(body: String) =
         post("/v1/auth/token/refresh").contentType(MediaType.APPLICATION_JSON).content(body)
+
+    private class StubTokenRevocation :
+        LogoutUseCase,
+        CheckRefreshAllowedUseCase {
+        val logouts = mutableListOf<Long>()
+        val checks = mutableListOf<Pair<Long, Instant>>()
+        var allowed = true
+
+        override fun logout(userId: Long) {
+            logouts += userId
+        }
+
+        override fun isRefreshAllowed(
+            userId: Long,
+            issuedAt: Instant,
+        ): Boolean {
+            checks += userId to issuedAt
+            return allowed
+        }
+    }
 
     private class StubLoginWithKakaoUseCase : LoginWithKakaoUseCase {
         val commands = mutableListOf<KakaoLoginCommand>()

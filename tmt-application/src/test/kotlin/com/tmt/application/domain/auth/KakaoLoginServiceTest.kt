@@ -158,6 +158,7 @@ class KakaoLoginServiceTest {
         profileImageUrl = null,
         profileImageAssetId = null,
         profileCompletedAt = profileCompletedAt,
+        tokensInvalidBefore = null,
     )
 
     private fun command() = KakaoLoginCommand(code = "auth-code", redirectUri = "http://localhost:3000/cb")
@@ -199,6 +200,11 @@ class KakaoLoginServiceTest {
             return account
         }
 
+        override fun invalidateTokensIssuedBefore(
+            userId: Long,
+            at: Instant,
+        ): Boolean = accounts.any { it.id == userId }
+
         override fun updateProfile(
             userId: Long,
             nickname: String,
@@ -217,6 +223,7 @@ class KakaoLoginServiceTest {
             profileImageUrl = null,
             profileImageAssetId = null,
             profileCompletedAt = null,
+            tokensInvalidBefore = null,
         )
     }
 
