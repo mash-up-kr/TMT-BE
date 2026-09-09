@@ -45,6 +45,7 @@ data class CreateSaveCommand(
  * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). 화면 분기의 유일한 기준.
  * @param placeId newPlace로 만들어진 매장의 ID. 기존 매장이면 요청값과 같다.
  * @param grantedCount 이번 요청으로 발급된 티켓 수 (0 또는 1). 상한 999장이면 리뷰여도 0이다 (T6).
+ * @param missing 리뷰 성립(C4)에 아직 모자란 항목. 리뷰가 됐으면 빈 목록이다 (TMT-395).
  */
 data class SaveResult(
     val saveId: Long,
@@ -52,7 +53,20 @@ data class SaveResult(
     val placeId: Long,
     val grantedCount: Int,
     val availableCount: Int,
+    val missing: List<ReviewCriterion>,
 )
+
+/**
+ * 리뷰 성립 판정(C4)의 항목. 응답 `missing`에 이름 그대로 실려 FE 안내 문구의 분기 기준이 되므로
+ * ErrorCode처럼 **이름 변경은 파괴적 변경**이다 — 고치지 말고 추가한다 (TMT-395).
+ * 사진은 판정 항목이 아니라서 없다 (C4-1).
+ */
+enum class ReviewCriterion {
+    COMPANION_TAG,
+    POSITIVE_POINT_TAG,
+    RATING,
+    CONTENT,
+}
 
 /**
  * 이어쓰기 (G §5). 전체 교체이고, 서버는 완성도 판정(C4)을 다시 돌린다 (C6).

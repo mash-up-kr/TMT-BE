@@ -15,6 +15,7 @@ import com.tmt.application.port.input.MySavesRequest
 import com.tmt.application.port.input.MySavesResult
 import com.tmt.application.port.input.PlaceSelection
 import com.tmt.application.port.input.ResolveAddressCoordinateUseCase
+import com.tmt.application.port.input.ReviewCriterion
 import com.tmt.application.port.input.SaveDetailView
 import com.tmt.application.port.input.SaveResult
 import com.tmt.application.port.input.UpdateSaveCommand
@@ -112,6 +113,8 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.reviewId").doesNotExist())
             .andExpect(jsonPath("$.ticket.grantedCount").value(0))
             .andExpect(jsonPath("$.ticket.availableCount").value(1))
+            .andExpect(jsonPath("$.missing.length()").value(1))
+            .andExpect(jsonPath("$.missing[0]").value("CONTENT"))
 
         assertEquals(5, createSaveUseCase.commands.single().rating)
     }
@@ -124,6 +127,7 @@ class SaveControllerTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.reviewId").value("rv_100"))
             .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.missing").isEmpty)
 
         assertEquals(listOf(7L), createSaveUseCase.commands.single().photoAssetIds)
     }
@@ -264,6 +268,7 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.saveId").value("save_9"))
             .andExpect(jsonPath("$.reviewId").value("rv_100"))
             .andExpect(jsonPath("$.ticket.grantedCount").value(1))
+            .andExpect(jsonPath("$.missing").isEmpty)
 
         val command = updateSaveUseCase.commands.single()
         assertEquals(9L, command.saveId)
@@ -407,6 +412,7 @@ class SaveControllerTest {
                 placeId = command.placeId ?: 1L,
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
+                missing = if (reviewed) emptyList() else listOf(ReviewCriterion.CONTENT),
             )
         }
     }
@@ -500,6 +506,7 @@ class SaveControllerTest {
                 placeId = (command.place as? PlaceSelection.Existing)?.placeId ?: 900L,
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
+                missing = if (reviewed) emptyList() else listOf(ReviewCriterion.CONTENT),
             )
         }
     }

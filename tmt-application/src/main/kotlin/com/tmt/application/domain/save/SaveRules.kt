@@ -1,5 +1,7 @@
 package com.tmt.application.domain.save
 
+import com.tmt.application.port.input.ReviewCriterion
+
 /** 폼 제약(F §3-1)과 리뷰 성립 판정(C4)의 서버 상수. review-form-config 응답과 같은 값이어야 한다. */
 object SaveRules {
     const val PHOTO_MAX_COUNT = 3
@@ -22,9 +24,22 @@ object SaveRules {
         positivePointTagCount: Int,
         rating: Int?,
         content: String?,
-    ): Boolean =
-        companionTagCount > 0 &&
-            positivePointTagCount > 0 &&
-            rating != null &&
-            !content.isNullOrBlank()
+    ): Boolean = missingReviewCriteria(companionTagCount, positivePointTagCount, rating, content).isEmpty()
+
+    /**
+     * 판정에서 모자란 항목을 선언 순서대로 돌려준다. 비어 있으면 리뷰다.
+     * 저장 응답의 `missing`이 되어 "별점만 매기면 리뷰가 돼요" 같은 안내의 근거가 된다 (TMT-395).
+     */
+    fun missingReviewCriteria(
+        companionTagCount: Int,
+        positivePointTagCount: Int,
+        rating: Int?,
+        content: String?,
+    ): List<ReviewCriterion> =
+        buildList {
+            if (companionTagCount <= 0) add(ReviewCriterion.COMPANION_TAG)
+            if (positivePointTagCount <= 0) add(ReviewCriterion.POSITIVE_POINT_TAG)
+            if (rating == null) add(ReviewCriterion.RATING)
+            if (content.isNullOrBlank()) add(ReviewCriterion.CONTENT)
+        }
 }
