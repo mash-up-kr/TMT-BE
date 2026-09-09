@@ -46,10 +46,15 @@ tmt:
       # gpt-oss-120b는 한국어 띄어쓰기가 깨지고 토큰을 5배 썼다 (TMT-232)
       # 모델이 또 소멸하면 코드 배포 없이 SSM /tmt-prod/ai/groq-model 값으로 바꾼다 (TMT-297)
       model: ${GROQ_MODEL:qwen/qwen3.8-27b}
+      # 무료 티어 OTPM 1,000 — 없으면 모델 기본 상한으로 계산돼 항상 429 (TMT-392)
+      max-tokens: ${GROQ_MAX_TOKENS:800}
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: gemini-2.5-flash
     batch-size: 100
+    # 한 호출에 실을 리뷰 수. groq.max-tokens(800)를 넘기면 잘린 JSON이 파싱에 실패해
+    # Gemini로 넘어간다 — 넘친 리뷰는 다음 배치가 줍는다 (PR #115 리뷰)
+    per-place-limit: 4
     backfill-cron: "0 */10 * * * *"
   address:
     # 주소 검색 (TMT-187). 페이지 상한 — 외부 호출이 페이지당 1회라 무한 순회를 막는다.

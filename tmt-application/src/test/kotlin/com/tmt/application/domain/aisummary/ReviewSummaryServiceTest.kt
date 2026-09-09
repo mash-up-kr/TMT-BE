@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 class ReviewSummaryServiceTest {
     private val summaryPort = mockk<ReviewAiSummaryPort>(relaxed = true)
     private val llmPort = mockk<ReviewSummaryLlmPort>()
-    private val service = ReviewSummaryService(summaryPort, llmPort, batchSize = 100)
+    private val service = ReviewSummaryService(summaryPort, llmPort, batchSize = 100, perPlaceLimit = 4)
 
     private fun pending(
         reviewId: Long,
@@ -79,9 +79,60 @@ class ReviewSummaryServiceTest {
     }
 
     @Test
-    fun `pros와 cons가 모두 비면 저장하지 않는다 - 다음 배치가 재시도한다`() {
+    fun `pros와 cons가 모두 비면 요약 불가로 기록한다 - 다음 배치가 다시 부르지 않는다 (TMT-392)`() {
+        // 예전엔 "저장하지 않고 다음 배치가 재시도"였다. 본문이 "ㅂㅈㄷ"이면 다음 배치도 같은 답을 받으므로
+        // 그 전제는 영원히 성립하지 않았고, 운영에서 37건이 10분마다 LLM을 다시 불렀다
         every { summaryPort.findPendingReviews(any()) } returns listOf(pending(1, placeId = 10))
-        every { llmPort.summarize(any()) } returns result(LlmSummaryResult.ReviewSummary(1, null, null))
+        every { llmPort.summarize(any()) } returns
+            result(LlmSummaryResult.ReviewSummary(1, null, null), model = "gemini/flash")
+        val saved = slot<List<NewReviewSummary>>()
+        every { summaryPort.saveSummaries(capture(saved)) } returns Unit
+
+        assertEquals(0, service.summarizePending(), "채운 요약은 0이지만")
+        assertEquals(listOf(NewReviewSummary(1, null, null, "gemini/flash")), saved.captured, "둘 다 null인 행이 기록된다")
+    }
+
+    @Test
+    fun `응답에 아예 빠진 reviewId는 건드리지 않는다 - 다음 배치가 다시 시도해야 한다 (PR 리뷰)`() {
+        // "요청했는데 안 온 것"까지 확정하면, 형식만 맞는 빈 응답 한 번에 그 매장 전체가 영구 null이 된다
+        every { summaryPort.findPendingReviews(any()) } returns
+            listOf(pending(1, placeId = 10), pending(2, placeId = 10))
+        every { llmPort.summarize(any()) } returns result(LlmSummaryResult.ReviewSummary(1, "좋아요", null))
+        val saved = slot<List<NewReviewSummary>>()
+        every { summaryPort.saveSummaries(capture(saved)) } returns Unit
+
+        assertEquals(1, service.summarizePending())
+        assertEquals(listOf(1L), saved.captured.map { it.reviewId }, "빠진 2번은 기록하지 않는다")
+        assertEquals("좋아요", saved.captured.single().pros)
+    }
+
+    @Test
+    fun `요약이 하나도 안 실려 온 응답은 아무것도 기록하지 않는다 (PR 리뷰)`() {
+        // 모델이 형식만 맞추고 빈 배열을 주면, 정상 본문 리뷰까지 되돌릴 수 없게 굳는 자리였다
+        every { summaryPort.findPendingReviews(any()) } returns
+            listOf(pending(1, placeId = 10), pending(2, placeId = 10))
+        every { llmPort.summarize(any()) } returns result()
+
+        assertEquals(0, service.summarizePending())
+        verify(exactly = 0) { summaryPort.saveSummaries(any()) }
+    }
+
+    @Test
+    fun `한 매장의 요청 리뷰 수는 상한까지만 실린다 - 나머지는 다음 배치가 줍는다 (PR 리뷰)`() {
+        // max_tokens 800을 넘기면 잘린 JSON → 파싱 실패 → 1순위 프로바이더를 살리려는 목적이 무산된다
+        every { summaryPort.findPendingReviews(any()) } returns (1L..6L).map { pending(it, placeId = 10) }
+        val request = slot<PlaceReviewsToSummarize>()
+        every { llmPort.summarize(capture(request)) } returns result(LlmSummaryResult.ReviewSummary(1, "좋아요", null))
+
+        service.summarizePending()
+
+        assertEquals(listOf(1L, 2L, 3L, 4L), request.captured.reviews.map { it.reviewId })
+    }
+
+    @Test
+    fun `호출이 실패한 매장은 기록하지 않는다 - 그쪽은 다음 배치가 재시도해야 한다`() {
+        every { summaryPort.findPendingReviews(any()) } returns listOf(pending(1, placeId = 10))
+        every { llmPort.summarize(any()) } throws IllegalStateException("프로바이더 소진")
 
         assertEquals(0, service.summarizePending())
         verify(exactly = 0) { summaryPort.saveSummaries(any()) }

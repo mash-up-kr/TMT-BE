@@ -5,7 +5,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 
-/** 행이 없으면 응답의 aiSummary가 null이다. */
+/** 행이 없으면 응답의 aiSummary가 null이다. 행이 있는데 pros·cons가 둘 다 null이어도 null — 요약 불가 기록 (TMT-392). */
 @Entity
 @Table(name = "review_ai_summary")
 class ReviewAiSummaryEntity(

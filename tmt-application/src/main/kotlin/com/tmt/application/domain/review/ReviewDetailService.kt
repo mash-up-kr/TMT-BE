@@ -59,6 +59,8 @@ class ReviewDetailService(
                 reviewCardLookupPort
                     .findSummaryRows(listOf(reviewId))
                     .firstOrNull()
+                    // 둘 다 null인 행은 "요약할 내용 없음" 기록이다 — 응답은 미요약과 같게 null (A2, TMT-392)
+                    ?.takeIf { it.pros != null || it.cons != null }
                     ?.let { ReviewDetailView.AiSummary(it.pros, it.cons) },
             isMine = viewerId != null && viewerId == row.authorId,
             createdAt = row.createdAt,

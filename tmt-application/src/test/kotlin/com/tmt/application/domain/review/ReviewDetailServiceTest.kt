@@ -59,6 +59,12 @@ class ReviewDetailServiceTest {
     }
 
     @Test
+    fun `요약 불가로 기록된 리뷰도 aiSummary가 null이다 (A2, TMT-392)`() {
+        // 둘 다 null인 행은 "봤는데 요약할 내용이 없다"는 기록이지 요약이 아니다 — 미요약과 같은 응답
+        assertNull(service(listOf(SummaryRow(1, null, null))).get(viewerId = null, reviewId = 1).aiSummary)
+    }
+
+    @Test
     fun `없거나 삭제된 리뷰는 REVIEW_NOT_FOUND다`() {
         val e = assertThrows<TmtException> { service().get(viewerId = null, reviewId = 999) }
         assertEquals(ErrorCode.REVIEW_NOT_FOUND, e.errorCode)
