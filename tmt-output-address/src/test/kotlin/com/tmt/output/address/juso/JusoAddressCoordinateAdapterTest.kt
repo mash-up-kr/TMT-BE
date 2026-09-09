@@ -57,13 +57,14 @@ class JusoAddressCoordinateAdapterTest {
         assertEquals(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE, e.errorCode)
     }
 
+    /** juso 장애(502)와 코드를 가른다 — 우리 키가 없는 것은 시간이 지나도 낫지 않는다 (TMT-354) */
     @Test
-    fun `좌표 승인키가 없으면 호출하지 않고 502다`() {
+    fun `좌표 승인키가 없으면 호출하지 않고 설정 결함으로 끊는다`() {
         val keyless = JusoAddressCoordinateAdapter(http, breaker, confmKey = "")
 
         val e = assertFailsWith<TmtException> { keyless.findCoordinate(key) }
 
-        assertEquals(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE, e.errorCode)
+        assertEquals(ErrorCode.ADDRESS_PROVIDER_MISCONFIGURED, e.errorCode)
         assertTrue(http.calls.isEmpty())
     }
 

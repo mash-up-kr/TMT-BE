@@ -25,8 +25,8 @@ class JusoAddressCoordinateAdapter(
 ) : AddressCoordinatePort {
     override fun findCoordinate(key: AddressCoordinateKey): ProjectedPoint? {
         if (confmKey.isBlank()) {
-            logger.error { "juso 좌표 승인키가 없다 - tmt.address.juso.coord-key 설정 확인 (검색 승인키와 다른 키다)" }
-            throw TmtException(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)
+            logger.warn { "juso 좌표 승인키가 없다 - tmt.address.juso.coord-key 설정 확인 (검색 승인키와 다른 키다)" }
+            throw TmtException(ErrorCode.ADDRESS_PROVIDER_MISCONFIGURED)
         }
         if (circuitBreaker.isOpen) {
             logger.warn { "juso 차단기가 열려 있어 좌표 호출을 건너뛴다" }
@@ -57,7 +57,7 @@ class JusoAddressCoordinateAdapter(
         val errorCode = common.path("errorCode").asString()
         if (errorCode != SUCCESS_CODE) {
             circuitBreaker.recordFailure()
-            logger.error {
+            logger.warn {
                 "juso 좌표 오류 - errorCode=$errorCode, errorMessage=${common.path("errorMessage").asString()}"
             }
             throw TmtException(ErrorCode.ADDRESS_PROVIDER_UNAVAILABLE)

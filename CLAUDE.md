@@ -72,6 +72,7 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
 |---|---|
 | 브랜치·커밋·PR·리뷰 등급(`[must]`/`[want]`/`[q]`)·머지 조건 | [docs/BRANCHING.md](docs/BRANCHING.md) |
 | 릴리즈 태그·배포 절차·롤백 | [docs/RELEASE.md](docs/RELEASE.md) |
+| 로그 레벨·Sentry 이벤트 경계 | [docs/LOGGING.md](docs/LOGGING.md) |
 | 테이블 구조·ERD·설계 결정 | [`V1__init.sql`](tmt-output-persistence/postgres/src/main/resources/db/migration/V1__init.sql) (DDL 정본) · [docs/DB-SCHEMA.md](docs/DB-SCHEMA.md) (근거) |
 | 응답 래퍼·에러 형식·커서 페이징·인증·멱등성 | [공통 API 규약 v1](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/51249170) |
 | 도메인 규칙 번호(C4·G17·T6 …)의 출처 | [도메인 설계 v2](https://ttalkkak.atlassian.net/wiki/spaces/ttalkkak/pages/57049090) |

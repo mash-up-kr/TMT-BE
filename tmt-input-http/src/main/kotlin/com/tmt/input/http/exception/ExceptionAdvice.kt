@@ -6,13 +6,18 @@ import com.tmt.common.exception.TicketShortageException
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.filter.RequestIdFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
+import org.apache.catalina.connector.ClientAbortException
+import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import java.time.Instant
@@ -23,10 +28,8 @@ private val logger = KotlinLogging.logger {}
 class ExceptionAdvice {
     @ExceptionHandler(TmtException::class)
     fun handleTmtException(e: TmtException): ProblemDetail {
-        if (e.errorCode.errorType == ErrorType.INTERNAL) {
-            logger.error(e) { "TmtException 발생 - ${e.errorCode.name}" }
-        } else {
-            logger.warn { "TmtException 발생 - ${e.errorCode.name}: ${e.detailMessage ?: e.errorCode.defaultMessage}" }
+        logByType(e.errorCode, e) {
+            "[${e.errorCode.name}] ${e.detailMessage ?: e.errorCode.defaultMessage}"
         }
         return problemDetail(e.errorCode, e.detailMessage)
     }
@@ -34,7 +37,7 @@ class ExceptionAdvice {
     /** 티켓이 걸린 409는 화면 갱신용 티켓 상태를 함께 싣는다 (공통 규약 §3-2, I §6-4). */
     @ExceptionHandler(TicketShortageException::class)
     fun handleTicketShortage(e: TicketShortageException): ProblemDetail {
-        logger.warn { "티켓 부족 - ${e.errorCode.name}: available=${e.availableCount}" }
+        logByType(e.errorCode, e) { "[${e.errorCode.name}] available=${e.availableCount}" }
         return problemDetail(e.errorCode, detail = null).apply {
             setProperty(
                 "ticket",
@@ -94,14 +97,59 @@ class ExceptionAdvice {
 
     @ExceptionHandler(NoResourceFoundException::class)
     fun handleNoResourceFound(e: NoResourceFoundException): ProblemDetail {
-        logger.warn { "리소스를 찾을 수 없음 - ${e.resourcePath}" }
+        // 없는 경로를 찔러본 것도 서버가 제 일을 한 결과다 (docs/LOGGING.md §3-1)
+        logger.info { "리소스를 찾을 수 없음 - ${e.resourcePath}" }
         return problemDetail(ErrorCode.RESOURCE_NOT_FOUND, e.resourcePath)
     }
 
+    /**
+     * 클라이언트가 응답을 받다 연결을 끊은 경우다 (모바일 화면 이탈·새로고침). 서버가 고칠 것이 없고
+     * 이미 나가던 응답이라 본문을 다시 쓸 수도 없는데, 맨 아래 [handleException]이 받으면
+     * ERROR로 남아 Sentry 이벤트가 된다 — 온콜 봇이 조치할 수 없는 건을 매번 분석하게 된다 (TMT-354).
+     *
+     * 본문을 만들지 않는다 — 받을 상대가 이미 없다. 상태만 500으로 두는 것은 이 예외가
+     * 비동기 타임아웃으로도 나기 때문이다. 그때는 연결이 살아 있어 빈 200이 나가면 안 된다.
+     */
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ExceptionHandler(AsyncRequestNotUsableException::class, ClientAbortException::class)
+    fun handleClientAbort(e: Exception) {
+        logger.warn { "클라이언트가 응답 수신 중 연결을 끊었다 - ${e.javaClass.simpleName}" }
+    }
+
+    /**
+     * 요청 경로를 메시지에 싣는다 — 이 자리는 [ErrorCode]가 늘 `INTERNAL_ERROR`라
+     * 넣지 않으면 서로 다른 엔드포인트의 500이 한 이슈로 묶인다. 쿼리스트링은 넣지 않는다 (§4-5).
+     */
     @ExceptionHandler(Exception::class)
-    fun handleException(e: Exception): ProblemDetail {
-        logger.error(e) { "예기치 못한 에러 발생" }
+    fun handleException(
+        e: Exception,
+        request: HttpServletRequest,
+    ): ProblemDetail {
+        logger.error(e) { "예기치 못한 에러 발생 - ${request.method} ${request.requestURI}" }
         return problemDetail(ErrorCode.INTERNAL_ERROR, detail = null)
+    }
+
+    /**
+     * 레벨은 [ErrorType] 하나로 정한다 — 자리마다 따로 정하면 기준이 흩어진다.
+     * 5xx는 원인이 밖에 있어도 ERROR고, 4xx는 정상 클라이언트에서 나오는지로 갈린다
+     * (docs/LOGGING.md §3-1).
+     */
+    private inline fun logByType(
+        errorCode: ErrorCode,
+        e: Throwable,
+        crossinline message: () -> String,
+    ) {
+        when (errorCode.errorType) {
+            ErrorType.INTERNAL, ErrorType.EXTERNAL_UNAVAILABLE, ErrorType.SERVICE_UNAVAILABLE ->
+                logger.error(e) { message() }
+
+            ErrorType.VALIDATION, ErrorType.RATE_LIMITED -> logger.warn { message() }
+
+            // else를 두지 않는다 - 새 ErrorType이 들어오면 컴파일이 막아 레벨을 정하게 한다
+            ErrorType.UNAUTHORIZED, ErrorType.FORBIDDEN, ErrorType.NOT_FOUND,
+            ErrorType.CONFLICT, ErrorType.GONE, ErrorType.UNPROCESSABLE,
+            -> logger.info { message() }
+        }
     }
 
     private fun problemDetail(

@@ -2,6 +2,8 @@ package com.tmt.output.llm
 
 import com.tmt.application.port.output.llm.PlaceChoiceRequest
 import com.tmt.application.port.output.llm.PlaceRecommendationLlmPort
+import com.tmt.common.exception.ErrorCode
+import com.tmt.common.exception.TmtException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import tools.jackson.databind.json.JsonMapper
@@ -25,7 +27,11 @@ class ChainedPlaceRecommendationLlmAdapter(
 
     override fun choose(request: PlaceChoiceRequest): Long {
         val active = clients.filter { it.enabled }
-        check(active.isNotEmpty()) { "활성 LLM 프로바이더가 없다 — GROQ_API_KEY/GEMINI_API_KEY 설정 확인" }
+        if (active.isEmpty()) {
+            // 쿼터 소진·장애와 달리 시간이 지나도 낫지 않는다. 503으로 내면 재시도해도 되는 줄 안다
+            logger.warn { "활성 LLM 프로바이더가 없다 - GROQ_API_KEY/GEMINI_API_KEY 설정 확인" }
+            throw TmtException(ErrorCode.LLM_MISCONFIGURED)
+        }
 
         val allowed = request.candidates.map { it.placeId }.toSet()
         // 재추천이 같은 매장만 내놓지 않게 두 군데를 흔든다 (PR #106 리뷰).

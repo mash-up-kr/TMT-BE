@@ -26,7 +26,8 @@
         <springProperty scope="context" name="sentryDsn" source="sentry.dsn" defaultValue=""/>
         <springProperty scope="context" name="sentryRelease" source="sentry.release" defaultValue=""/>
 
-        <!-- ERROR만 이벤트가 된다 — 4xx는 ExceptionAdvice가 warn으로 남겨 올라가지 않는다 (TMT-325) -->
+        <!-- 레벨 기준은 docs/LOGGING.md. ERROR만 이벤트가 되고(5xx·기동 점검), 그 아래는
+             breadcrumb으로만 이벤트에 딸려 간다 (TMT-354) -->
         <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
             <options>
                 <dsn>${sentryDsn}</dsn>

@@ -94,6 +94,7 @@ class RecommendationController(
         ErrorCode.PLACE_NOT_FOUND,
         ErrorCode.RECOMMENDATION_UNAVAILABLE,
         ErrorCode.RECOMMENDATION_FAILED,
+        ErrorCode.LLM_MISCONFIGURED,
     )
     @PostMapping("/v1/recommendations/places")
     fun recommendPlace(

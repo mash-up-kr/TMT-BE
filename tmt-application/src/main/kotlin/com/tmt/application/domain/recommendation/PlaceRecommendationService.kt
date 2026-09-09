@@ -103,6 +103,8 @@ class PlaceRecommendationService(
                     ),
                 )
             }.getOrElse { e ->
+                // 설정 결함(키 없음)까지 503으로 덮으면 "잠시 뒤 다시"로 읽혀 원인이 묻힌다
+                if (e is TmtException) throw e
                 logger.warn(e) { "매장 추천 LLM 실패 - userId=${command.userId}, candidates=${candidates.size}" }
                 throw TmtException(ErrorCode.RECOMMENDATION_FAILED)
             }
@@ -111,7 +113,7 @@ class PlaceRecommendationService(
         val row =
             recommendationQueryPort.findRecommendedPlace(chosenId)
                 ?: run {
-                    logger.error { "추천된 매장을 다시 읽지 못했다 - placeId=$chosenId" }
+                    logger.warn { "추천된 매장을 다시 읽지 못했다 - placeId=$chosenId" }
                     throw TmtException(ErrorCode.RECOMMENDATION_FAILED)
                 }
 
