@@ -337,6 +337,9 @@ class SaveController(
     /**
      * @param missing 리뷰 성립(C4)에 모자란 항목 — 리뷰가 됐으면 빈 배열 (TMT-395). 사진은 항목이 아니다 (C4-1).
      *   FE는 이걸로 "별점만 매기면 리뷰가 돼요" 같은 안내 문구를 고른다. 화면 분기 자체는 여전히 reviewId다 (S3).
+     *
+     *   **기본값은 멱등 리플레이 때문이다** — 이 필드가 없던 때 기록된 응답 JSON을 되돌려줄 때
+     *   non-null 파라미터가 비면 역직렬화가 깨진다. 보관이 P1D라 배포 후 하루가 그 창이다 (PR #118 리뷰).
      */
     data class SaveResultResponse(
         val saveId: String,
@@ -344,8 +347,6 @@ class SaveController(
         val placeId: String,
         val ticket: TicketGrantSummary,
         @field:Schema(description = "리뷰 성립(C4)에 모자란 항목. 리뷰가 됐으면 빈 배열. 사진은 항목이 아니다 (C4-1)")
-        // 기본값은 멱등 리플레이 때문이다 — 이 필드가 없던 때 기록된 응답 JSON을 되돌려줄 때
-        // non-null 파라미터가 비면 역직렬화가 깨진다. 보관은 P1D라 배포 후 하루가 그 창이다
         val missing: List<ReviewCriterion> = emptyList(),
     ) {
         data class TicketGrantSummary(
