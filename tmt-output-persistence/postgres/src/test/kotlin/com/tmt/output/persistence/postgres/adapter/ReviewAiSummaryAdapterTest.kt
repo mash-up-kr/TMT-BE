@@ -74,6 +74,17 @@ class ReviewAiSummaryAdapterTest : PersistenceTest() {
     }
 
     @Test
+    fun `개행과 탭뿐인 본문도 대기 목록에 없다 (PR 리뷰)`() {
+        // Postgres trim() 기본은 스페이스만 지운다 — btrim에 개행·탭을 넣지 않으면 여기가 계속 pending이다
+        val user = fixtures.newUser()
+        val place = fixtures.newPlace()
+        val saveId = fixtures.newSave(user, place, content = "\n\t\n")
+        val reviewId = fixtures.newReview(saveId, user, place)
+
+        assertFalse(isPending(reviewId))
+    }
+
+    @Test
     fun `요약 불가로 기록된 리뷰는 대기 목록에서 빠진다 (TMT-392)`() {
         // pros·cons 둘 다 null인 행 = "봤는데 요약할 내용이 없다". 행이 있으니 다음 배치가 다시 집지 않는다
         val review = fixtures.newPublishedReview(fixtures.newPlace(), content = "ㅂㅈㄷ")

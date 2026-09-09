@@ -31,6 +31,12 @@ class ReviewSummaryService(
     private val reviewAiSummaryPort: ReviewAiSummaryPort,
     private val reviewSummaryLlmPort: ReviewSummaryLlmPort,
     @param:Value("\${tmt.ai-summary.batch-size:100}") private val batchSize: Int,
+    /**
+     * 한 번의 호출에 실을 리뷰 수 상한. Groq `max_tokens`가 800이고 요약 JSON은 리뷰당 두 문장이라
+     * 리뷰가 몰리면 잘린 JSON → 파싱 실패 → Gemini 폴백이 되어 "1순위를 살린다"는 목적이 무산된다.
+     * 넘친 리뷰는 다음 배치(10분)가 줍는다 (PR #115 리뷰).
+     */
+    @param:Value("\${tmt.ai-summary.per-place-limit:4}") private val perPlaceLimit: Int,
 ) : SummarizePendingReviewsUseCase {
     override fun summarizePending(): Int {
         val pending = reviewAiSummaryPort.findPendingReviews(batchSize)
@@ -42,7 +48,7 @@ class ReviewSummaryService(
         var lastError: Throwable? = null
         val places = pending.groupBy { it.placeId }
         places.forEach { (placeId, reviews) ->
-            runCatching { summarizePlace(reviews) }
+            runCatching { summarizePlace(reviews.take(perPlaceLimit)) }
                 .onSuccess { (accepted, skipped) ->
                     filled += accepted
                     unsummarizable += skipped
@@ -78,17 +84,24 @@ class ReviewSummaryService(
 
         // 요청한 리뷰만 받는다 — LLM이 지어낸 id로 남의 리뷰 요약을 덮으면 안 된다
         val requested = reviews.map { it.reviewId }.toSet()
+        val returned = result.summaries.filter { it.reviewId in requested }
         val accepted =
-            result.summaries
-                .filter { it.reviewId in requested }
+            returned
                 .filter { it.pros != null || it.cons != null }
                 .map { NewReviewSummary(it.reviewId, it.pros, it.cons, result.model) }
-        // 요청했는데 요약이 안 온 리뷰 — LLM이 빠뜨렸거나 둘 다 null로 준 것. 본문은 다시 봐도 같으니
-        // 여기서 끝낸다: 둘 다 null인 행이 "요약할 내용 없음"의 기록이다 (TMT-392)
+        // **응답에 실려 온 리뷰만** 요약 불가로 확정한다. LLM이 규칙대로 둘 다 null로 준 것은
+        // 본문을 다시 봐도 같은 답이라 여기서 끝내고(TMT-392), 아예 빠진 id는 건드리지 않는다 —
+        // `{"summaries":[]}`처럼 형식만 맞는 응답 한 번에 그 매장 전체가 영구 null로 굳는다 (PR #115 리뷰)
         val summarized = accepted.map { it.reviewId }.toSet()
         val unsummarizable =
-            (requested - summarized).map { NewReviewSummary(it, pros = null, cons = null, model = result.model) }
+            returned
+                .filter { it.pros == null && it.cons == null }
+                .map { it.reviewId }
+                .distinct()
+                .filterNot { it in summarized }
+                .map { NewReviewSummary(it, pros = null, cons = null, model = result.model) }
 
+        if (accepted.isEmpty() && unsummarizable.isEmpty()) return 0 to 0
         reviewAiSummaryPort.saveSummaries(accepted + unsummarizable)
         return accepted.size to unsummarizable.size
     }

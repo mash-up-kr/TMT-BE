@@ -6,8 +6,11 @@ package com.tmt.application.port.output.llm
  */
 interface ReviewSummaryLlmPort {
     /**
-     * 실패(모든 프로바이더 소진)면 예외. 응답에 빠진 리뷰는 요약 없음으로 두고
-     * 다음 배치가 다시 시도한다 — 지어내는 것보다 비는 쪽이 낫다 (A2: 없으면 null).
+     * 실패(모든 프로바이더 소진)면 예외.
+     *
+     * 응답에 **아예 빠진** 리뷰는 건드리지 않는다 — 다음 배치가 다시 시도한다. 반면 `pros`·`cons`를
+     * **둘 다 null로 응답한** 리뷰는 "요약할 내용 없음"으로 기록해 재시도를 끊는다 (TMT-392) —
+     * 본문이 "ㅂㅈㄷ"이면 다시 물어도 같은 답이다. 지어내는 것보다 비는 쪽이 낫다 (A2: 없으면 null).
      */
     fun summarize(request: PlaceReviewsToSummarize): LlmSummaryResult
 }

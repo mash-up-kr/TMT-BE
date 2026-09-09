@@ -52,6 +52,9 @@ tmt:
       api-key: ${GEMINI_API_KEY:}
       model: gemini-2.5-flash
     batch-size: 100
+    # 한 호출에 실을 리뷰 수. groq.max-tokens(800)를 넘기면 잘린 JSON이 파싱에 실패해
+    # Gemini로 넘어간다 — 넘친 리뷰는 다음 배치가 줍는다 (PR #115 리뷰)
+    per-place-limit: 4
     backfill-cron: "0 */10 * * * *"
   address:
     # 주소 검색 (TMT-187). 페이지 상한 — 외부 호출이 페이지당 1회라 무한 순회를 막는다.

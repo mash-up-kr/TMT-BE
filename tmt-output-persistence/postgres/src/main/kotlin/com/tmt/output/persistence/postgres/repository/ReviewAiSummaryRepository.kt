@@ -23,7 +23,8 @@ interface ReviewAiSummaryRepository : JpaRepository<ReviewAiSummaryEntity, Long>
             WHERE a.review_id IS NULL
               AND r.deleted_at IS NULL
               AND s.content IS NOT NULL
-              AND length(trim(s.content)) > 0
+              -- trim() 기본은 스페이스만 지운다. 개행·탭뿐인 본문도 요약할 내용이 없다 (PR #115 리뷰)
+              AND length(btrim(s.content, E' \t\n\r')) > 0
             ORDER BY r.place_id, r.id
             LIMIT :limit
         """,
