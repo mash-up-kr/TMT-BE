@@ -46,8 +46,7 @@ class ReviewSummaryService(
                 .onSuccess { (accepted, skipped) ->
                     filled += accepted
                     unsummarizable += skipped
-                }
-                .onFailure { e ->
+                }.onFailure { e ->
                     // 한 매장의 실패가 배치 전체를 죽이면 안 된다 — 남은 매장은 계속 진행
                     failed++
                     lastError = e
