@@ -9,6 +9,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
 import org.apache.catalina.connector.ClientAbortException
+import org.apache.tomcat.util.http.InvalidParameterException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -53,8 +54,9 @@ class ExceptionAdvice {
     /**
      * 요청을 해석하지 못한 경우는 전부 400이다.
      *
-     * 아래 셋은 Spring이 컨트롤러에 들어가기 **전에** 던진다 — 잡지 않으면 맨 아래 [handleException]이
+     * 아래는 Spring·Tomcat이 컨트롤러에 들어가기 **전에** 던진다 — 잡지 않으면 맨 아래 [handleException]이
      * 받아 **500 INTERNAL_ERROR**가 나간다. `?limit=abc` 하나로 서버 오류가 잡히던 자리다 (TMT-343).
+     * `?cursor=%%%`처럼 퍼센트 인코딩이 깨진 값은 Tomcat이 [InvalidParameterException]으로 던진다 (TMT-394).
      * 클라이언트 잘못을 서버 오류로 보고하면 알람·로그가 오염되고, FE는 재시도해도 되는 줄 안다.
      *
      * 메시지에 사용자가 보낸 **값을 넣지 않는다** — 무엇이 틀렸는지는 파라미터 이름으로 충분하고,
@@ -66,6 +68,7 @@ class ExceptionAdvice {
         MissingServletRequestParameterException::class,
         MethodArgumentTypeMismatchException::class,
         HttpMessageNotReadableException::class,
+        InvalidParameterException::class,
     )
     fun handleValidationException(e: Exception): ProblemDetail {
         val detail =
@@ -88,6 +91,9 @@ class ExceptionAdvice {
 
                 // 본문 파싱 실패. 예외 메시지에 원본 조각이 섞여 나가므로 그대로 쓰지 않는다
                 is HttpMessageNotReadableException -> "요청 본문을 읽을 수 없습니다."
+
+                // Tomcat 메시지에는 깨진 원본 값이 들어 있다 — 값은 응답·로그에 싣지 않는다 (LOGGING.md §4-5)
+                is InvalidParameterException -> "요청 파라미터의 인코딩이 올바르지 않습니다."
 
                 else -> e.message
             }
