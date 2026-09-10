@@ -271,8 +271,9 @@ class SaveController(
                 ),
             photos =
                 detail.photos.map {
-                    SaveDetailResponse.Photo(
+                    SaveDetailResponse.PhotoResponse(
                         photoId = PublicIds.savePhoto(it.photoId),
+                        assetId = it.assetId.toString(),
                         url = it.url,
                         order = it.order,
                     )
@@ -412,7 +413,7 @@ class SaveController(
         val saveId: String,
         val reviewId: String?,
         val place: PlaceSummary,
-        val photos: List<Photo>,
+        val photos: List<PhotoResponse>,
         val tags: List<TagResponse>,
         val rating: Int?,
         val content: String?,
@@ -426,8 +427,10 @@ class SaveController(
             val categoryName: String?,
         )
 
-        data class Photo(
+        data class PhotoResponse(
             val photoId: String,
+            /** 이어쓰기에서 PUT photoAssetIds로 그대로 되돌려 보내는 값 (M2). */
+            val assetId: String,
             val url: String,
             val order: Int,
         )

@@ -36,7 +36,12 @@ class SaveQueryAdapter(
 
     override fun findSavePhotos(saveId: Long): List<SavePhotoRow> =
         saveQueryRepository.findPhotoRows(saveId).map {
-            SavePhotoRow(savePhotoId = it.getSavePhotoId(), s3Key = it.getS3Key(), photoOrder = it.getPhotoOrder())
+            SavePhotoRow(
+                savePhotoId = it.getSavePhotoId(),
+                mediaAssetId = it.getMediaAssetId(),
+                s3Key = it.getS3Key(),
+                photoOrder = it.getPhotoOrder(),
+            )
         }
 
     override fun findSaveTags(saveId: Long): List<SaveTagRow> =

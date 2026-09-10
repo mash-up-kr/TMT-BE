@@ -433,6 +433,8 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.place.categoryName").value("한식"))
             .andExpect(jsonPath("$.photos[0].photoId").value("sp_5"))
             .andExpect(jsonPath("$.photos[0].url").value("https://media.tmt.example/photos/5.jpg"))
+            // 이어쓰기에서 PUT photoAssetIds로 그대로 되돌려 보낼 수 있는 형식이다 (M2)
+            .andExpect(jsonPath("$.photos[0].assetId").value("42"))
             .andExpect(jsonPath("$.tags[0].tagId").value("tag_couple"))
             .andExpect(jsonPath("$.rating").value(4))
             .andExpect(jsonPath("$.aiSummary").doesNotExist())
@@ -539,7 +541,12 @@ class SaveControllerTest {
                     ),
                 photos =
                     listOf(
-                        SaveDetailView.Photo(photoId = 5, url = "https://media.tmt.example/photos/5.jpg", order = 0),
+                        SaveDetailView.Photo(
+                            photoId = 5,
+                            assetId = 42,
+                            url = "https://media.tmt.example/photos/5.jpg",
+                            order = 0,
+                        ),
                     ),
                 tags = listOf(SaveDetailView.Tag("tag_couple", "연인")),
                 rating = 4,

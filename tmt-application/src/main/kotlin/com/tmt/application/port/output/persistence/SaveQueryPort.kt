@@ -40,6 +40,7 @@ data class SaveRow(
 
 data class SavePhotoRow(
     val savePhotoId: Long,
+    val mediaAssetId: Long,
     val s3Key: String,
     val photoOrder: Int,
 )

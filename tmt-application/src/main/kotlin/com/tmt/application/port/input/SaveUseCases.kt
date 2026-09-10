@@ -152,6 +152,7 @@ data class SaveDetailView(
 
     data class Photo(
         val photoId: Long,
+        val assetId: Long,
         val url: String,
         val order: Int,
     )
