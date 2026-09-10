@@ -4,13 +4,22 @@
 # ALB는 비용 방침으로 제외돼(TMT-61) 인스턴스 안에서 Caddy가 TLS를 끝낸다 —
 # Let's Encrypt 인증서를 자동 발급·갱신하므로 ACM이 필요 없다.
 #
-# 도메인은 sslip.io(무료 wildcard DNS, 3-39-38-23 → 3.39.38.23 EIP)다.
-# 실도메인을 사면 아래 호스트명과 DNS A레코드만 바꾸면 된다. EIP가 바뀌면
-# 이 파일의 호스트명도 함께 바뀌어야 한다 (compute.tf의 aws_eip.was).
+# **두 호스트를 동시에 서빙하는 전환기다** (TMT-346).
+#
+# - api.ttomatto.kr — 실도메인. 가비아 DNS A레코드 → 3.39.38.23 (TTL 600, 2026-09-10 추가)
+# - 3-39-38-23.sslip.io — 종전 주소. 무료 wildcard DNS(3-39-38-23 → 3.39.38.23 EIP)
+#
+# 둘을 함께 두는 이유는 무중단이다 — FE가 API 주소를 바꿔 재배포하기 전까지 양쪽이 다 응답해야
+# 한다. FE 전환을 확인한 뒤 sslip.io를 뺀다. **그때 CI 헬스체크의 API_HOST도 같이 바꿔야 한다**
+# (.github/workflows/cicd-release.yml) — 안 바꾸면 배포 후 검증이 실패한다.
+#
+# 인증서는 호스트마다 따로 발급된다. HTTP-01 챌린지라 DNS가 이 인스턴스를 가리킨 뒤에
+# 배포해야 한다 — 순서가 뒤집히면 발급이 실패한다.
+# EIP가 바뀌면 A레코드와 이 파일이 함께 바뀌어야 한다 (compute.tf의 aws_eip.was).
 #
 # 80 포트의 HTTP → HTTPS 리다이렉트는 Caddy가 자동으로 건다.
 
-3-39-38-23.sslip.io {
+3-39-38-23.sslip.io, api.ttomatto.kr {
 	# compose 네트워크의 서비스명으로 붙는다. 8080 직결(호스트 포트)은
 	# 전환기 동안 유지한다 — CI 헬스체크와 기존 FE 설정이 아직 그 경로를 쓴다.
 	reverse_proxy app:8080
