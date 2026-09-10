@@ -105,7 +105,8 @@ mock은 이미 그렇게 동작하는데 문서에는 없는 상태가 된다 �
   `Authorization: Bearer`로 보낸다. `@UserId Long`은 필수(없으면 401), `@UserId Long?`은 선택.
   X-User-Id 헤더 스텁(TMT-150)은 제거됐다
 - **배포는 릴리즈 태그(vX.Y.Z) 발행 기준이다 — main 머지는 배포하지 않는다.** mock 기간 한정으로 켜 뒀던
-  main 자동 배포(TMT-155)는 UT2 뒤 되돌렸다. mock 서버: `https://3-39-38-23.sslip.io/api` (TMT-175,
-  Caddy TLS 종단 — `docker/Caddyfile`)
+  main 자동 배포(TMT-155)는 UT2 뒤 되돌렸다. API 주소는 **전환기라 둘 다 유효하다** (TMT-346) —
+  `https://api.ttomatto.kr/api`(실도메인)와 `https://3-39-38-23.sslip.io/api`(종전). FE 전환을
+  확인한 뒤 후자를 뺀다 (TMT-175, Caddy TLS 종단 — `docker/Caddyfile`)
 - Jira는 `TMT` 프로젝트(ttalkkak.atlassian.net). 브랜치·PR 제목에 티켓 키가 들어간다
 - 이 문서는 Claude Code가 읽고, `AGENTS.md`는 여기로 향하는 심볼릭 링크다 — 다른 에이전트도 같은 규칙을 본다
