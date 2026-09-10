@@ -2,6 +2,7 @@ package com.tmt.application.domain.user
 
 import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.GetUserProfileUseCase
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UserProfileView
 import com.tmt.application.port.output.persistence.UserAccount
@@ -25,7 +26,9 @@ class UserProfileServiceTest {
     fun `가입 완결은 닉네임을 덮어쓰고 완료 시각을 채운다`() {
         userPort.accounts += account(id = 7L, nickname = "카카오닉")
 
-        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImageAssetId = 12L))
+        service.update(
+            UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImage = ImageAssetSelection.Set(12L)),
+        )
 
         val saved = userPort.accounts.single()
         assertEquals("준형이", saved.nickname)
@@ -34,20 +37,33 @@ class UserProfileServiceTest {
     }
 
     @Test
-    fun `사진을 보내지 않으면 사진 없는 상태가 된다`() {
+    fun `사진에 null을 실으면 사진 없는 상태가 된다`() {
         userPort.accounts += account(id = 7L, nickname = "카카오닉")
 
-        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImageAssetId = null))
+        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImage = ImageAssetSelection.None))
 
         assertNull(userPort.accounts.single().profileImageAssetId)
         assertEquals(emptyList(), attachMedia.attachedIds)
     }
 
     @Test
+    fun `사진 필드를 생략한 수정은 현재 사진을 유지한다 (TMT-415)`() {
+        userPort.accounts += account(id = 7L, nickname = "준형이", profileImageAssetId = 3L)
+
+        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "새이름", profileImage = ImageAssetSelection.Keep))
+
+        assertEquals(3L, userPort.accounts.single().profileImageAssetId)
+        assertEquals(emptyList(), attachMedia.attachedIds)
+        assertEquals(emptyList(), attachMedia.detachedIds)
+    }
+
+    @Test
     fun `사진을 바꾸면 새 사진을 붙이고 이전 사진은 떼어 낸다`() {
         userPort.accounts += account(id = 7L, nickname = "준형이", profileImageAssetId = 3L)
 
-        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImageAssetId = 9L))
+        service.update(
+            UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImage = ImageAssetSelection.Set(9L)),
+        )
 
         assertEquals(listOf(9L), attachMedia.attachedIds)
         assertEquals(listOf(3L), attachMedia.detachedIds)
@@ -59,7 +75,9 @@ class UserProfileServiceTest {
         // 이미 ATTACHED라 재부착하면 MEDIA_ALREADY_ATTACHED가 난다
         userPort.accounts += account(id = 7L, nickname = "준형이", profileImageAssetId = 3L)
 
-        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "새이름", profileImageAssetId = 3L))
+        service.update(
+            UpdateUserProfileCommand(userId = 7L, nickname = "새이름", profileImage = ImageAssetSelection.Set(3L)),
+        )
 
         assertEquals(emptyList(), attachMedia.attachedIds)
         assertEquals(emptyList(), attachMedia.detachedIds)
@@ -71,7 +89,7 @@ class UserProfileServiceTest {
         val completedAt = Instant.parse("2026-09-01T00:00:00Z")
         userPort.accounts += account(id = 7L, nickname = "준형이", profileCompletedAt = completedAt)
 
-        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "새이름", profileImageAssetId = null))
+        service.update(UpdateUserProfileCommand(userId = 7L, nickname = "새이름", profileImage = ImageAssetSelection.None))
 
         assertEquals(completedAt, userPort.accounts.single().profileCompletedAt)
     }
@@ -83,7 +101,7 @@ class UserProfileServiceTest {
         listOf("가", "가".repeat(21)).forEach { nickname ->
             val error =
                 assertFailsWith<TmtException> {
-                    service.update(UpdateUserProfileCommand(7L, nickname, null))
+                    service.update(UpdateUserProfileCommand(7L, nickname, ImageAssetSelection.None))
                 }
             assertEquals(ErrorCode.VALIDATION_FAILED, error.errorCode)
         }
@@ -94,7 +112,7 @@ class UserProfileServiceTest {
         // 이모지는 UTF-16 코드 유닛으로 2다 — length로 재면 20자 상한이 이모지 10개에서 걸린다
         userPort.accounts += account(id = 7L, nickname = "준형이")
 
-        service.update(UpdateUserProfileCommand(7L, "🍅".repeat(20), null))
+        service.update(UpdateUserProfileCommand(7L, "🍅".repeat(20), ImageAssetSelection.None))
 
         assertEquals("🍅".repeat(20), userPort.accounts.single().nickname)
     }
@@ -103,7 +121,7 @@ class UserProfileServiceTest {
     fun `없는 사용자는 USER_NOT_FOUND다`() {
         val error =
             assertFailsWith<TmtException> {
-                service.update(UpdateUserProfileCommand(404L, "준형이", null))
+                service.update(UpdateUserProfileCommand(404L, "준형이", ImageAssetSelection.None))
             }
         assertEquals(ErrorCode.USER_NOT_FOUND, error.errorCode)
     }
