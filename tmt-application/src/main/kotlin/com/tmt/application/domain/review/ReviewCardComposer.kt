@@ -29,7 +29,7 @@ class ReviewCardComposer(
                 reviewId = row.reviewId,
                 authorId = row.authorId,
                 authorNickname = row.authorNickname,
-                authorProfileImageUrl = row.authorProfileImageUrl,
+                authorProfileImageUrl = row.authorProfileImageS3Key?.let(::mediaUrl) ?: row.authorProfileImageUrl,
                 rating = row.rating,
                 distanceMeters = row.distanceMeters,
                 photos =

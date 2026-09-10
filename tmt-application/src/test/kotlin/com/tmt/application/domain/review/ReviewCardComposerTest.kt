@@ -21,6 +21,8 @@ class ReviewCardComposerTest {
     private fun row(
         reviewId: Long,
         distance: Int? = 100,
+        profileImageUrl: String? = null,
+        profileImageS3Key: String? = null,
     ) = ReviewCardRow(
         reviewId = reviewId,
         saveId = reviewId,
@@ -29,7 +31,8 @@ class ReviewCardComposerTest {
         content = "본문",
         authorId = 1,
         authorNickname = "먹짱",
-        authorProfileImageUrl = null,
+        authorProfileImageUrl = profileImageUrl,
+        authorProfileImageS3Key = profileImageS3Key,
         placeId = 10,
         placeName = "가게",
         placeRegionName = "마포구 서교동",
@@ -60,6 +63,28 @@ class ReviewCardComposerTest {
         every { lookup.findSummaryRows(any()) } returns emptyList()
 
         assertNull(composer.compose(listOf(row(1, distance = null))).single().distanceMeters)
+    }
+
+    @Test
+    fun `작성자 사진은 업로드한 것을 쓰고 없을 때만 카카오 URL로 돌아간다 (V7)`() {
+        every { lookup.findPhotoRows(any()) } returns emptyList()
+        every { lookup.findTagRows(any()) } returns emptyList()
+        every { lookup.findSummaryRows(any()) } returns emptyList()
+
+        val uploaded =
+            row(1, profileImageUrl = "https://kakao.example/legacy.jpg", profileImageS3Key = "profile/a.jpg")
+        assertEquals(
+            "https://media.example/profile/a.jpg",
+            composer.compose(listOf(uploaded)).single().authorProfileImageUrl,
+        )
+
+        val legacyOnly = row(2, profileImageUrl = "https://kakao.example/legacy.jpg")
+        assertEquals(
+            "https://kakao.example/legacy.jpg",
+            composer.compose(listOf(legacyOnly)).single().authorProfileImageUrl,
+        )
+
+        assertNull(composer.compose(listOf(row(3))).single().authorProfileImageUrl)
     }
 
     @Test

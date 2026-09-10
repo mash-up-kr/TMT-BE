@@ -35,7 +35,8 @@ class ReviewDetailService(
                 ReviewDetailView.Author(
                     userId = row.authorId,
                     nickname = row.authorNickname,
-                    profileImageUrl = row.authorProfileImageUrl,
+                    profileImageUrl =
+                        row.authorProfileImageS3Key?.let(reviewCardComposer::mediaUrl) ?: row.authorProfileImageUrl,
                 ),
             place =
                 ReviewDetailView.Place(

@@ -49,6 +49,7 @@ class GroupReviewQueryAdapter(
                         authorId = it.getAuthorId(),
                         authorNickname = it.getAuthorNickname(),
                         authorProfileImageUrl = it.getAuthorProfileImageUrl(),
+                        authorProfileImageS3Key = it.getAuthorProfileImageS3Key(),
                         placeId = it.getPlaceId(),
                         placeName = it.getPlaceName(),
                         placeRegionName = it.getPlaceRegionName(),
