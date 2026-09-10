@@ -83,7 +83,7 @@ erDiagram
 |---|---|---|
 | 근처 피드 (B §2-1) | `review JOIN save JOIN place WHERE ST_DWithin(location, :me, 1000)` 거리순 | `place_location_gix` |
 | 지도 핀 (B §2-3) | `place WHERE location && viewport AND review_count > 0` 상한 30 | `place_location_gix` + `place_pins_ix` |
-| 매장 검색 (E9) | `name ILIKE / % 유사도` + 좌표 정렬 | `place_name_trgm` |
+| 매장 검색 (E9) | `name ILIKE` · `replace(name,' ','') ILIKE` · `%` 유사도 세 갈래 OR + 좌표 정렬 | `place_name_trgm` · `place_name_nospace_trgm` |
 | 이어쓰기 목록 (G §5-1) | `save LEFT JOIN review ... WHERE review.id IS NULL AND save.user_id=:me` updatedAt DESC | `save_owner_ix` + `review.save_id` UNIQUE |
 | 가게 리뷰 목록 (B §3-2) | `review WHERE place_id=:p` 최신순 | `review_place_ix` |
 | 그룹 게이트 목록 (G1) | `group_review_share WHERE group_id=:g` 최신순 LIMIT 3 or 커서 | `share_gate_ix` |

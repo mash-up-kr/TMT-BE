@@ -9,6 +9,11 @@ import org.springframework.data.repository.query.Param
  * 매장 검색 쿼리 (TMT-195). 술어는 근처 핀(E9)과 같고, 정렬만 두 가지다 —
  * 좌표가 오면 거리순, 없으면 매장명 유사도순.
  *
+ * **술어는 토씨 하나를 관용한다** (TMT-413). `ILIKE '%검색어%'` 하나만 쓰면 글자가 그대로
+ * 이어져야 걸려서 띄어쓰기·어순이 어긋나면 0건이 된다. 그래서 세 갈래를 OR로 둔다 —
+ * 부분 일치, 공백을 지운 부분 일치, pg_trgm 유사도(`%`). 등급 판정에서는 앞의 둘을 함께
+ * "이름에 걸린 것"으로 봐서(8000점) 띄어쓰기만 다른 정답이 상위에 오게 한다.
+ *
  * **정렬 키의 앞자리를 항상 정수로 만든다.** 거리는 반올림 미터(규약 §8-3),
  * 유사도는 `similarity × 1000`을 반올림한 정수다. 커서에 부동소수를 담으면
  * 문자열 왕복에서 값이 흔들려 `(score, id)` 행 비교가 경계에서 어긋날 수 있다.
@@ -40,6 +45,11 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                         -- OR가 카테고리 한 갈래로 조용히 좁혀진다
                         CAST(:queryPattern AS text) IS NULL
                         OR p.name ILIKE :queryPattern ESCAPE '\'
+                        -- 띄어쓰기 관용 (TMT-413). `위드유 용산`이 `위드유용산카페`를 찾는다
+                        OR replace(p.name, ' ', '') ILIKE :queryNoSpacePattern ESCAPE '\'
+                        -- 어순·오타 관용. `홍대 스타벅스`가 `스타벅스 홍대역`을 찾는다.
+                        -- `%`는 pg_trgm 유사도 연산자로 place_name_trgm(GIN)을 탄다
+                        OR p.name % CAST(:query AS text)
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
@@ -61,6 +71,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
         @Param("radius") radius: Int?,
         @Param("query") query: String?,
         @Param("queryPattern") queryPattern: String?,
+        @Param("queryNoSpacePattern") queryNoSpacePattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,
@@ -99,7 +110,8 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                        CAST(
                            CASE
                                WHEN CAST(:queryPattern AS text) IS NULL THEN 0
-                               WHEN p.name ILIKE :queryPattern ESCAPE '\' THEN
+                               WHEN p.name ILIKE :queryPattern ESCAPE '\'
+                                    OR replace(p.name, ' ', '') ILIKE :queryNoSpacePattern ESCAPE '\' THEN
                                    8000
                                    + CASE WHEN p.name ILIKE :queryPrefixPattern ESCAPE '\' THEN 2000 ELSE 0 END
                                    + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
@@ -120,6 +132,11 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                         -- OR가 카테고리 한 갈래로 조용히 좁혀진다
                         CAST(:queryPattern AS text) IS NULL
                         OR p.name ILIKE :queryPattern ESCAPE '\'
+                        -- 띄어쓰기 관용 (TMT-413). `위드유 용산`이 `위드유용산카페`를 찾는다
+                        OR replace(p.name, ' ', '') ILIKE :queryNoSpacePattern ESCAPE '\'
+                        -- 어순·오타 관용. `홍대 스타벅스`가 `스타벅스 홍대역`을 찾는다.
+                        -- `%`는 pg_trgm 유사도 연산자로 place_name_trgm(GIN)을 탄다
+                        OR p.name % CAST(:query AS text)
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
@@ -137,6 +154,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
     fun searchByRelevance(
         @Param("query") query: String?,
         @Param("queryPattern") queryPattern: String?,
+        @Param("queryNoSpacePattern") queryNoSpacePattern: String?,
         @Param("queryPrefixPattern") queryPrefixPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,

@@ -19,6 +19,8 @@ class PlaceSearchAdapter(
         val queryCategoryCsv = criteria.queryCategoryIds.joinToString(",")
         // similarity()는 원문이 필요하고 ILIKE는 이스케이프된 패턴이 필요해 둘을 따로 넘긴다
         val queryPattern = LikePatterns.contains(criteria.query)
+        // 띄어쓰기가 달라도 걸리게 한다 (TMT-413). 쿼리도 replace(name, ' ', '')로 비교한다
+        val queryNoSpacePattern = LikePatterns.containsIgnoringSpaces(criteria.query)
         // 앞매칭은 술어가 아니라 유사도 정렬의 가산점이다 (TMT-300)
         val queryPrefixPattern = LikePatterns.startsWith(criteria.query)
         val rows =
@@ -29,6 +31,7 @@ class PlaceSearchAdapter(
                     radius = criteria.radiusMeters,
                     query = criteria.query,
                     queryPattern = queryPattern,
+                    queryNoSpacePattern = queryNoSpacePattern,
                     queryCategoryCsv = queryCategoryCsv,
                     categoryId = criteria.categoryId,
                     regionPrefix = criteria.regionPrefix,
@@ -41,6 +44,7 @@ class PlaceSearchAdapter(
                 placeSearchRepository.searchByRelevance(
                     query = criteria.query,
                     queryPattern = queryPattern,
+                    queryNoSpacePattern = queryNoSpacePattern,
                     queryPrefixPattern = queryPrefixPattern,
                     queryCategoryCsv = queryCategoryCsv,
                     categoryId = criteria.categoryId,
