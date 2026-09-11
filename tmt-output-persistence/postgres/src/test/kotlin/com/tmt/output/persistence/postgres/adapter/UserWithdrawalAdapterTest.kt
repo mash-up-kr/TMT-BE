@@ -135,6 +135,39 @@ class UserWithdrawalAdapterTest : PersistenceTest() {
     }
 
     @Test
+    fun `별점이 비어 있어도 리뷰 수는 차감한다`() {
+        // 별점 필터가 남아 있으면 이 리뷰가 통째로 빠져 review_count가 영구히 높게 남는다
+        val user = fixtures.newUser()
+        val place = fixtures.newPlace(reviewCount = 1, ratingSum = 0)
+        val review = fixtures.newPublishedReview(place, user)
+        jdbcTemplate.update("UPDATE save SET rating = NULL WHERE id = ${review.saveId}")
+
+        service.withdraw(user)
+
+        assertEquals(0, count("SELECT review_count FROM place WHERE id = $place"))
+        assertEquals(0, count("SELECT rating_sum FROM place WHERE id = $place"))
+    }
+
+    @Test
+    fun `소유 그룹이 사라져도 남은 멤버의 티켓 이력은 그대로다`() {
+        // group_join_ticket.consumed_group_id에 FK가 없어 가입 이력이 남는다 — 붙이면 여기서 깨진다
+        val owner = fixtures.newUser()
+        val other = fixtures.newUser()
+        val group = fixtures.newGroup(owner)
+        fixtures.newMembership(group, owner)
+        fixtures.newMembership(group, other)
+        val ticket = fixtures.newTicket(other, status = "CONSUMED", consumedGroupId = group, consumedAt = Instant.now())
+
+        service.withdraw(owner)
+
+        assertEquals(0, count("SELECT count(*) FROM groups WHERE id = $group"))
+        assertEquals(
+            1,
+            count("SELECT count(*) FROM group_join_ticket WHERE id = $ticket AND consumed_group_id = $group"),
+        )
+    }
+
+    @Test
     fun `남의 그룹은 가입자 수를 차감하고 공유 집계를 다시 센다`() {
         val owner = fixtures.newUser()
         val user = fixtures.newUser()

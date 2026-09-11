@@ -26,15 +26,18 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     ): List<Long>
 
-    /** 별점은 save에 있다 (P9). 삭제된 리뷰는 이미 집계에서 빠져 있어 되돌릴 것이 없다. */
+    /**
+     * 별점은 save에 있다 (P9). 삭제된 리뷰는 이미 집계에서 빠져 있어 되돌릴 것이 없다.
+     * 별점이 비어 있어도 리뷰는 세야 하므로(C4상 나올 일은 없다) 0으로 본다 — review_count는 차감되고
+     * rating_sum은 그대로 남는다.
+     */
     @Query(
         value = """
-            SELECT r.place_id AS placeId, sv.rating AS rating
+            SELECT r.place_id AS placeId, coalesce(sv.rating, 0) AS rating
             FROM review r
             JOIN save sv ON sv.id = r.save_id
             WHERE r.user_id = :userId
               AND r.deleted_at IS NULL
-              AND sv.rating IS NOT NULL
         """,
         nativeQuery = true,
     )
@@ -56,38 +59,38 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     ): List<Long>
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_review_share WHERE group_id IN (:groupIds)", nativeQuery = true)
     fun deleteSharesByGroupIds(
         @Param("groupIds") groupIds: List<Long>,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_place WHERE group_id IN (:groupIds)", nativeQuery = true)
     fun deleteGroupPlacesByGroupIds(
         @Param("groupIds") groupIds: List<Long>,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_region_tag WHERE group_id IN (:groupIds)", nativeQuery = true)
     fun deleteRegionTagsByGroupIds(
         @Param("groupIds") groupIds: List<Long>,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_membership WHERE group_id IN (:groupIds)", nativeQuery = true)
     fun deleteMembershipsByGroupIds(
         @Param("groupIds") groupIds: List<Long>,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM groups WHERE id IN (:groupIds)", nativeQuery = true)
     fun deleteGroups(
         @Param("groupIds") groupIds: List<Long>,
     )
 
     /** 남이 내 리뷰를 공유한 행까지 끊어야 review 삭제가 FK에 걸리지 않는다. */
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = """
             DELETE FROM group_review_share
@@ -100,7 +103,7 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = "DELETE FROM review_ai_summary WHERE review_id IN (SELECT id FROM review WHERE user_id = :userId)",
         nativeQuery = true,
@@ -109,13 +112,13 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM review WHERE user_id = :userId", nativeQuery = true)
     fun deleteReviews(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = "DELETE FROM save_tag WHERE save_id IN (SELECT id FROM save WHERE user_id = :userId)",
         nativeQuery = true,
@@ -124,7 +127,7 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = "DELETE FROM save_photo WHERE save_id IN (SELECT id FROM save WHERE user_id = :userId)",
         nativeQuery = true,
@@ -133,57 +136,66 @@ interface UserWithdrawalRepository : JpaRepository<UserEntity, Long> {
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM save WHERE user_id = :userId", nativeQuery = true)
     fun deleteSaves(
         @Param("userId") userId: Long,
     )
 
     /** 티켓이 근거(reward_grant)를 참조하므로 티켓부터. */
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_join_ticket WHERE user_id = :userId", nativeQuery = true)
     fun deleteTickets(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM reward_grant WHERE user_id = :userId", nativeQuery = true)
     fun deleteRewardGrants(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM group_membership WHERE user_id = :userId", nativeQuery = true)
     fun deleteMembershipsOfUser(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM place_favorite WHERE user_id = :userId", nativeQuery = true)
     fun deleteFavorites(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM idempotency_key WHERE user_id = :userId", nativeQuery = true)
     fun deleteIdempotencyKeys(
         @Param("userId") userId: Long,
     )
 
-    /** V7의 순환을 끊는다 — 이 줄이 없으면 다음 문장이 FK 위반으로 멈춘다. */
-    @Modifying
-    @Query(value = "UPDATE users SET profile_image_asset_id = NULL WHERE id = :userId", nativeQuery = true)
+    /**
+     * V7의 순환을 끊는다 — 이 줄이 없으면 다음 문장이 FK 위반으로 멈춘다.
+     * 남이 이 사용자의 에셋을 프로필로 쓰고 있어도 같이 끊는다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = """
+            UPDATE users SET profile_image_asset_id = NULL
+            WHERE profile_image_asset_id IN (SELECT id FROM media_asset WHERE owner_id = :userId)
+        """,
+        nativeQuery = true,
+    )
     fun clearProfileImage(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM media_asset WHERE owner_id = :userId", nativeQuery = true)
     fun deleteMediaAssets(
         @Param("userId") userId: Long,
     )
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "DELETE FROM users WHERE id = :userId", nativeQuery = true)
     fun deleteUser(
         @Param("userId") userId: Long,
