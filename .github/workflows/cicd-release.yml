@@ -29,6 +29,7 @@ env:
   SSM_ADDRESS_PREFIX: /tmt-prod/address
   SSM_AUTH_PREFIX: /tmt-prod/auth
   SSM_SENTRY_PREFIX: /tmt-prod/sentry
+  SSM_ADMIN_PREFIX: /tmt-prod/admin
 
 jobs:
   build-and-deploy:
@@ -189,6 +190,9 @@ jobs:
           # Sentry DSN (TMT-325) — 미등록이면 빈 값으로 두고 SDK가 no-op으로 뜬다.
           # 수집이 끊기는 편이 기동이 막히는 것보다 낫다
           SENTRY_DSN=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_SENTRY_PREFIX}/dsn --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
+          # 어드민 허용 목록 (TMT-421). 비어 있으면 /v1/admin/** 전부 403이라 기능만 닫히고
+          # 서비스는 정상이므로 필수 검사에는 넣지 않는다
+          ADMIN_USER_IDS=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADMIN_PREFIX}/user-ids --query Parameter.Value --output text 2>/dev/null || echo "")
 
           # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
           # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252).
@@ -230,6 +234,7 @@ jobs:
           JWT_SECRET=\$JWT_SECRET
           SENTRY_DSN=\$SENTRY_DSN
           SENTRY_RELEASE=${SENTRY_RELEASE}
+          ADMIN_USER_IDS=\$ADMIN_USER_IDS
           ENV
 
           cd "\$DEPLOY_DIR"
