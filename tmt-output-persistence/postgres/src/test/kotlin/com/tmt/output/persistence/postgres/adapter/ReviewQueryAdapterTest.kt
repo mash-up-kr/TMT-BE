@@ -40,19 +40,7 @@ class ReviewQueryAdapterTest : PersistenceTest() {
     @Test
     fun `작성자 사진은 업로드한 자산을 우선하고 없으면 카카오 URL이다 (V7)`() {
         val author = fixtures.newUser()
-        val assetId = fixtures.newMediaAsset(ownerId = author, status = "ATTACHED")
-        val s3Key =
-            jdbcTemplate.queryForObject(
-                "SELECT s3_key FROM media_asset WHERE id = ?",
-                String::class.java,
-                assetId,
-            )
-        jdbcTemplate.update(
-            "UPDATE users SET profile_image_asset_id = ?, profile_image_url = ? WHERE id = ?",
-            assetId,
-            "https://kakao.example/legacy.jpg",
-            author,
-        )
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
         val review = fixtures.newPublishedReview(fixtures.newPlace(), author)
 
         val row = assertNotNull(adapter.findReviewDetail(review.reviewId))

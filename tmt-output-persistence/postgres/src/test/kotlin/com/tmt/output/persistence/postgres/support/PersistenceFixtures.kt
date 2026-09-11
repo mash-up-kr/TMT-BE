@@ -138,6 +138,30 @@ class PersistenceFixtures(
             createdAt?.let { java.sql.Timestamp.from(it) },
         )
 
+    /**
+     * 업로드한 프로필 사진을 붙인다 — [legacyUrl]을 같이 넣어 정본(`profile_image_asset_id`)이
+     * 카카오 URL 폴백보다 앞서는지 가른다 (V7).
+     *
+     * @return 붙인 자산의 `s3_key`
+     */
+    fun attachProfileImage(
+        userId: Long,
+        legacyUrl: String? = null,
+    ): String {
+        val assetId = newMediaAsset(ownerId = userId, status = "ATTACHED")
+        jdbcTemplate.update(
+            "UPDATE users SET profile_image_asset_id = ?, profile_image_url = ? WHERE id = ?",
+            assetId,
+            legacyUrl,
+            userId,
+        )
+        return jdbcTemplate.queryForObject(
+            "SELECT s3_key FROM media_asset WHERE id = ?",
+            String::class.java,
+            assetId,
+        )!!
+    }
+
     /** save_photo는 `(save_id, photo_order)`가 UNIQUE라 같은 save 안에서 order가 겹치면 안 된다. */
     fun attachPhoto(
         saveId: Long,

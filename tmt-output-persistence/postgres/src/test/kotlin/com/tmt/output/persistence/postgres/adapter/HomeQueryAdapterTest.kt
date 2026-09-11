@@ -166,6 +166,34 @@ class HomeQueryAdapterTest : PersistenceTest() {
         assertFalse(adapter.findFeedRowsByRecency(user, null, null, 2).hasNext)
     }
 
+    @Test
+    fun `피드 두 경로 모두 작성자의 업로드한 사진을 내린다 (V7)`() {
+        val user = fixtures.newUser()
+        val group = fixtures.newGroup(user)
+        fixtures.newMembership(group, user)
+        val author = fixtures.newUser()
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
+        val place = fixtures.newPlace(latitude = SEOUL_LAT, longitude = SEOUL_LNG)
+        val review = fixtures.newPublishedReview(place, userId = author, createdAt = t(1))
+        fixtures.shareReview(group, review.reviewId, review.userId)
+
+        val byRecency = adapter.findFeedRowsByRecency(user, null, null, 20).rows.single()
+        val byDistance =
+            adapter
+                .findFeedRowsByDistance(
+                    userId = user,
+                    latitude = SEOUL_LAT,
+                    longitude = SEOUL_LNG,
+                    afterDistanceMeters = null,
+                    afterReviewId = null,
+                    limit = 20,
+                ).rows
+                .single()
+
+        assertEquals(s3Key, byRecency.authorProfileImageS3Key)
+        assertEquals(s3Key, byDistance.authorProfileImageS3Key)
+    }
+
     private fun t(seconds: Long): Instant = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(seconds)
 
     private companion object {

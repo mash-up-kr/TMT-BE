@@ -44,6 +44,19 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
     }
 
     @Test
+    fun `작성자의 업로드한 사진을 내린다 (V7)`() {
+        val (lat, lng) = isolatedPoint()
+        val place = fixtures.newPlace(latitude = lat, longitude = lng)
+        val author = fixtures.newUser()
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
+        fixtures.newPublishedReview(place, userId = author)
+
+        val row = repository.findNearbyReviewRows(lat, lng, 500, null, null, null, 50).single()
+
+        assertEquals(s3Key, row.getAuthorProfileImageS3Key())
+    }
+
+    @Test
     fun `삭제된 리뷰는 빠진다`() {
         val (lat, lng) = isolatedPoint()
         val place = fixtures.newPlace(latitude = lat, longitude = lng)
