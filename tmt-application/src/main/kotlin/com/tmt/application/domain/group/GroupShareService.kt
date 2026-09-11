@@ -1,9 +1,13 @@
 package com.tmt.application.domain.group
 
 import com.tmt.application.domain.media.MediaUrlResolver
+import com.tmt.application.port.input.GetReviewShareCandidatesUseCase
 import com.tmt.application.port.input.GetReviewSharesUseCase
 import com.tmt.application.port.input.ReplaceReviewSharesUseCase
 import com.tmt.application.port.input.ReplaceSharesResult
+import com.tmt.application.port.input.ReviewShareCandidateView
+import com.tmt.application.port.input.ReviewShareCandidatesRequest
+import com.tmt.application.port.input.ReviewShareCandidatesResult
 import com.tmt.application.port.input.ReviewShareItemView
 import com.tmt.application.port.input.ReviewSharesRequest
 import com.tmt.application.port.input.ReviewSharesResult
@@ -27,6 +31,7 @@ class GroupShareService(
     private val groupStatsPort: GroupStatsPort,
     private val mediaUrlResolver: MediaUrlResolver,
 ) : GetReviewSharesUseCase,
+    GetReviewShareCandidatesUseCase,
     ReplaceReviewSharesUseCase {
     @Transactional(readOnly = true)
     override fun get(request: ReviewSharesRequest): ReviewSharesResult {
@@ -53,6 +58,32 @@ class GroupShareService(
                     )
                 },
             sharedCount = groupShareQueryPort.countSharedByUser(request.groupId, request.userId),
+            hasNext = slice.hasNext,
+        )
+    }
+
+    /** 그룹 생성 전이라 확인할 그룹도, 셀 공유 건수도 없다 (TMT-428). */
+    @Transactional(readOnly = true)
+    override fun get(request: ReviewShareCandidatesRequest): ReviewShareCandidatesResult {
+        val slice =
+            groupShareQueryPort.findMyReviewsWithShared(
+                groupId = null,
+                userId = request.userId,
+                afterCreatedAt = request.after?.createdAt,
+                afterReviewId = request.after?.reviewId,
+                limit = request.limit,
+            )
+        return ReviewShareCandidatesResult(
+            items =
+                slice.rows.map {
+                    ReviewShareCandidateView(
+                        reviewId = it.reviewId,
+                        placeName = it.placeName,
+                        thumbnailUrl = it.thumbnailS3Key?.let(mediaUrlResolver::urlOf),
+                        contentPreview = it.content,
+                        createdAt = it.createdAt,
+                    )
+                },
             hasNext = slice.hasNext,
         )
     }

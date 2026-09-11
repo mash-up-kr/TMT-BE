@@ -1,6 +1,8 @@
 package com.tmt.output.persistence.postgres.adapter
 
+import com.tmt.application.port.output.persistence.ReviewShareRow
 import com.tmt.output.persistence.postgres.support.PersistenceTest
+import com.tmt.output.persistence.postgres.support.assertKeysetWalk
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Import
@@ -134,6 +136,75 @@ class GroupShareQueryAdapterTest : PersistenceTest() {
         val next = adapter.findMyReviewsWithShared(group, user, last.createdAt, last.reviewId, 2)
 
         assertEquals(listOf(r1.reviewId), next.rows.map { it.reviewId })
+    }
+
+    @Test
+    fun `groupId가 없으면 공유 후보 목록이다 - 같은 행 같은 순서에 공유 표시만 없다`() {
+        // 그룹 생성 5단계는 그룹이 아직 없어 groupId 없이 부른다 (TMT-428)
+        val user = fixtures.newUser()
+        val group = fixtures.newGroup(user)
+        val shared = fixtures.newPublishedReview(fixtures.newPlace(name = "공유중"), user, createdAt = t(1))
+        val notShared = fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(2))
+        fixtures.attachPhoto(shared.saveId, fixtures.newMediaAsset(user), photoOrder = 0)
+        fixtures.shareReview(group, shared.reviewId, user)
+
+        val withGroup = adapter.findMyReviewsWithShared(group, user, null, null, 20).rows
+        val candidates = adapter.findMyReviewsWithShared(null, user, null, null, 20).rows
+
+        assertEquals(withGroup.map { it.reviewId }, candidates.map { it.reviewId })
+        assertEquals(listOf(notShared.reviewId, shared.reviewId), candidates.map { it.reviewId })
+        assertTrue(candidates.none { it.isShared }, "물어볼 그룹이 없으니 전부 false여야 한다")
+        // 나머지 열은 그룹 조회와 같아야 한다 — 후보 화면도 매장명·본문·썸네일을 그린다
+        val candidate = candidates.last()
+        assertEquals("공유중", candidate.placeName)
+        assertNotNull(candidate.thumbnailS3Key)
+        assertEquals(withGroup.last().content, candidate.content)
+    }
+
+    @Test
+    fun `공유 후보 목록에도 남의 리뷰와 삭제된 리뷰는 없다`() {
+        val user = fixtures.newUser()
+        val other = fixtures.newUser()
+        val mine = fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(1))
+        fixtures.newPublishedReview(fixtures.newPlace(), other, createdAt = t(2))
+        fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(3), deletedAt = Instant.now())
+
+        val ids = adapter.findMyReviewsWithShared(null, user, null, null, 20).rows.map { it.reviewId }
+
+        assertEquals(listOf(mine.reviewId), ids)
+    }
+
+    @Test
+    fun `공유 후보 커서가 같은 시각 행을 사이에 두고도 중복도 누락도 없다`() {
+        val user = fixtures.newUser()
+        // 같은 createdAt 3건 — tie-breaker(reviewId)가 빠지면 여기서 무너진다
+        val tied = (1..3).map { fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(2)) }
+        val older = fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(1))
+        val newer = fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(3))
+        val expected =
+            listOf(newer.reviewId) + tied.map { it.reviewId }.sortedDescending() + listOf(older.reviewId)
+
+        assertKeysetWalk(
+            expected = expected,
+            idOf = { row: ReviewShareRow -> row.reviewId },
+            page = { after -> adapter.findMyReviewsWithShared(null, user, after?.createdAt, after?.reviewId, 1).rows },
+        )
+    }
+
+    @Test
+    fun `공유 선택 커서가 같은 시각 행을 사이에 두고도 중복도 누락도 없다`() {
+        val user = fixtures.newUser()
+        val group = fixtures.newGroup(user)
+        val tied = (1..3).map { fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(2)) }
+        val older = fixtures.newPublishedReview(fixtures.newPlace(), user, createdAt = t(1))
+        fixtures.shareReview(group, tied.first().reviewId, user)
+        val expected = tied.map { it.reviewId }.sortedDescending() + listOf(older.reviewId)
+
+        assertKeysetWalk(
+            expected = expected,
+            idOf = { row: ReviewShareRow -> row.reviewId },
+            page = { after -> adapter.findMyReviewsWithShared(group, user, after?.createdAt, after?.reviewId, 1).rows },
+        )
     }
 
     @Test

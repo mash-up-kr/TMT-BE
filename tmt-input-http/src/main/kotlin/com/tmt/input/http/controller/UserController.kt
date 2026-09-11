@@ -2,6 +2,7 @@ package com.tmt.input.http.controller
 
 import com.tmt.application.port.input.FavoriteKey
 import com.tmt.application.port.input.FavoritePlaceView
+import com.tmt.application.port.input.GetReviewShareCandidatesUseCase
 import com.tmt.application.port.input.GetTicketHistoryUseCase
 import com.tmt.application.port.input.GetUserFavoritesUseCase
 import com.tmt.application.port.input.GetUserGroupsUseCase
@@ -11,6 +12,9 @@ import com.tmt.application.port.input.GroupCardView
 import com.tmt.application.port.input.JoinedGroupKey
 import com.tmt.application.port.input.ReviewGridItemView
 import com.tmt.application.port.input.ReviewGridKey
+import com.tmt.application.port.input.ReviewShareCandidateView
+import com.tmt.application.port.input.ReviewShareCandidatesRequest
+import com.tmt.application.port.input.ReviewShareKey
 import com.tmt.application.port.input.TicketHistoryItemView
 import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.input.UpdateUserProfileCommand
@@ -57,6 +61,7 @@ class UserController(
     private val getUserFavoritesUseCase: GetUserFavoritesUseCase,
     private val getTicketHistoryUseCase: GetTicketHistoryUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
+    private val getReviewShareCandidatesUseCase: GetReviewShareCandidatesUseCase,
 ) {
     @Operation(summary = "마이페이지 상단", description = "프로필·티켓 배너·칩 카운트 3종. 칩 숫자는 탭을 열기 전에 보이므로 여기 함께 싣는다 (J §2).")
     @GetMapping("/me")
@@ -132,6 +137,40 @@ class UserController(
                 createdAt = item.createdAt.toString(),
             )
         }
+
+    @Operation(
+        summary = "그룹 생성용 리뷰 공유 후보",
+        description =
+            "그룹 생성 5단계에서 고를 내 리뷰 목록 (TMT-428). 그룹이 아직 없어 isShared가 없고, " +
+                "생성 후 PUT /v1/groups/{groupId}/review-shares로 공유한다. " +
+                "contentPreview는 본문 전체이고 화면이 두 줄로 자른다. 미완성 저장은 나오지 않는다 (R8).",
+    )
+    @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
+    @GetMapping("/me/review-share-candidates")
+    fun myReviewShareCandidates(
+        @UserId userId: Long,
+        @RequestParam(required = false) cursor: String?,
+        @RequestParam(required = false) limit: Int?,
+    ): CursorPage<ReviewShareCandidateItem> {
+        val condition = CursorCondition.of(SHARE_CANDIDATES_CONDITION, userId)
+        val after = CursorCodec.decode(ShareCandidateCursorSpec, cursor, condition)
+        val slice =
+            getReviewShareCandidatesUseCase.get(
+                ReviewShareCandidatesRequest(userId = userId, after = after, limit = PageLimit.of(limit)),
+            )
+        val nextCursor =
+            slice.items
+                .lastOrNull()
+                ?.takeIf { slice.hasNext }
+                ?.let {
+                    CursorCodec.encode(ShareCandidateCursorSpec, ReviewShareKey(it.createdAt, it.reviewId), condition)
+                }
+        return CursorPage(
+            items = slice.items.map { it.toResponse() },
+            nextCursor = nextCursor,
+            hasNext = slice.hasNext,
+        )
+    }
 
     @Operation(summary = "내 그룹 탭", description = "가입 오래된 순 — 홈의 myGroups와 같은 기준이라 두 화면에서 순서가 어긋나지 않는다 (G20).")
     @ApiErrorCodes(ErrorCode.INVALID_CURSOR)
@@ -316,6 +355,15 @@ class UserController(
             categoryName = placeCategoryName,
         )
 
+    private fun ReviewShareCandidateView.toResponse() =
+        ReviewShareCandidateItem(
+            reviewId = PublicIds.review(reviewId),
+            placeName = placeName,
+            thumbnailUrl = thumbnailUrl,
+            contentPreview = contentPreview,
+            createdAt = createdAt.toString(),
+        )
+
     private fun GroupCardView.toResponse() =
         GroupCardResponse(
             groupId = PublicIds.group(groupId),
@@ -406,6 +454,17 @@ class UserController(
         val createdAt: String,
     )
 
+    /** 공유 후보 카드 (TMT-428). GroupShareController의 Item에서 isShared만 빠진 모양이다. */
+    data class ReviewShareCandidateItem(
+        val reviewId: String,
+        val placeName: String,
+        /** 첫 사진. 사진 0장 리뷰(C4-1)는 null — 화면이 대체 이미지를 그린다 (R11) */
+        val thumbnailUrl: String?,
+        /** 본문 전체 — 화면이 두 줄로 자른다 */
+        val contentPreview: String,
+        val createdAt: String,
+    )
+
     data class ReviewGridPlace(
         val placeId: String,
         val name: String,
@@ -462,6 +521,15 @@ class UserController(
         }
     }
 
+    internal object ShareCandidateCursorSpec : CursorSpec<ReviewShareKey> {
+        override fun toKeys(key: ReviewShareKey) = listOf(key.createdAt.toString(), key.reviewId.toString())
+
+        override fun fromKeys(keys: List<String>): ReviewShareKey {
+            require(keys.size == 2) { "정렬 키 2개가 필요하다" }
+            return ReviewShareKey(Instant.parse(keys[0]), keys[1].toLong())
+        }
+    }
+
     internal object JoinedGroupCursorSpec : CursorSpec<JoinedGroupKey> {
         override fun toKeys(key: JoinedGroupKey) = listOf(key.joinedAt.toString(), key.groupId.toString())
 
@@ -494,5 +562,6 @@ class UserController(
         private const val GROUPS_CONDITION = "USER_GROUPS"
         private const val FAVORITES_CONDITION = "USER_FAVORITES"
         private const val TICKETS_CONDITION = "USER_TICKETS"
+        private const val SHARE_CANDIDATES_CONDITION = "USER_REVIEW_SHARE_CANDIDATES"
     }
 }

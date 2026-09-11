@@ -3,6 +3,7 @@ package com.tmt.input.http.controller
 import com.tmt.application.port.input.FavoriteKey
 import com.tmt.application.port.input.FavoritePlaceView
 import com.tmt.application.port.input.FavoriteSlice
+import com.tmt.application.port.input.GetReviewShareCandidatesUseCase
 import com.tmt.application.port.input.GetTicketHistoryUseCase
 import com.tmt.application.port.input.GetUserFavoritesUseCase
 import com.tmt.application.port.input.GetUserGroupsUseCase
@@ -16,6 +17,10 @@ import com.tmt.application.port.input.JoinedGroupView
 import com.tmt.application.port.input.ReviewGridItemView
 import com.tmt.application.port.input.ReviewGridKey
 import com.tmt.application.port.input.ReviewGridSlice
+import com.tmt.application.port.input.ReviewShareCandidateView
+import com.tmt.application.port.input.ReviewShareCandidatesRequest
+import com.tmt.application.port.input.ReviewShareCandidatesResult
+import com.tmt.application.port.input.ReviewShareKey
 import com.tmt.application.port.input.TicketHistoryItemType
 import com.tmt.application.port.input.TicketHistoryItemView
 import com.tmt.application.port.input.TicketHistoryKey
@@ -44,7 +49,7 @@ class UserControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(UserController(stub, stub, stub, stub, stub, stub))
+            .standaloneSetup(UserController(stub, stub, stub, stub, stub, stub, stub))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
@@ -281,12 +286,89 @@ class UserControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
+    @Test
+    fun `공유 후보 목록은 isShared 없이 본문 미리보기를 내린다 (TMT-428)`() {
+        mockMvc
+            .perform(
+                get("/v1/users/me/review-share-candidates")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.items[0].reviewId").value("rv_1"))
+            .andExpect(jsonPath("$.items[0].placeName").value("김밥천국"))
+            .andExpect(jsonPath("$.items[0].contentPreview").value("라면이 맛있다"))
+            .andExpect(jsonPath("$.items[0].thumbnailUrl").doesNotExist())
+            .andExpect(jsonPath("$.items[0].isShared").doesNotExist())
+            .andExpect(jsonPath("$.hasNext").value(false))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
+
+        assertEquals(7L, stub.candidateRequests.single().userId)
+        assertNull(stub.candidateRequests.single().after)
+    }
+
+    @Test
+    fun `공유 후보 목록은 인증이 없으면 401이다`() {
+        mockMvc
+            .perform(get("/v1/users/me/review-share-candidates"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `공유 후보 커서를 되돌려주면 그 키가 유스케이스로 간다`() {
+        stub.candidateHasNext = true
+        val cursor =
+            mockMvc
+                .perform(
+                    get("/v1/users/me/review-share-candidates")
+                        .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L),
+                ).andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"nextCursor\":\"")
+                .substringBefore('"')
+
+        mockMvc
+            .perform(
+                get("/v1/users/me/review-share-candidates")
+                    .param("cursor", cursor)
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L),
+            ).andExpect(status().isOk)
+
+        assertEquals(
+            ReviewShareKey(Instant.parse("2026-08-01T00:00:00Z"), 1L),
+            stub.candidateRequests.last().after,
+        )
+    }
+
+    @Test
+    fun `다른 사용자의 커서는 거절한다`() {
+        stub.candidateHasNext = true
+        val cursor =
+            mockMvc
+                .perform(
+                    get("/v1/users/me/review-share-candidates")
+                        .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L),
+                ).andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"nextCursor\":\"")
+                .substringBefore('"')
+
+        mockMvc
+            .perform(
+                get("/v1/users/me/review-share-candidates")
+                    .param("cursor", cursor)
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 8L),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
+    }
+
     private class StubUserPageUseCases :
         GetUserProfileUseCase,
         GetUserReviewGridUseCase,
         GetUserGroupsUseCase,
         GetUserFavoritesUseCase,
         GetTicketHistoryUseCase,
+        GetReviewShareCandidatesUseCase,
         UpdateUserProfileUseCase {
         val profileUpdates = mutableListOf<UpdateUserProfileCommand>()
         var profileError: TmtException? = null
@@ -295,6 +377,25 @@ class UserControllerTest {
         val reviewCalls = mutableListOf<Long>()
         val reviewAfterKeys = mutableListOf<ReviewGridKey?>()
         val groupCalls = mutableListOf<Long?>()
+        var candidateHasNext = false
+        val candidateRequests = mutableListOf<ReviewShareCandidatesRequest>()
+
+        override fun get(request: ReviewShareCandidatesRequest): ReviewShareCandidatesResult {
+            candidateRequests += request
+            return ReviewShareCandidatesResult(
+                items =
+                    listOf(
+                        ReviewShareCandidateView(
+                            reviewId = 1L,
+                            placeName = "김밥천국",
+                            thumbnailUrl = null,
+                            contentPreview = "라면이 맛있다",
+                            createdAt = Instant.parse("2026-08-01T00:00:00Z"),
+                        ),
+                    ),
+                hasNext = candidateHasNext,
+            )
+        }
 
         override fun getMine(userId: Long): UserProfileView = profile(userId, mine = true)
 
