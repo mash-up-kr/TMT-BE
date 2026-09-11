@@ -28,6 +28,7 @@ import com.tmt.application.port.input.TicketHistorySlice
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.application.port.input.UserProfileView
+import com.tmt.application.port.input.WithdrawUserUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserIdArgumentResolver
@@ -35,6 +36,7 @@ import com.tmt.input.http.exception.ExceptionAdvice
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -49,7 +51,7 @@ class UserControllerTest {
 
     private val mockMvc: MockMvc =
         MockMvcBuilders
-            .standaloneSetup(UserController(stub, stub, stub, stub, stub, stub, stub))
+            .standaloneSetup(UserController(stub, stub, stub, stub, stub, stub, stub, stub))
             .setCustomArgumentResolvers(UserIdArgumentResolver())
             .setControllerAdvice(ExceptionAdvice())
             .build()
@@ -362,6 +364,26 @@ class UserControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
+    @Test
+    fun `회원탈퇴는 204와 함께 유스케이스로 간다 (TMT-409)`() {
+        mockMvc
+            .perform(
+                delete("/v1/users/me")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L),
+            ).andExpect(status().isNoContent)
+
+        assertEquals(listOf(7L), stub.withdrawn)
+    }
+
+    @Test
+    fun `회원탈퇴는 인증이 없으면 401이고 아무것도 지우지 않는다`() {
+        mockMvc
+            .perform(delete("/v1/users/me"))
+            .andExpect(status().isUnauthorized)
+
+        assertEquals(emptyList(), stub.withdrawn)
+    }
+
     private class StubUserPageUseCases :
         GetUserProfileUseCase,
         GetUserReviewGridUseCase,
@@ -369,6 +391,7 @@ class UserControllerTest {
         GetUserFavoritesUseCase,
         GetTicketHistoryUseCase,
         GetReviewShareCandidatesUseCase,
+        WithdrawUserUseCase,
         UpdateUserProfileUseCase {
         val profileUpdates = mutableListOf<UpdateUserProfileCommand>()
         var profileError: TmtException? = null
@@ -378,6 +401,7 @@ class UserControllerTest {
         val reviewAfterKeys = mutableListOf<ReviewGridKey?>()
         val groupCalls = mutableListOf<Long?>()
         var candidateHasNext = false
+        val withdrawn = mutableListOf<Long>()
         val candidateRequests = mutableListOf<ReviewShareCandidatesRequest>()
 
         override fun get(request: ReviewShareCandidatesRequest): ReviewShareCandidatesResult {
@@ -395,6 +419,10 @@ class UserControllerTest {
                     ),
                 hasNext = candidateHasNext,
             )
+        }
+
+        override fun withdraw(userId: Long) {
+            withdrawn += userId
         }
 
         override fun getMine(userId: Long): UserProfileView = profile(userId, mine = true)

@@ -19,6 +19,7 @@ import com.tmt.application.port.input.TicketHistoryItemView
 import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UpdateUserProfileUseCase
+import com.tmt.application.port.input.WithdrawUserUseCase
 import com.tmt.common.exception.ErrorCode
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
@@ -37,12 +38,15 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
@@ -62,6 +66,7 @@ class UserController(
     private val getTicketHistoryUseCase: GetTicketHistoryUseCase,
     private val updateUserProfileUseCase: UpdateUserProfileUseCase,
     private val getReviewShareCandidatesUseCase: GetReviewShareCandidatesUseCase,
+    private val withdrawUserUseCase: WithdrawUserUseCase,
 ) {
     @Operation(summary = "마이페이지 상단", description = "프로필·티켓 배너·칩 카운트 3종. 칩 숫자는 탭을 열기 전에 보이므로 여기 함께 싣는다 (J §2).")
     @GetMapping("/me")
@@ -137,6 +142,25 @@ class UserController(
                 createdAt = item.createdAt.toString(),
             )
         }
+
+    @Operation(
+        summary = "회원탈퇴",
+        description =
+            "계정과 이 사용자가 만든 데이터를 지운다 (TMT-409). **되돌릴 수 없다** — 리뷰·저장·사진·티켓·찜과 " +
+                "가입 이력이 함께 사라지고, 남의 그룹에 공유해 둔 리뷰도 내려간다.\n\n" +
+                "**소유한 그룹은 멤버가 남아 있어도 그룹째 삭제된다** — 소유자는 바뀔 수 없다 (G13). " +
+                "그 그룹에 남이 공유해 둔 리뷰는 공유만 풀리고 리뷰 자체는 남는다.\n\n" +
+                "탈퇴 후 기존 access 토큰으로 호출하면 사용자 행이 없어 USER_NOT_FOUND(404)로 떨어진다. " +
+                "같은 카카오 계정으로 다시 로그인하면 신규 가입으로 들어온다.",
+    )
+    @ApiErrorCodes(ErrorCode.USER_NOT_FOUND)
+    @DeleteMapping("/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun withdraw(
+        @UserId userId: Long,
+    ) {
+        withdrawUserUseCase.withdraw(userId)
+    }
 
     @Operation(
         summary = "그룹 생성용 리뷰 공유 후보",

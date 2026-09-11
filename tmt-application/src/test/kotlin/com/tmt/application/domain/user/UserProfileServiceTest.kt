@@ -133,7 +133,13 @@ class UserProfileServiceTest {
 
         assertTrue(service.isCompleted(7L))
         assertEquals(false, service.isCompleted(8L))
-        assertEquals(false, service.isCompleted(404L))
+    }
+
+    @Test
+    fun `탈퇴해 사라진 사용자의 토큰은 가입 미완료가 아니라 401이다 (TMT-409)`() {
+        val error = assertFailsWith<TmtException> { service.isCompleted(404L) }
+
+        assertEquals(ErrorCode.UNAUTHORIZED, error.errorCode)
     }
 
     private fun account(
