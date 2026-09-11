@@ -16,5 +16,6 @@ class CurationTagAdapter(
             .findAllByActiveIsTrueOrderByDisplayOrderAsc()
             .map { CurationTagRow(curationTagId = it.id, label = it.label) }
 
-    override fun existsActiveTag(curationTagId: String): Boolean = curationTagRepository.existsByIdAndActiveIsTrue(curationTagId)
+    override fun existsActiveTag(curationTagId: String): Boolean =
+        curationTagRepository.existsByIdAndActiveIsTrue(curationTagId)
 }

@@ -14,5 +14,6 @@ import org.springframework.stereotype.Service
 class CurationTagService(
     private val curationTagPort: CurationTagPort,
 ) : GetCurationTagsUseCase {
-    override fun get(): List<CurationTagView> = curationTagPort.findActiveTags().map { CurationTagView(it.curationTagId, it.label) }
+    override fun get(): List<CurationTagView> =
+        curationTagPort.findActiveTags().map { CurationTagView(it.curationTagId, it.label) }
 }
