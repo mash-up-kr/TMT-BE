@@ -76,9 +76,7 @@ class SaveCreationService(
                 rating = command.rating,
                 content = command.content,
             )
-        // 중간 저장은 판정을 돌리되 승격만 하지 않는다 — 사용자가 `작성 완료`를 누른 적이 없으므로
-        // 값이 다 차 있어도 리뷰·티켓·집계가 나가면 안 된다 (TMT-426)
-        if (command.draft || missing.isNotEmpty()) {
+        if (!SaveRules.shouldPromote(command.draft, missing)) {
             // 집계는 판정을 통과했을 때만 움직인다 — 여기서 돌리면 rating이 null인 저장까지
             // review_count를 올려 매장 평균(P9)과 지도 핀 조건(E6)이 함께 틀어진다
             return SaveResult(

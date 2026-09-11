@@ -51,11 +51,12 @@ data class CreateSaveCommand(
 )
 
 /**
- * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). 화면 분기의 유일한 기준.
- *   중간 저장(`draft`)은 판정을 충족해도 항상 null이다 — 이때만 `missing`이 비어 있으면서 null이다.
+ * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). **화면 분기의 유일한 기준이다.**
  * @param placeId newPlace로 만들어진 매장의 ID. 기존 매장이면 요청값과 같다.
  * @param grantedCount 이번 요청으로 발급된 티켓 수 (0 또는 1). 상한 999장이면 리뷰여도 0이다 (T6).
- * @param missing 리뷰 성립(C4)에 아직 모자란 항목. 리뷰가 됐으면 빈 목록이다 (TMT-395).
+ * @param missing 리뷰 성립(C4)에 아직 모자란 항목 — 안내 문구 전용이고 분기에 쓰지 않는다 (TMT-395).
+ *   중간 저장(`draft`)은 판정을 충족해도 승격하지 않으므로 `missing`이 비었는데 `reviewId`가 null일 수
+ *   있다 — 정상이며, 이 조합도 저장으로 읽는다.
  */
 data class SaveResult(
     val saveId: Long,

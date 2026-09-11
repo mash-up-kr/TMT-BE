@@ -2,6 +2,7 @@ package com.tmt.application.domain.save
 
 import com.tmt.application.port.input.ReviewCriterion
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -32,5 +33,20 @@ class SaveRulesTest {
         val missing = SaveRules.missingReviewCriteria(2, 0, rating = null, content = "본문은 있다")
 
         assertEquals(listOf(ReviewCriterion.POSITIVE_POINT_TAG, ReviewCriterion.RATING), missing)
+    }
+
+    @Test
+    fun `모자란 항목이 없고 작성 완료면 승격한다 (C6)`() {
+        assertTrue(SaveRules.shouldPromote(draft = false, missing = emptyList()))
+    }
+
+    @Test
+    fun `중간 저장은 모자란 항목이 없어도 승격하지 않는다 (TMT-426)`() {
+        assertFalse(SaveRules.shouldPromote(draft = true, missing = emptyList()))
+    }
+
+    @Test
+    fun `모자란 항목이 있으면 승격하지 않는다 (C4)`() {
+        assertFalse(SaveRules.shouldPromote(draft = false, missing = listOf(ReviewCriterion.RATING)))
     }
 }
