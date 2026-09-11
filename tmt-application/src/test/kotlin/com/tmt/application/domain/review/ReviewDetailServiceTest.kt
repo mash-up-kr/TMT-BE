@@ -16,6 +16,7 @@ import org.junit.jupiter.api.assertThrows
 class ReviewDetailServiceTest {
     private val authorId = 7L
     private val saveId = 10L
+    private val mediaUrlResolver = MediaUrlResolver("https://cdn.example.com")
 
     private fun service(
         summaries: List<SummaryRow> = emptyList(),
@@ -46,7 +47,8 @@ class ReviewDetailServiceTest {
                         ),
                 ),
             reviewCardLookupPort = lookup,
-            reviewCardComposer = ReviewCardComposer(lookup, MediaUrlResolver("https://cdn.example.com")),
+            reviewCardComposer = ReviewCardComposer(lookup, mediaUrlResolver),
+            mediaUrlResolver = mediaUrlResolver,
         )
     }
 

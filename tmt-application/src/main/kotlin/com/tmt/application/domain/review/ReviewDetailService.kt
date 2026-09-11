@@ -1,5 +1,6 @@
 package com.tmt.application.domain.review
 
+import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.place.FoodCategories
 import com.tmt.application.port.input.GetReviewDetailUseCase
 import com.tmt.application.port.input.ReviewDetailView
@@ -19,6 +20,7 @@ class ReviewDetailService(
     private val reviewQueryPort: ReviewQueryPort,
     private val reviewCardLookupPort: ReviewCardLookupPort,
     private val reviewCardComposer: ReviewCardComposer,
+    private val mediaUrlResolver: MediaUrlResolver,
 ) : GetReviewDetailUseCase {
     @Transactional(readOnly = true)
     override fun get(
@@ -36,7 +38,7 @@ class ReviewDetailService(
                     userId = row.authorId,
                     nickname = row.authorNickname,
                     profileImageUrl =
-                        row.authorProfileImageS3Key?.let(reviewCardComposer::mediaUrl) ?: row.authorProfileImageUrl,
+                        row.authorProfileImageS3Key?.let(mediaUrlResolver::urlOf) ?: row.authorProfileImageUrl,
                 ),
             place =
                 ReviewDetailView.Place(
