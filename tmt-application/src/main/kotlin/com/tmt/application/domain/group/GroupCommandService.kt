@@ -4,6 +4,7 @@ import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.CreateGroupUseCase
 import com.tmt.application.port.input.GroupCommand
 import com.tmt.application.port.input.GroupDetailView
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.input.UpdateGroupUseCase
 import com.tmt.application.port.output.persistence.GroupCommandPort
 import com.tmt.common.exception.ErrorCode
@@ -21,7 +22,13 @@ class GroupCommandService(
     UpdateGroupUseCase {
     @Transactional
     override fun create(command: GroupCommand): GroupDetailView {
-        validate(command)
+        // 생성에는 유지할 이미지가 없다 — Keep은 이미지 없음과 같다
+        val imageAssetId =
+            when (val selection = command.imageAsset) {
+                is ImageAssetSelection.Keep, is ImageAssetSelection.None -> null
+                is ImageAssetSelection.Set -> selection.assetId
+            }
+        validate(command, imageAssetId)
 
         val groupId =
             groupCommandPort.create(
@@ -31,10 +38,10 @@ class GroupCommandService(
                 description = command.description,
                 foodCategoryId = command.foodCategoryId,
                 regionTagIds = command.regionTagIds,
-                imageAssetId = command.imageAssetId,
+                imageAssetId = imageAssetId,
             )
         // 대표 이미지도 리뷰 사진과 같은 업로드 경로다(M7) — ATTACHED로 전이해야 TTL 정리(M4)가 지우지 않는다
-        command.imageAssetId?.let { attachMediaUseCase.attach(listOf(it)) }
+        imageAssetId?.let { attachMediaUseCase.attach(listOf(it)) }
 
         return requireNotNull(groupDetailComposer.compose(groupId, command.requesterId))
     }
@@ -48,7 +55,13 @@ class GroupCommandService(
         if (target.ownerId != command.requesterId) {
             throw TmtException(ErrorCode.GROUP_OWNER_REQUIRED)
         }
-        validate(command, currentImageAssetId = target.imageAssetId)
+        val imageAssetId =
+            when (val selection = command.imageAsset) {
+                is ImageAssetSelection.Keep -> target.imageAssetId
+                is ImageAssetSelection.None -> null
+                is ImageAssetSelection.Set -> selection.assetId
+            }
+        validate(command, imageAssetId, currentImageAssetId = target.imageAssetId)
 
         groupCommandPort.update(
             groupId = groupId,
@@ -57,12 +70,12 @@ class GroupCommandService(
             description = command.description,
             foodCategoryId = command.foodCategoryId,
             regionTagIds = command.regionTagIds,
-            imageAssetId = command.imageAssetId,
+            imageAssetId = imageAssetId,
         )
         // 이미지를 교체하면 이전 asset은 STAGED로 되돌려 TTL 정리 대상이 되게 한다
-        if (command.imageAssetId != target.imageAssetId) {
+        if (imageAssetId != target.imageAssetId) {
             target.imageAssetId?.let { attachMediaUseCase.detach(listOf(it)) }
-            command.imageAssetId?.let { attachMediaUseCase.attach(listOf(it)) }
+            imageAssetId?.let { attachMediaUseCase.attach(listOf(it)) }
         }
 
         return requireNotNull(groupDetailComposer.compose(groupId, command.requesterId))
@@ -70,6 +83,7 @@ class GroupCommandService(
 
     private fun validate(
         command: GroupCommand,
+        imageAssetId: Long?,
         currentImageAssetId: Long? = null,
     ) {
         if (command.name.isBlank() || command.oneLineDescription.isBlank()) {
@@ -96,7 +110,7 @@ class GroupCommandService(
         command.regionTagIds.forEach {
             if (it !in GroupTagCatalog.REGION_TAG_IDS) throw TmtException(ErrorCode.GROUP_TAG_NOT_FOUND, it)
         }
-        command.imageAssetId?.let { assetId ->
+        imageAssetId?.let { assetId ->
             attachMediaUseCase.verifyAttachable(
                 ownerId = command.requesterId,
                 assetIds = listOf(assetId),

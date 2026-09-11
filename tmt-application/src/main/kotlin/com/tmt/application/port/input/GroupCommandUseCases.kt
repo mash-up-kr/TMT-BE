@@ -20,7 +20,7 @@ data class GroupCommand(
     val description: String?,
     val foodCategoryId: String,
     val regionTagIds: List<String>,
-    val imageAssetId: Long?,
+    val imageAsset: ImageAssetSelection,
 )
 
 /** 그룹 상세 (D_02 §3-1) 읽기 모델 — 생성·편집 응답과 상세 조회(TMT-222)가 같은 형태를 쓴다. */

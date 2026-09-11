@@ -3,6 +3,7 @@ package com.tmt.application.domain.user
 import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.CheckSignupCompletedUseCase
 import com.tmt.application.port.input.GetUserProfileUseCase
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.application.port.input.UserProfileView
@@ -32,7 +33,12 @@ class UserProfileService(
         validateNickname(nickname)
 
         val current = userAccountPort.findById(command.userId) ?: throw TmtException(ErrorCode.USER_NOT_FOUND)
-        val newAssetId = command.profileImageAssetId
+        val newAssetId =
+            when (val selection = command.profileImage) {
+                is ImageAssetSelection.Keep -> current.profileImageAssetId
+                is ImageAssetSelection.None -> null
+                is ImageAssetSelection.Set -> selection.assetId
+            }
         if (newAssetId != null && newAssetId != current.profileImageAssetId) {
             attachMediaUseCase.verifyAttachable(command.userId, listOf(newAssetId))
         }
