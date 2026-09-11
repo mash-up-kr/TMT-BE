@@ -144,11 +144,13 @@ class CurationTagAdminAdapterTest : PersistenceTest() {
         assertEquals(emptyList(), adapter.findMissingPlaceIds(emptyList()))
     }
 
-    private fun updatedAtOf(curationTagId: String): Instant =
-        jdbcTemplate
-            .queryForObject(
+    private fun updatedAtOf(curationTagId: String): Instant {
+        val timestamp =
+            jdbcTemplate.queryForObject(
                 "SELECT updated_at FROM curation_tag WHERE id = ?",
                 java.sql.Timestamp::class.java,
                 curationTagId,
-            )!!.toInstant()
+            )
+        return timestamp!!.toInstant()
+    }
 }
