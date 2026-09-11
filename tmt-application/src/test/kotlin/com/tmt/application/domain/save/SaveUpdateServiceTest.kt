@@ -30,11 +30,15 @@ class SaveUpdateServiceTest {
     private val published = mutableListOf<Any>()
     private val attachMediaUseCase =
         MediaAttachmentService(mediaAssetPort, MediaUrlResolver("https://media.tmt.example"))
+    private val sharePorts = FakeGroupSharePorts()
     private val writeSupport =
         SaveWriteSupport(
             reviewTagPort = reviewTagPort,
             attachMediaUseCase = attachMediaUseCase,
             groupJoinTicketPort = ticketPort,
+            groupReviewQueryPort = FakeGroupMembershipQueryPort(sharePorts),
+            groupReviewSharePort = sharePorts,
+            groupStatsPort = sharePorts,
         )
 
     private val creationService =
@@ -88,17 +92,68 @@ class SaveUpdateServiceTest {
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
+        groupId: Long? = null,
     ) = UpdateSaveCommand(
         userId = userId,
         saveId = saveId,
         placeId = placeId,
         newPlaceRequested = newPlaceRequested,
+        groupId = groupId,
         photoAssetIds = photoAssetIds,
         companionTagIds = companionTagIds,
         positivePointTagIds = positivePointTagIds,
         rating = rating,
         content = content,
     )
+
+    @Test
+    fun `이어쓰기로 완성되는 시점에 그룹에 올라간다 (C6·TMT-423)`() {
+        // 작성 중에는 리뷰가 없어 공유할 것이 없다 — 판정이 충족된 이 순간이 공유 시점이다
+        sharePorts.addMembership(groupId = 7, userId = 1)
+        val saveId = seedDraft()
+
+        val draft = service.update(updateCommand(saveId = saveId, rating = 4, groupId = 7))
+        assertNull(draft.sharedGroupId, "미충족 단계에서는 공유하지 않는다")
+        assertTrue(sharePorts.shared.isEmpty())
+
+        val result =
+            service.update(
+                updateCommand(
+                    saveId = saveId,
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "사진 없이 완성했다",
+                    groupId = 7,
+                ),
+            )
+
+        val reviewId = requireNotNull(result.reviewId)
+        assertEquals(7L, result.sharedGroupId)
+        assertEquals(listOf(Triple(7L, 1L, reviewId)), sharePorts.shared)
+        assertEquals(listOf(7L), sharePorts.refreshedGroupIds)
+    }
+
+    @Test
+    fun `이어쓰기도 멤버가 아니면 리뷰만 만든다 (TMT-423)`() {
+        val saveId = seedDraft()
+
+        val result =
+            service.update(
+                updateCommand(
+                    saveId = saveId,
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "맛있어요",
+                    groupId = 7,
+                ),
+            )
+
+        assertNotNull(result.reviewId)
+        assertNull(result.sharedGroupId)
+        assertTrue(sharePorts.shared.isEmpty())
+    }
 
     @Test
     fun `이어쓰기로 판정이 충족되면 그 시점에 리뷰·티켓·집계가 나간다 (C6)`() {
