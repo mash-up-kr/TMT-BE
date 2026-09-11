@@ -43,8 +43,16 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
-                  AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
-                  AND (CAST(:regionPrefix AS text) IS NULL OR p.region_name LIKE :regionPrefix || '%')
+                  AND (
+                        -- 칩은 조건이 아니라 운영이 고른 매장 목록이다 (E12, V9). 목록을
+                        -- 애플리케이션으로 끌어올려 IN으로 넘기면 파라미터가 목록 크기만큼
+                        -- 늘고 상한이 없어, 술어를 SQL에 둔다
+                        CAST(:curationTagId AS varchar) IS NULL
+                        OR EXISTS(
+                               SELECT 1 FROM curation_tag_place ctp
+                               WHERE ctp.curation_tag_id = :curationTagId AND ctp.place_id = p.id
+                           )
+                      )
                   AND (CAST(:radius AS int) IS NULL OR ST_DWithin(p.location, pt.g, :radius))
             )
             SELECT c.*, c.distanceMeters AS sortValue FROM candidate c
@@ -62,8 +70,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
         @Param("query") query: String?,
         @Param("queryPattern") queryPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
-        @Param("categoryId") categoryId: String?,
-        @Param("regionPrefix") regionPrefix: String?,
+        @Param("curationTagId") curationTagId: String?,
         @Param("afterSortValue") afterSortValue: Int?,
         @Param("afterPlaceId") afterPlaceId: Long?,
         @Param("viewerId") viewerId: Long?,
@@ -123,8 +130,16 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                         OR p.road_address ILIKE :queryPattern ESCAPE '\'
                         OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                       )
-                  AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
-                  AND (CAST(:regionPrefix AS text) IS NULL OR p.region_name LIKE :regionPrefix || '%')
+                  AND (
+                        -- 칩은 조건이 아니라 운영이 고른 매장 목록이다 (E12, V9). 목록을
+                        -- 애플리케이션으로 끌어올려 IN으로 넘기면 파라미터가 목록 크기만큼
+                        -- 늘고 상한이 없어, 술어를 SQL에 둔다
+                        CAST(:curationTagId AS varchar) IS NULL
+                        OR EXISTS(
+                               SELECT 1 FROM curation_tag_place ctp
+                               WHERE ctp.curation_tag_id = :curationTagId AND ctp.place_id = p.id
+                           )
+                      )
             )
             SELECT * FROM candidate c
             WHERE CAST(:afterSortValue AS int) IS NULL
@@ -139,8 +154,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
         @Param("queryPattern") queryPattern: String?,
         @Param("queryPrefixPattern") queryPrefixPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
-        @Param("categoryId") categoryId: String?,
-        @Param("regionPrefix") regionPrefix: String?,
+        @Param("curationTagId") curationTagId: String?,
         @Param("afterSortValue") afterSortValue: Int?,
         @Param("afterPlaceId") afterPlaceId: Long?,
         @Param("viewerId") viewerId: Long?,

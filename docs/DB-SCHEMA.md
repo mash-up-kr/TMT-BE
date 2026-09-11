@@ -34,6 +34,8 @@ erDiagram
     groups ||--o{ group_review_share : ""
     groups ||--o{ group_region_tag : "지역 N"
     groups ||--o{ group_place : "파생 집계"
+    curation_tag ||--o{ curation_tag_place : "칩 매장 N"
+    place ||--o{ curation_tag_place : ""
 ```
 
 ## 2. 핵심 설계 결정
@@ -54,10 +56,15 @@ erDiagram
 
 `place.review_count`·`place.rating_sum`, `groups.member_count`·`review_count`·`place_count`. 평균 별점은 `rating_sum / review_count`로 계산한다 — 평균을 직접 저장하면 반올림 누적 오차가 생기고, 합계는 리뷰 삭제 시 역연산이 정확하다. `group_place`는 그룹에 공유된 리뷰들의 매장 집합(도메인 §3 내부 엔티티)으로, `place_count`와 커버 파생을 받친다.
 
-### D4. 태그·지역·카테고리 — taxonomy 테이블은 리뷰 태그 하나만
+### D4. 태그·지역·카테고리 — taxonomy 테이블은 리뷰 태그와 큐레이션 칩 둘
 
-- `review_tag_definition` (COMPANION 5 + POSITIVE_POINT 7)만 테이블이다. FK로 무결성이 걸리고, "사용된 태그는 삭제하지 않고 비활성화"(§3) 요구가 있어서다
-- 음식 카테고리 14종(E11)·지역 26종(E10)·큐레이션 칩(E12)은 **서버 상수**다. 도메인 v2가 CurationTag 테이블을 명시적으로 제거했고, 값 변경 = 서버 배포라는 결정(질문 36·37)과 일치한다. 컬럼에는 코드 문자열(`cat_cafe`, `region_mapo`)을 저장하고 앱이 검증한다
+- `review_tag_definition` (COMPANION 5 + POSITIVE_POINT 7)이 테이블인 이유는 둘이다. FK로 무결성이 걸리고, "사용된 태그는 삭제하지 않고 비활성화"(§3) 요구가 있어서다
+- **`curation_tag` · `curation_tag_place`도 테이블이다** (V9, 2026-09-11). 처음 판에서는 큐레이션 칩(E12)도 서버 상수였다 — 근거는 도메인 v2 §0의 "`CurationTag` 애그리거트 → BE 하드코딩, 테이블 없음"이고 그 출처가 질문 36·37이다. **그 결정을 다시 읽으면 원칙이 아니라 유예였다**:
+  - 질문 36("칩을 매장·리뷰와 어떻게 연결합니까? 운영이 매장을 수동 매핑 / 검색어 프리셋")의 결론은 **"초기 하드코딩으로 관리 이후 논의 필요"**였다. 질문 37("값 목록과 관리 주체")은 "BE에서 하드코딩"
+  - 같은 질문 문서가 그 갈래에 필요한 테이블 이름을 이미 지목해 뒀다 — "운영이 매장을 수동 매핑하면 `curation_tag_place` 연결 테이블이 필요하고, 검색어 프리셋이면 테이블 없이 칩이 쿼리 조건으로만 존재한다"
+  - **지금 수동 매핑 갈래를 택한다.** 칩이 담던 것은 `(categoryId, regionPrefix)` 조건 하나였고, 그래서 `curation_euljiro_yajang`("을지로 야장")이 **중구 전체와 같았다** — 야장을 조건식으로 쓸 방법이 없다. 매장을 지정하면 칩이 조건이 아니라 목록이 되고, **목록은 해석할 코드가 없으니 배포와 함께 나갈 이유가 없다**
+  - `pin_order`는 운영이 의도한 노출 순서를 받아 두지만 **읽는 경로가 아직 없다.** 검색·핀은 기존 정렬(거리순·유사도순)을 쓰고 칩은 후보를 좁히는 술어로만 동작한다 — 칩이 필터인지 결과 형태를 바꾸는지가 도메인 v2 §7-1의 유일한 미결(E5, FE 확인 대기)이라 정렬 축을 새로 만들지 않았다
+- 음식 카테고리 14종(E11)·지역 26종(E10)은 여전히 **서버 상수**다. 둘은 조건이고 해석하는 코드가 있어 값 변경 = 서버 배포가 맞다. 컬럼에는 코드 문자열(`cat_cafe`, `region_mapo`)을 저장하고 앱이 검증한다
 
 ### D5. 멤버십은 이력을 남긴다 — 활성 1건은 partial unique
 
@@ -84,6 +91,7 @@ erDiagram
 | 근처 피드 (B §2-1) | `review JOIN save JOIN place WHERE ST_DWithin(location, :me, 1000)` 거리순 | `place_location_gix` |
 | 지도 핀 (B §2-3) | `place WHERE location && viewport AND review_count > 0` 상한 30 | `place_location_gix` + `place_pins_ix` |
 | 매장 검색 (E9) | `name ILIKE / % 유사도` + 좌표 정렬 | `place_name_trgm` |
+| 큐레이션 칩 검색·핀 (E12) | 위 두 쿼리에 `EXISTS(curation_tag_place WHERE curation_tag_id=:chip AND place_id=p.id)` 술어를 더한다 — 정렬은 그대로 | `curation_tag_place` PK |
 | 이어쓰기 목록 (G §5-1) | `save LEFT JOIN review ... WHERE review.id IS NULL AND save.user_id=:me` updatedAt DESC | `save_owner_ix` + `review.save_id` UNIQUE |
 | 가게 리뷰 목록 (B §3-2) | `review WHERE place_id=:p` 최신순 | `review_place_ix` |
 | 그룹 게이트 목록 (G1) | `group_review_share WHERE group_id=:g` 최신순 LIMIT 3 or 커서 | `share_gate_ix` |
@@ -105,6 +113,7 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 | `MockReviewShareStore` | `group_review_share` + `group_place` |
 | `MockIdempotencyRegistry` | `idempotency_key` |
 | PlaceCard 집계 (매번 계산) | `place.review_count`·`rating_sum` 컬럼 (D3) |
+| 큐레이션 칩 상수 (`CurationPresets`) | `curation_tag` + `curation_tag_place` (D4: 조건 → 매장 목록) |
 
 ## 6. TMT-96(ERD·DDL 확정)으로 넘기는 것
 
@@ -123,3 +132,4 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 | 2026-09-07 | `users.profile_completed_at`·`users.profile_image_asset_id` 추가 (V7, TMT-370) — 카카오 로그인이 만든 행은 닉네임이 카카오 값이라 사용자가 입력한 값이 들어갈 자리가 없었다. 가입 완결(`PUT /v1/users/me/profile`)이 두 컬럼을 채우고, `profile_completed_at IS NULL`이면 다른 API가 403으로 막힌다. 프로필 사진의 정본은 `profile_image_asset_id`(그룹 대표 이미지와 같은 업로드 경로, M7)로 옮기고 `profile_image_url`(카카오 값)은 신규 쓰기를 멈춘다. 이전 가입자는 `created_at`으로 백필해 완료로 본다 | 장민서 |
 | 2026-09-08 | `users.tokens_invalid_before` 추가 (V8, TMT-353) — 로그아웃(U8)이 찍는 "이 시각 전에 발급된 refresh는 무효" 기준. 토큰이 stateless라 개별 토큰을 저장할 자리가 없었는데, **토큰마다 저장하는 denylist 대신 사용자 행에 시각 하나**를 두면 늘어나는 행 없이 재발급이 refresh의 `iat`와 비교해 거절할 수 있다. 대가는 "기기별"이 아니라 **"이 사용자 전 기기" 로그아웃**이 된다는 것 — 모바일 웹 하나를 쓰는 지금은 자연스럽고, 기기별이 필요해지면 그때 토큰 저장소를 붙인다. access는 여기서 보지 않고 짧은 만료(1h)로 흘려보낸다 (X 명세 §4-2). NULL이면 로그아웃한 적이 없다 | 이준표 |
 | 2026-09-09 | `review_ai_summary` 행의 의미 확장 (TMT-392, 스키마 변경 없음) — A2 "행 없음 = 미요약"에 **"행 있음 + pros·cons 둘 다 null = 요약할 내용 없음"**을 더한다. 요약 배치가 LLM 응답을 받고도 요약이 없으면 아무 행도 남기지 않아 같은 리뷰를 10분마다 다시 보냈다 — 운영에서 본문 10자 미만 QA 리뷰 37건이 무한 재시도돼 Groq 일일 한도를 태우고 추천이 503으로 밀렸다. 응답 매퍼는 둘 다 null인 행을 `aiSummary: null`로 내려 계약은 그대로다. 재시도는 호출 실패(예외)에만 남는다 | 이준표 |
+| 2026-09-11 | `curation_tag`·`curation_tag_place` 추가 (V9·V10, D4 개정) — 큐레이션 칩(E12)을 서버 상수에서 테이블로 옮겼다. **기존 결정을 뒤집은 것이 아니라 질문 36이 열어둔 다른 갈래를 택한 것이다** — 36의 결론은 "초기 하드코딩으로 관리 **이후 논의 필요**"였고, 질문 문서가 수동 매핑 갈래의 테이블 이름으로 `curation_tag_place`를 이미 지목해 뒀다. 바꾼 이유는 조건식의 한계다: 칩이 `(categoryId, regionPrefix)` 하나뿐이라 "을지로 야장"이 중구 전체와 같았다. 검색·핀 쿼리 3개에 `EXISTS(curation_tag_place …)` 술어를 더하고 `categoryId`·`regionPrefix` 파라미터를 걷어냈다 — 프리셋만 그 값을 넣고 있었다. 초기 매장 목록은 **종전 프리셋 조건을 한 번 실행한 결과**(칩당 리뷰 많은 순 30개)로 상수 시절 동작을 재현해 두고, 이후 운영이 고친다. `pin_order`는 받아만 두고 읽지 않는다 — E5(칩이 필터인가)가 열려 있어 정렬 축을 새로 만들지 않았다. 어드민 쓰기 경로는 별건이다 | 이준표 |

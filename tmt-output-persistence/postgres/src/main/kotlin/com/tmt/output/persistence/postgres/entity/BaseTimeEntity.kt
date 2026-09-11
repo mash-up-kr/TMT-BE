@@ -5,7 +5,7 @@ import jakarta.persistence.MappedSuperclass
 import org.springframework.data.annotation.LastModifiedDate
 import java.time.Instant
 
-/** `updated_at`이 있는 테이블만 상속한다 — users·place·save·groups 4종. */
+/** `updated_at`이 있는 테이블만 상속한다 — users·place·save·groups·curation_tag 5종. */
 @MappedSuperclass
 abstract class BaseTimeEntity : BaseCreatedEntity() {
     @LastModifiedDate
