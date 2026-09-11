@@ -21,11 +21,16 @@ import java.util.concurrent.atomic.AtomicLong
 class PersistenceFixtures(
     private val jdbcTemplate: JdbcTemplate,
 ) {
-    fun newUser(nickname: String = "tester"): Long =
+    /** [profileCompletedAt]에 null을 주면 가입 미완료 계정이 된다 (TMT-370). */
+    fun newUser(
+        nickname: String = "tester",
+        profileCompletedAt: Instant? = Instant.now(),
+    ): Long =
         insertReturningId(
-            "INSERT INTO users (kakao_id, nickname) VALUES (?, ?) RETURNING id",
+            "INSERT INTO users (kakao_id, nickname, profile_completed_at) VALUES (?, ?, ?) RETURNING id",
             nextSequence(),
             nickname,
+            profileCompletedAt?.let { Timestamp.from(it) },
         )
 
     /**
