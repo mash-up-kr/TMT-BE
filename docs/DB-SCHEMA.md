@@ -90,7 +90,7 @@ erDiagram
 |---|---|---|
 | 근처 피드 (B §2-1) | `review JOIN save JOIN place WHERE ST_DWithin(location, :me, 1000)` 거리순 | `place_location_gix` |
 | 지도 핀 (B §2-3) | `place WHERE location && viewport AND review_count > 0` 상한 30 | `place_location_gix` + `place_pins_ix` |
-| 매장 검색 (E9) | `name ILIKE / % 유사도` + 좌표 정렬 | `place_name_trgm` |
+| 매장 검색 (E9) | `name ILIKE` · `replace(name,' ','') ILIKE` · `%` 유사도 세 갈래 OR + 좌표 정렬 | `place_name_trgm` · `place_name_nospace_trgm` |
 | 큐레이션 칩 검색·핀 (E12) | 위 두 쿼리에 `EXISTS(curation_tag_place WHERE curation_tag_id=:chip AND place_id=p.id)` 술어를 더한다 — 정렬은 그대로 | `curation_tag_place` PK |
 | 이어쓰기 목록 (G §5-1) | `save LEFT JOIN review ... WHERE review.id IS NULL AND save.user_id=:me` updatedAt DESC | `save_owner_ix` + `review.save_id` UNIQUE |
 | 가게 리뷰 목록 (B §3-2) | `review WHERE place_id=:p` 최신순 | `review_place_ix` |
@@ -133,3 +133,4 @@ mock(TMT-149)의 인메모리 store가 이 스키마의 축소판이다. 실구�
 | 2026-09-08 | `users.tokens_invalid_before` 추가 (V8, TMT-353) — 로그아웃(U8)이 찍는 "이 시각 전에 발급된 refresh는 무효" 기준. 토큰이 stateless라 개별 토큰을 저장할 자리가 없었는데, **토큰마다 저장하는 denylist 대신 사용자 행에 시각 하나**를 두면 늘어나는 행 없이 재발급이 refresh의 `iat`와 비교해 거절할 수 있다. 대가는 "기기별"이 아니라 **"이 사용자 전 기기" 로그아웃**이 된다는 것 — 모바일 웹 하나를 쓰는 지금은 자연스럽고, 기기별이 필요해지면 그때 토큰 저장소를 붙인다. access는 여기서 보지 않고 짧은 만료(1h)로 흘려보낸다 (X 명세 §4-2). NULL이면 로그아웃한 적이 없다 | 이준표 |
 | 2026-09-09 | `review_ai_summary` 행의 의미 확장 (TMT-392, 스키마 변경 없음) — A2 "행 없음 = 미요약"에 **"행 있음 + pros·cons 둘 다 null = 요약할 내용 없음"**을 더한다. 요약 배치가 LLM 응답을 받고도 요약이 없으면 아무 행도 남기지 않아 같은 리뷰를 10분마다 다시 보냈다 — 운영에서 본문 10자 미만 QA 리뷰 37건이 무한 재시도돼 Groq 일일 한도를 태우고 추천이 503으로 밀렸다. 응답 매퍼는 둘 다 null인 행을 `aiSummary: null`로 내려 계약은 그대로다. 재시도는 호출 실패(예외)에만 남는다 | 이준표 |
 | 2026-09-11 | `curation_tag`·`curation_tag_place` 추가 (V9·V10, D4 개정) — 큐레이션 칩(E12)을 서버 상수에서 테이블로 옮겼다. **기존 결정을 뒤집은 것이 아니라 질문 36이 열어둔 다른 갈래를 택한 것이다** — 36의 결론은 "초기 하드코딩으로 관리 **이후 논의 필요**"였고, 질문 문서가 수동 매핑 갈래의 테이블 이름으로 `curation_tag_place`를 이미 지목해 뒀다. 바꾼 이유는 조건식의 한계다: 칩이 `(categoryId, regionPrefix)` 하나뿐이라 "을지로 야장"이 중구 전체와 같았다. 검색·핀 쿼리 3개에 `EXISTS(curation_tag_place …)` 술어를 더하고 `categoryId`·`regionPrefix` 파라미터를 걷어냈다 — 프리셋만 그 값을 넣고 있었다. 초기 매장 목록은 **종전 프리셋 조건을 한 번 실행한 결과**(칩당 리뷰 많은 순 30개)로 상수 시절 동작을 재현해 두고, 이후 운영이 고친다. `pin_order`는 받아만 두고 읽지 않는다 — E5(칩이 필터인가)가 열려 있어 정렬 축을 새로 만들지 않았다. 어드민 쓰기 경로는 별건이다 | 이준표 |
+| 2026-09-11 | `place_name_nospace_trgm` 추가 (V11, TMT-413) — 매장 검색 술어에 `replace(name, ' ', '') ILIKE`를 더하면서 그 표현식이 인덱스를 타게 했다. `place_name_trgm`(원문 이름)은 부분 일치와 유사도(`%`) 술어가 그대로 쓴다 | 장민서 |
