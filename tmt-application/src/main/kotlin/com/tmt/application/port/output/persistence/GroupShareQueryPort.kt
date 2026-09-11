@@ -4,9 +4,14 @@ import java.time.Instant
 
 /** 공유 선택 화면의 조회 (H §3-1, TMT-223). */
 interface GroupShareQueryPort {
-    /** 내 리뷰 최신순 + 이 그룹 공유 여부. */
+    /**
+     * 내 리뷰 최신순 + 이 그룹 공유 여부.
+     *
+     * [groupId]가 null이면 그룹 생성 전의 후보 목록이다 (TMT-428) — 공유 여부를 물을 그룹이
+     * 아직 없어 모든 행의 [ReviewShareRow.isShared]가 false다.
+     */
     fun findMyReviewsWithShared(
-        groupId: Long,
+        groupId: Long?,
         userId: Long,
         afterCreatedAt: Instant?,
         afterReviewId: Long?,

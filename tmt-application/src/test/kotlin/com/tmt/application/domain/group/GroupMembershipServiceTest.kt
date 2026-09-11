@@ -83,7 +83,7 @@ class GroupMembershipServiceTest {
     private val shareQueryPort =
         object : GroupShareQueryPort {
             override fun findMyReviewsWithShared(
-                groupId: Long,
+                groupId: Long?,
                 userId: Long,
                 afterCreatedAt: Instant?,
                 afterReviewId: Long?,

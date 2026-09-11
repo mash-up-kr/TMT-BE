@@ -15,6 +15,9 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
      * INNER였을 때는 "리뷰는 사진이 필수"(C4)를 근거로 삼았는데, C4-1(TMT-268)로 사진 0장
      * 리뷰가 성립하면서 그 전제가 깨졌다. 500이 아니라 **행이 조용히 사라져** 사진 없이 쓴
      * 리뷰를 공유할 방법이 없어지고, `PUT`이 전체 교체라 이미 공유돼 있던 것까지 풀렸다.
+     *
+     * [groupId]는 null일 수 있다 — 그룹 생성 전 후보 목록(TMT-428)이 같은 행·같은 정렬을 쓴다.
+     * 이때 shared는 EXISTS를 타지 않고 false다.
      */
     @Query(
         value = """
@@ -22,9 +25,12 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
                    p.name       AS placeName,
                    thumb.s3_key AS thumbnailS3Key,
                    sv.content   AS content,
-                   EXISTS(
-                       SELECT 1 FROM group_review_share s
-                       WHERE s.group_id = :groupId AND s.review_id = r.id
+                   (
+                       CAST(:groupId AS bigint) IS NOT NULL
+                       AND EXISTS(
+                           SELECT 1 FROM group_review_share s
+                           WHERE s.group_id = :groupId AND s.review_id = r.id
+                       )
                    ) AS shared,
                    r.created_at AS createdAt
             FROM review r
@@ -50,7 +56,7 @@ interface GroupShareQueryRepository : JpaRepository<GroupReviewShareEntity, Long
         nativeQuery = true,
     )
     fun findMyReviewsWithShared(
-        @Param("groupId") groupId: Long,
+        @Param("groupId") groupId: Long?,
         @Param("userId") userId: Long,
         @Param("afterCreatedAt") afterCreatedAt: Instant?,
         @Param("afterReviewId") afterReviewId: Long?,

@@ -12,7 +12,7 @@ class GroupShareQueryAdapter(
     private val repository: GroupShareQueryRepository,
 ) : GroupShareQueryPort {
     override fun findMyReviewsWithShared(
-        groupId: Long,
+        groupId: Long?,
         userId: Long,
         afterCreatedAt: Instant?,
         afterReviewId: Long?,

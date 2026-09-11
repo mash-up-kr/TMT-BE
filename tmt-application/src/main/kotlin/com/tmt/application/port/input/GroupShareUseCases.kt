@@ -7,6 +7,14 @@ fun interface GetReviewSharesUseCase {
     fun get(request: ReviewSharesRequest): ReviewSharesResult
 }
 
+/**
+ * 그룹 생성 5단계의 공유 후보 목록 (TMT-428) — 그룹이 아직 없어 groupId 없이 조회한다.
+ * 항목은 [GetReviewSharesUseCase]와 같은 행·같은 정렬이고 공유 여부만 빠진다.
+ */
+fun interface GetReviewShareCandidatesUseCase {
+    fun get(request: ReviewShareCandidatesRequest): ReviewShareCandidatesResult
+}
+
 /** 리뷰 공유 전체 교체 (H §3-2) — 보낸 목록이 최종 집합이다. 빠진 것은 해제된다. */
 fun interface ReplaceReviewSharesUseCase {
     fun replace(
@@ -49,6 +57,28 @@ data class ReviewShareItemView(
     /** 본문 전체 — 화면이 두 줄로 자른다. */
     val contentPreview: String,
     val isShared: Boolean,
+    val createdAt: Instant,
+)
+
+data class ReviewShareCandidatesRequest(
+    val userId: Long,
+    val after: ReviewShareKey?,
+    val limit: Int,
+)
+
+data class ReviewShareCandidatesResult(
+    val items: List<ReviewShareCandidateView>,
+    val hasNext: Boolean,
+)
+
+/** [ReviewShareItemView]에서 isShared만 뺀 모양 — 공유 여부를 물을 그룹이 아직 없다. */
+data class ReviewShareCandidateView(
+    val reviewId: Long,
+    val placeName: String,
+    /** 사진 0장 리뷰(C4-1)면 null — 서버가 대체 이미지를 채우지 않는다 (R11) */
+    val thumbnailUrl: String?,
+    /** 본문 전체 — 화면이 두 줄로 자른다. */
+    val contentPreview: String,
     val createdAt: Instant,
 )
 
