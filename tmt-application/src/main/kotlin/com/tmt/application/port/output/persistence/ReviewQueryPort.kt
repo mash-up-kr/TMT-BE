@@ -23,6 +23,8 @@ data class ReviewDetailRow(
     val authorId: Long,
     val authorNickname: String,
     val authorProfileImageUrl: String?,
+    /** users.profile_image_asset_id의 s3_key — 있으면 이쪽이 정본이다 (V7) */
+    val authorProfileImageS3Key: String? = null,
     val placeId: Long,
     val placeName: String,
     val placeRoadAddress: String,

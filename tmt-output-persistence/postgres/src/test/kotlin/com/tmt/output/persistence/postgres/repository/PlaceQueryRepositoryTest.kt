@@ -100,6 +100,18 @@ class PlaceQueryRepositoryTest : PersistenceTest() {
     }
 
     @Test
+    fun `작성자의 업로드한 사진을 내린다 (V7)`() {
+        val place = fixtures.newPlace()
+        val author = fixtures.newUser()
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
+        fixtures.newPublishedReview(place, userId = author)
+
+        val row = repository.findPlaceReviewRows(place, null, null, null, null, null, 50).single()
+
+        assertEquals(s3Key, row.getAuthorProfileImageS3Key())
+    }
+
+    @Test
     fun `보는 사람 좌표가 없으면 거리는 null이다`() {
         val place = fixtures.newPlace(latitude = 37.5, longitude = 127.0)
         fixtures.newPublishedReview(place)

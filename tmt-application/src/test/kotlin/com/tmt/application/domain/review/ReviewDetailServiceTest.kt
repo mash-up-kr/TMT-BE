@@ -16,8 +16,13 @@ import org.junit.jupiter.api.assertThrows
 class ReviewDetailServiceTest {
     private val authorId = 7L
     private val saveId = 10L
+    private val mediaUrlResolver = MediaUrlResolver("https://cdn.example.com")
 
-    private fun service(summaries: List<SummaryRow> = emptyList()): ReviewDetailService {
+    private fun service(
+        summaries: List<SummaryRow> = emptyList(),
+        authorProfileImageUrl: String? = null,
+        authorProfileImageS3Key: String? = null,
+    ): ReviewDetailService {
         val lookup =
             FakeReviewCardLookupPort(
                 photos =
@@ -29,9 +34,21 @@ class ReviewDetailServiceTest {
                 summaries = summaries,
             )
         return ReviewDetailService(
-            reviewQueryPort = FakeReviewQueryPort(details = mapOf(1L to reviewDetailRow(authorId = authorId))),
+            reviewQueryPort =
+                FakeReviewQueryPort(
+                    details =
+                        mapOf(
+                            1L to
+                                reviewDetailRow(
+                                    authorId = authorId,
+                                    authorProfileImageUrl = authorProfileImageUrl,
+                                    authorProfileImageS3Key = authorProfileImageS3Key,
+                                ),
+                        ),
+                ),
             reviewCardLookupPort = lookup,
-            reviewCardComposer = ReviewCardComposer(lookup, MediaUrlResolver("https://cdn.example.com")),
+            reviewCardComposer = ReviewCardComposer(lookup, mediaUrlResolver),
+            mediaUrlResolver = mediaUrlResolver,
         )
     }
 
@@ -62,6 +79,22 @@ class ReviewDetailServiceTest {
     fun `요약 불가로 기록된 리뷰도 aiSummary가 null이다 (A2, TMT-392)`() {
         // 둘 다 null인 행은 "봤는데 요약할 내용이 없다"는 기록이지 요약이 아니다 — 미요약과 같은 응답
         assertNull(service(listOf(SummaryRow(1, null, null))).get(viewerId = null, reviewId = 1).aiSummary)
+    }
+
+    @Test
+    fun `작성자 사진은 업로드한 것을 쓰고 없을 때만 카카오 URL로 돌아간다 (V7)`() {
+        val uploaded =
+            service(
+                authorProfileImageUrl = "https://kakao.example/legacy.jpg",
+                authorProfileImageS3Key = "profile/a.jpg",
+            ).get(viewerId = null, reviewId = 1)
+        assertEquals("https://cdn.example.com/profile/a.jpg", uploaded.author.profileImageUrl)
+
+        val legacyOnly =
+            service(authorProfileImageUrl = "https://kakao.example/legacy.jpg").get(viewerId = null, reviewId = 1)
+        assertEquals("https://kakao.example/legacy.jpg", legacyOnly.author.profileImageUrl)
+
+        assertNull(service().get(viewerId = null, reviewId = 1).author.profileImageUrl)
     }
 
     @Test
