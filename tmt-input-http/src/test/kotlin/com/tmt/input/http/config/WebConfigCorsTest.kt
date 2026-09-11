@@ -1,6 +1,8 @@
 package com.tmt.input.http.config
 
 import com.tmt.application.port.input.CheckSignupCompletedUseCase
+import com.tmt.input.http.auth.AdminAllowlist
+import com.tmt.input.http.auth.AdminOnlyInterceptor
 import com.tmt.input.http.auth.SignupCompletionInterceptor
 import com.tmt.input.http.filter.RequestIdFilter
 import org.assertj.core.api.Assertions.assertThat
@@ -19,11 +21,17 @@ class WebConfigCorsTest {
         fun configurations(): Map<String, CorsConfiguration> = getCorsConfigurations()
     }
 
-    private val config: CorsConfiguration =
-        ProbeRegistry()
-            .also { WebConfig(SignupCompletionInterceptor(AlwaysCompleted)).addCorsMappings(it) }
-            .configurations()
-            .getValue("/**")
+    private val config: CorsConfiguration = corsConfiguration()
+
+    private fun corsConfiguration(): CorsConfiguration {
+        val registry = ProbeRegistry()
+        WebConfig(
+            SignupCompletionInterceptor(AlwaysCompleted),
+            // 허용 목록은 비워 둔다 — CORS 검증과 무관하다
+            AdminOnlyInterceptor(AdminAllowlist("")),
+        ).addCorsMappings(registry)
+        return registry.configurations().getValue("/**")
+    }
 
     @Test
     fun `로컬 개발 오리진을 허용한다`() {

@@ -71,6 +71,17 @@ enum class ErrorCode(
     RECOMMENDATION_UNAVAILABLE(ErrorType.UNPROCESSABLE, "추천할 만한 새 매장이 없습니다."),
     RECOMMENDATION_FAILED(ErrorType.SERVICE_UNAVAILABLE, "매장 추천에 실패했습니다."),
 
+    // 큐레이션 어드민 (TMT-421)
+
+    /**
+     * 어드민 판정은 설정 허용 목록(`tmt.admin.user-ids`)이고 역할 컬럼이 아니다.
+     * [FORBIDDEN]과 코드를 가르는 이유는 운영 로그에서 "권한 없음"의 원인을 구분하려는 것이다 —
+     * 이 코드가 보이면 볼 곳은 배포 설정이지 사용자 데이터가 아니다.
+     */
+    ADMIN_REQUIRED(ErrorType.FORBIDDEN, "관리자만 할 수 있습니다."),
+    CURATION_TAG_NOT_FOUND(ErrorType.NOT_FOUND, "큐레이션 칩을 찾을 수 없습니다."),
+    CURATION_TAG_DUPLICATED(ErrorType.CONFLICT, "같은 id의 큐레이션 칩이 있습니다."),
+
     /** 프로바이더 키가 하나도 없다 — 쿼터 소진·장애와 달리 시간이 지나도 낫지 않는다 (docs/LOGGING.md §4-3) */
     LLM_MISCONFIGURED(ErrorType.INTERNAL, "AI 기능을 사용할 수 없습니다."),
 }
