@@ -114,7 +114,7 @@ class SaveController(
                             rating = request.rating,
                             content = request.content,
                             // 접두가 어긋난 groupId는 없는 그룹과 같게 본다 — 리뷰는 그대로 만든다
-                            groupId = request.groupId?.removePrefix("group_")?.toLongOrNull(),
+                            groupId = PublicIds.parseGroupIdOrNull(request.groupId),
                         ),
                     )
                 SaveResultResponse(
@@ -179,7 +179,7 @@ class SaveController(
                             positivePointTagIds = request.positivePointTagIds,
                             rating = request.rating,
                             content = request.content,
-                            groupId = request.groupId?.removePrefix("group_")?.toLongOrNull(),
+                            groupId = PublicIds.parseGroupIdOrNull(request.groupId),
                         ),
                     )
                 SaveResultResponse(
