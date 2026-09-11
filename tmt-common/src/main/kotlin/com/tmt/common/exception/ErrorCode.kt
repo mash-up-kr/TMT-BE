@@ -72,6 +72,7 @@ enum class ErrorCode(
     RECOMMENDATION_FAILED(ErrorType.SERVICE_UNAVAILABLE, "매장 추천에 실패했습니다."),
 
     // 큐레이션 어드민 (TMT-421)
+
     /**
      * 어드민 판정은 설정 허용 목록(`tmt.admin.user-ids`)이고 역할 컬럼이 아니다.
      * [FORBIDDEN]과 코드를 가르는 이유는 운영 로그에서 "권한 없음"의 원인을 구분하려는 것이다 —

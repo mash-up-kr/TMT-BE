@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController
  * 큐레이션 칩 운영 (TMT-421). **FE가 쓰는 API가 아니다** — 운영이 칩과 매장 목록을
  * 배포 없이 고치는 자리다. 공개 목록은 `GET /v1/curation-tags`가 그대로 담당한다.
  *
- * 인증·인가는 컨트롤러가 아니라 경로로 걸린다 — `/v1/admin/**`은
+ * 인증·인가는 컨트롤러가 아니라 경로로 걸린다 — `/v1/admin` 아래는
  * [AdminOnlyInterceptor][com.tmt.input.http.auth.AdminOnlyInterceptor]가 막는다.
  * `@UserId`를 받는 이유는 인가가 아니라 **누가 바꿨는지 로그에 남기기 위한 것**이다.
  */
