@@ -37,6 +37,14 @@ interface UpdateUserProfileUseCase {
     fun update(command: UpdateUserProfileCommand): UserProfileView
 }
 
+/**
+ * 회원탈퇴 (TMT-409) — 계정과 그 사용자가 만든 데이터를 한 트랜잭션에서 지운다.
+ * 되돌릴 수 없고, 같은 카카오 계정으로 다시 로그인하면 신규 가입으로 들어온다.
+ */
+fun interface WithdrawUserUseCase {
+    fun withdraw(userId: Long)
+}
+
 /** 가입 완결 여부 — 미완료 사용자의 요청을 막는 데 쓴다 (TMT-370). */
 interface CheckSignupCompletedUseCase {
     fun isCompleted(userId: Long): Boolean

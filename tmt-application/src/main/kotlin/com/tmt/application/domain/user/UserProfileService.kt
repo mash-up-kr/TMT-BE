@@ -25,7 +25,14 @@ class UserProfileService(
     private val getUserProfileUseCase: GetUserProfileUseCase,
 ) : UpdateUserProfileUseCase,
     CheckSignupCompletedUseCase {
-    override fun isCompleted(userId: Long): Boolean = userAccountPort.findById(userId)?.profileCompletedAt != null
+    /**
+     * 탈퇴한 사용자의 토큰은 만료 전이라도 401이다 (TMT-409) — 행이 사라진 것을 "가입 미완료"로 읽으면
+     * 화면이 가입 화면으로 보내고, 사용자는 끝낼 수 없는 가입을 반복한다.
+     */
+    override fun isCompleted(userId: Long): Boolean {
+        val account = userAccountPort.findById(userId) ?: throw TmtException(ErrorCode.UNAUTHORIZED)
+        return account.profileCompletedAt != null
+    }
 
     @Transactional
     override fun update(command: UpdateUserProfileCommand): UserProfileView {
