@@ -3,6 +3,7 @@ package com.tmt.application.domain.place
 import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.PlaceSearchKey
 import com.tmt.application.port.input.PlaceSearchRequest
+import com.tmt.application.port.output.persistence.CurationTagPort
 import com.tmt.application.port.output.persistence.PlaceSearchCriteria
 import com.tmt.application.port.output.persistence.PlaceSearchPort
 import com.tmt.application.port.output.persistence.PlaceSearchRow
@@ -21,8 +22,9 @@ import kotlin.test.assertTrue
 
 class PlaceSearchServiceTest {
     private val searchPort = mockk<PlaceSearchPort>()
+    private val curationTagPort = mockk<CurationTagPort>()
     private val composer = mockk<ReviewCardComposer>()
-    private val service = PlaceSearchService(searchPort, composer)
+    private val service = PlaceSearchService(searchPort, curationTagPort, composer)
 
     private fun request(
         query: String? = null,
@@ -119,17 +121,21 @@ class PlaceSearchServiceTest {
     }
 
     @Test
-    fun `칩은 검색 조건 프리셋으로 풀린다`() {
+    fun `칩은 매장 목록 술어로 그대로 넘어간다`() {
+        // 조건(categoryId·regionPrefix)으로 풀지 않는다 — 칩에 속한 매장은 SQL이 직접 찾는다 (V9)
+        every { curationTagPort.existsActiveTag("curation_ganmaek") } returns true
         val criteria = stubSearch(emptyList())
 
         service.search(request(curationTagId = "curation_ganmaek"))
 
-        assertEquals("cat_pub", criteria.captured.categoryId)
+        assertEquals("curation_ganmaek", criteria.captured.curationTagId)
         assertNull(criteria.captured.query)
     }
 
     @Test
-    fun `알 수 없는 칩은 오류가 아니라 빈 결과다`() {
+    fun `없는 칩은 오류가 아니라 빈 결과다`() {
+        every { curationTagPort.existsActiveTag("curation_unknown") } returns false
+
         val result = service.search(request(curationTagId = "curation_unknown"))
 
         assertEquals(emptyList(), result.items)

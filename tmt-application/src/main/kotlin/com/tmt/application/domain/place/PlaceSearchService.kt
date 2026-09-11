@@ -6,6 +6,7 @@ import com.tmt.application.port.input.PlaceSearchKey
 import com.tmt.application.port.input.PlaceSearchRequest
 import com.tmt.application.port.input.PlaceSearchResult
 import com.tmt.application.port.input.SearchPlacesUseCase
+import com.tmt.application.port.output.persistence.CurationTagPort
 import com.tmt.application.port.output.persistence.PlaceSearchCriteria
 import com.tmt.application.port.output.persistence.PlaceSearchPort
 import com.tmt.common.exception.ErrorCode
@@ -16,6 +17,7 @@ import kotlin.math.roundToInt
 @Service
 class PlaceSearchService(
     private val placeSearchPort: PlaceSearchPort,
+    private val curationTagPort: CurationTagPort,
     private val reviewCardComposer: ReviewCardComposer,
 ) : SearchPlacesUseCase {
     override fun search(request: PlaceSearchRequest): PlaceSearchResult {
@@ -33,9 +35,8 @@ class PlaceSearchService(
             throw TmtException(ErrorCode.VALIDATION_FAILED, "latitude·longitude는 위경도 범위 안이어야 합니다.")
         }
 
-        val preset = request.curationTagId?.let { CurationPresets.BY_ID[it] }
-        // 알 수 없는 칩은 mock과 같게 빈 결과다 — 쿼리를 낼 이유가 없다
-        if (request.curationTagId != null && preset == null) {
+        // 없는·비활성 칩은 mock과 같게 빈 결과다 — 쿼리를 낼 이유가 없다
+        if (request.curationTagId != null && !curationTagPort.existsActiveTag(request.curationTagId)) {
             return PlaceSearchResult(emptyList(), hasNext = false, lastKey = null)
         }
 
@@ -51,8 +52,7 @@ class PlaceSearchService(
                                     .keys
                                     .toList()
                             }.orEmpty(),
-                    categoryId = preset?.categoryId,
-                    regionPrefix = preset?.regionPrefix,
+                    curationTagId = request.curationTagId,
                     latitude = latitude,
                     longitude = longitude,
                     radiusMeters = if (request.nearbyOnly) NEARBY_RADIUS_METERS else null,

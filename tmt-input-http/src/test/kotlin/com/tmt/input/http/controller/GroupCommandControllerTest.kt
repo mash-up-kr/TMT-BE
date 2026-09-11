@@ -3,6 +3,7 @@ package com.tmt.input.http.controller
 import com.tmt.application.port.input.CreateGroupUseCase
 import com.tmt.application.port.input.GroupCommand
 import com.tmt.application.port.input.GroupDetailView
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.input.UpdateGroupUseCase
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.exception.ExceptionAdvice
@@ -57,7 +58,7 @@ class GroupCommandControllerTest {
             .andExpect(jsonPath("$.coverImages[0].reviewId").value("rv_3"))
             .andExpect(jsonPath("$.isOwner").value(true))
 
-        assertEquals(42L, requireNotNull(lastCreate).imageAssetId)
+        assertEquals(ImageAssetSelection.Set(42L), requireNotNull(lastCreate).imageAsset)
     }
 
     @Test
@@ -70,6 +71,18 @@ class GroupCommandControllerTest {
                     .content(body(imageAssetId = "\"asset_42\"")),
             ).andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("MEDIA_NOT_OWNED"))
+    }
+
+    @Test
+    fun `assetId 자리에 객체가 오면 형식 오류로 400이다`() {
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body(imageAssetId = "{\"id\":42}")),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
 
     @Test
@@ -94,6 +107,27 @@ class GroupCommandControllerTest {
     }
 
     @Test
+    fun `편집에서 imageAssetId 생략은 유지, null은 삭제로 구분된다 (TMT-415)`() {
+        mockMvc
+            .perform(
+                put("/v1/groups/group_7")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(bodyWithoutImage()),
+            ).andExpect(status().isOk)
+        assertEquals(ImageAssetSelection.Keep, requireNotNull(lastUpdate).second.imageAsset)
+
+        mockMvc
+            .perform(
+                put("/v1/groups/group_7")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body()),
+            ).andExpect(status().isOk)
+        assertEquals(ImageAssetSelection.None, requireNotNull(lastUpdate).second.imageAsset)
+    }
+
+    @Test
     fun `비로그인 생성은 401이다`() {
         mockMvc
             .perform(post("/v1/groups").contentType(MediaType.APPLICATION_JSON).content(body()))
@@ -104,6 +138,12 @@ class GroupCommandControllerTest {
         """
         {"name":"새 그룹","oneLineDescription":"한줄","foodCategoryId":"cat_korean",
          "regionTagIds":["region_guro"],"imageAssetId":$imageAssetId}
+        """.trimIndent()
+
+    private fun bodyWithoutImage() =
+        """
+        {"name":"새 그룹","oneLineDescription":"한줄","foodCategoryId":"cat_korean",
+         "regionTagIds":["region_guro"]}
         """.trimIndent()
 
     private fun view() =

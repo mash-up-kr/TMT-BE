@@ -31,6 +31,10 @@ sealed interface PlaceSelection {
     ) : PlaceSelection
 }
 
+/**
+ * @param groupId 이 리뷰를 시작한 그룹 (TMT-423). 리뷰가 성립하면 같은 트랜잭션에서 그 그룹에
+ *   공유한다. null이면 공유하지 않는다 — 그룹 맥락 없이 들어온 작성이다.
+ */
 data class CreateSaveCommand(
     val userId: Long,
     val place: PlaceSelection,
@@ -39,6 +43,7 @@ data class CreateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    val groupId: Long? = null,
 )
 
 /**
@@ -46,6 +51,8 @@ data class CreateSaveCommand(
  * @param placeId newPlace로 만들어진 매장의 ID. 기존 매장이면 요청값과 같다.
  * @param grantedCount 이번 요청으로 발급된 티켓 수 (0 또는 1). 상한 999장이면 리뷰여도 0이다 (T6).
  * @param missing 리뷰 성립(C4)에 아직 모자란 항목. 리뷰가 됐으면 빈 목록이다 (TMT-395).
+ * @param sharedGroupId 이번 요청으로 리뷰가 올라간 그룹 (TMT-423). 요청에 groupId가 없었거나
+ *   그 그룹의 멤버가 아니면 null이다 — 화면이 "그룹에 공유됐어요" 안내를 고르는 기준.
  */
 data class SaveResult(
     val saveId: Long,
@@ -54,6 +61,7 @@ data class SaveResult(
     val grantedCount: Int,
     val availableCount: Int,
     val missing: List<ReviewCriterion>,
+    val sharedGroupId: Long? = null,
 )
 
 /**
@@ -90,6 +98,8 @@ data class UpdateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    /** 이 리뷰를 시작한 그룹 (TMT-423). 이어쓰기로 판정이 충족되는 시점에 공유한다. */
+    val groupId: Long? = null,
 )
 
 /** 임시저장 버리기 (F·G·I §5-2). 리뷰가 된 저장은 리뷰 삭제 소관이다. */

@@ -4,6 +4,7 @@ import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyReviewsRequest
+import com.tmt.application.port.output.persistence.CurationTagPort
 import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.application.port.output.persistence.NearbyReviewRows
 import com.tmt.application.port.output.persistence.PinRow
@@ -29,7 +30,9 @@ class NearbyServiceTest {
             every { findTagRows(any()) } returns emptyList()
             every { findSummaryRows(any()) } returns emptyList()
         }
-    private val service = NearbyService(port, ReviewCardComposer(lookup, MediaUrlResolver("https://media.example/")))
+    private val curationTagPort = mockk<CurationTagPort>()
+    private val service =
+        NearbyService(port, curationTagPort, ReviewCardComposer(lookup, MediaUrlResolver("https://media.example/")))
 
     private fun row(
         reviewId: Long,
@@ -75,7 +78,7 @@ class NearbyServiceTest {
     @Test
     fun `핀이 상한을 넘으면 30개로 자르고 truncated다`() {
         every {
-            port.findPins(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            port.findPins(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns (1L..31L).map { pin(it) }
 
         val result = service.get(NearbyPlacesRequest(north = 37.6, south = 37.5, east = 127.0, west = 126.9))
@@ -85,7 +88,9 @@ class NearbyServiceTest {
     }
 
     @Test
-    fun `알 수 없는 큐레이션 칩은 쿼리 없이 빈 결과다`() {
+    fun `없는 큐레이션 칩은 쿼리 없이 빈 결과다`() {
+        every { curationTagPort.existsActiveTag("curation_nope") } returns false
+
         val result =
             service.get(
                 NearbyPlacesRequest(
@@ -98,16 +103,14 @@ class NearbyServiceTest {
             )
 
         assertEquals(emptyList(), result.pins)
-        verify(
-            exactly = 0,
-        ) { port.findPins(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { port.findPins(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `검색어가 카테고리 라벨에 걸리면 해당 카테고리 id를 함께 넘긴다`() {
         val captured = mutableListOf<List<String>>()
         every {
-            port.findPins(any(), any(), any(), any(), any(), any(), any(), capture(captured), any(), any(), any())
+            port.findPins(any(), any(), any(), any(), any(), any(), any(), capture(captured), any(), any())
         } returns emptyList()
 
         service.get(NearbyPlacesRequest(north = 37.6, south = 37.5, east = 127.0, west = 126.9, query = "카페"))

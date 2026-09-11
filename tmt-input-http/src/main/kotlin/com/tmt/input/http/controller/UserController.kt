@@ -16,9 +16,10 @@ import com.tmt.application.port.input.TicketHistoryKey
 import com.tmt.application.port.input.UpdateUserProfileCommand
 import com.tmt.application.port.input.UpdateUserProfileUseCase
 import com.tmt.common.exception.ErrorCode
-import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
+import com.tmt.input.http.controller.dto.request.ImageAssetField
+import com.tmt.input.http.controller.dto.request.toSelection
 import com.tmt.input.http.controller.dto.response.CursorPage
 import com.tmt.input.http.controller.dto.response.GroupCardResponse
 import com.tmt.input.http.controller.dto.response.PlaceCardResponse
@@ -81,8 +82,8 @@ class UserController(
         description =
             "닉네임과 프로필 사진을 저장한다 (TMT-370). 카카오 로그인 직후에는 닉네임이 카카오 값이라 " +
                 "이 요청을 마쳐야 `profileCompleted=true`가 되고 다른 API를 쓸 수 있다.\n\n" +
-                "`profileImageAssetId`는 `POST /v1/media/upload-intents`로 받은 것이고, 보내지 않으면 " +
-                "사진 없는 상태가 된다. 가입 후에도 같은 요청으로 프로필을 수정한다.",
+                "`profileImageAssetId`는 `POST /v1/media/upload-intents`로 받은 것이고, 생략하면 현재 사진을 " +
+                "유지하고 `null`을 실으면 지운다 (TMT-415). 가입 후에도 같은 요청으로 프로필을 수정한다.",
     )
     @ApiErrorCodes(ErrorCode.VALIDATION_FAILED, ErrorCode.MEDIA_NOT_OWNED, ErrorCode.MEDIA_ALREADY_ATTACHED)
     @PutMapping("/me/profile")
@@ -95,7 +96,7 @@ class UserController(
                 UpdateUserProfileCommand(
                     userId = userId,
                     nickname = request.nickname,
-                    profileImageAssetId = request.profileImageAssetId?.let(::parseAssetId),
+                    profileImage = request.profileImageAssetId.toSelection(),
                 ),
             )
         return MyProfileResponse(
@@ -110,16 +111,6 @@ class UserController(
             profileCompleted = profile.profileCompleted,
         )
     }
-
-    /**
-     * 실구현 발급 assetId는 접두 없는 숫자 문자열이다 (TMT-202) — 형식이 다르면 거절한다
-     * (`GroupCommandController`·`SaveController`와 같은 처리).
-     *
-     * **여기서 null로 떨어뜨리면 안 된다.** 이 요청은 프로필 전체 교체라, 형식이 틀린 assetId가
-     * "사진 없음"이 되면 사용자가 지운 적 없는 사진이 지워지고 응답은 200으로 나간다.
-     */
-    private fun parseAssetId(assetId: String): Long =
-        assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED, assetId)
 
     @Operation(
         summary = "내 리뷰 탭",
@@ -382,10 +373,10 @@ class UserController(
         @field:Schema(description = "2~20자 (U3)", example = "또맛또")
         val nickname: String,
         @field:Schema(
-            description = "업로드 발급(POST /v1/media/upload-intents)으로 받은 assetId. 없으면 사진 없는 상태가 된다",
+            description = "업로드 발급(POST /v1/media/upload-intents)으로 받은 assetId. 생략하면 현재 사진 유지, null이면 삭제",
             nullable = true,
         )
-        val profileImageAssetId: String?,
+        val profileImageAssetId: ImageAssetField = ImageAssetField.Omitted,
     )
 
     /** 타인 프로필에는 email·availableTicketCount가 없다 (U7). */

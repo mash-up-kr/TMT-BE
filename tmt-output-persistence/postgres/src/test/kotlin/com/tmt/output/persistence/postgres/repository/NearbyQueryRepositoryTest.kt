@@ -142,8 +142,7 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
                     centerLng = null,
                     queryPattern = null,
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    regionPrefix = null,
+                    curationTagId = null,
                     limitPlusOne = 50,
                 ).map { it.getPlaceId() }
 
@@ -178,8 +177,7 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
                     centerLng = null,
                     queryPattern = LikePatterns.contains(token),
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    regionPrefix = null,
+                    curationTagId = null,
                     limitPlusOne = 50,
                 ).map { it.getPlaceId() }
 
@@ -204,8 +202,7 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
                     centerLng = null,
                     queryPattern = LikePatterns.contains("100%"),
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    regionPrefix = null,
+                    curationTagId = null,
                     limitPlusOne = 50,
                 ).map { it.getPlaceId() }
 
@@ -215,12 +212,12 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
     }
 
     @Test
-    fun `핀은 지역 접두어로 걸러진다`() {
+    fun `핀은 큐레이션 칩 목록으로 걸러진다`() {
         val (lat, lng) = isolatedPoint()
-        val region = "마포구 도화동"
-        val inRegion = fixtures.newPlace(regionName = region, latitude = lat, longitude = lng, reviewCount = 1)
-        val otherRegion =
-            fixtures.newPlace(regionName = "강남구 역삼동", latitude = lat, longitude = lng, reviewCount = 1)
+        val inChip = fixtures.newPlace(latitude = lat, longitude = lng, reviewCount = 1)
+        // bbox·리뷰 조건은 똑같이 통과하지만 칩 목록에 없다 — 칩이 조건이 아니라 목록이다 (V9)
+        val outOfChip = fixtures.newPlace(latitude = lat, longitude = lng, reviewCount = 1)
+        val chip = fixtures.newCurationTag(listOf(inChip))
 
         val pins =
             repository
@@ -233,14 +230,12 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
                     centerLng = null,
                     queryPattern = null,
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    // 구 이름만으로도 그 아래 동이 전부 걸린다 — LIKE 접두어 매칭이다
-                    regionPrefix = "마포구",
+                    curationTagId = chip,
                     limitPlusOne = 50,
                 ).map { it.getPlaceId() }
 
-        assertEquals(listOf(inRegion), pins)
-        assertFalse(otherRegion in pins)
+        assertEquals(listOf(inChip), pins)
+        assertFalse(outOfChip in pins)
     }
 
     @Test
@@ -259,8 +254,7 @@ class NearbyQueryRepositoryTest : PersistenceTest() {
                     centerLng = null,
                     queryPattern = null,
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    regionPrefix = null,
+                    curationTagId = null,
                     limitPlusOne = 50,
                 ).single { it.getPlaceId() == place }
 
