@@ -45,6 +45,9 @@ services:
       # release는 CI가 배포 커밋 SHA로 채운다
       - SENTRY_DSN=${SENTRY_DSN}
       - SENTRY_RELEASE=${SENTRY_RELEASE}
+      # 어드민 허용 목록 (TMT-421). 정본은 SSM /tmt-prod/admin/user-ids.
+      # 비어 있으면 /v1/admin/** 이 전부 403이다 — 기본값이 열리면 안 된다
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS}
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
