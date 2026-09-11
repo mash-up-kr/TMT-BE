@@ -5,6 +5,7 @@ import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
 import io.swagger.v3.oas.annotations.media.Schema
 import tools.jackson.core.JsonParser
+import tools.jackson.core.JsonToken
 import tools.jackson.databind.DeserializationContext
 import tools.jackson.databind.ValueDeserializer
 import tools.jackson.databind.annotation.JsonDeserialize
@@ -31,14 +32,20 @@ fun ImageAssetField.toSelection(): ImageAssetSelection =
         is ImageAssetField.Omitted -> ImageAssetSelection.Keep
         is ImageAssetField.Cleared -> ImageAssetSelection.None
         is ImageAssetField.Present ->
-            ImageAssetSelection.Set(assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED))
+            ImageAssetSelection.Set(assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED, assetId))
     }
 
 class ImageAssetFieldDeserializer : ValueDeserializer<ImageAssetField>() {
     override fun deserialize(
         p: JsonParser,
         ctxt: DeserializationContext,
-    ): ImageAssetField = ImageAssetField.Present(p.valueAsString.orEmpty())
+    ): ImageAssetField =
+        // 문자열·숫자만 값으로 받는다. 객체·배열까지 문자열로 접으면 형식 오류가 MEDIA_NOT_OWNED(403)로
+        // 나가고, 파서가 중첩 토큰을 건너뛰지 않아 뒤 필드까지 어긋난다 — 타입 불일치는 400이 맞다
+        when (p.currentToken()) {
+            JsonToken.VALUE_STRING, JsonToken.VALUE_NUMBER_INT -> ImageAssetField.Present(p.valueAsString.orEmpty())
+            else -> ctxt.handleUnexpectedToken(ImageAssetField::class.java, p) as ImageAssetField
+        }
 
     override fun getNullValue(ctxt: DeserializationContext): ImageAssetField = ImageAssetField.Cleared
 

@@ -74,6 +74,18 @@ class GroupCommandControllerTest {
     }
 
     @Test
+    fun `assetId 자리에 객체가 오면 형식 오류로 400이다`() {
+        mockMvc
+            .perform(
+                post("/v1/groups")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 1L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body(imageAssetId = "{\"id\":42}")),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
     fun `편집은 group_ 접두 ID를 풀어 넘기고, 형식이 어긋나면 GROUP_NOT_FOUND다`() {
         mockMvc
             .perform(

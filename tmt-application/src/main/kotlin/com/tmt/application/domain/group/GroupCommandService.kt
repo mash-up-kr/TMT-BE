@@ -22,7 +22,12 @@ class GroupCommandService(
     UpdateGroupUseCase {
     @Transactional
     override fun create(command: GroupCommand): GroupDetailView {
-        val imageAssetId = (command.imageAsset as? ImageAssetSelection.Set)?.assetId
+        // 생성에는 유지할 이미지가 없다 — Keep은 이미지 없음과 같다
+        val imageAssetId =
+            when (val selection = command.imageAsset) {
+                is ImageAssetSelection.Keep, is ImageAssetSelection.None -> null
+                is ImageAssetSelection.Set -> selection.assetId
+            }
         validate(command, imageAssetId)
 
         val groupId =
