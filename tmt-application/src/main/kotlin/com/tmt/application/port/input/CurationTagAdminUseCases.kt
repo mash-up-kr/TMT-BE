@@ -4,7 +4,7 @@ package com.tmt.application.port.input
  * 큐레이션 칩 운영 (E12, TMT-421). 읽기 전용 공개 API([GetCurationTagsUseCase])와 달리
  * **비활성 칩도 보여주고** 값을 바꾼다 — 운영 화면이 내린 칩을 다시 올릴 수 있어야 한다.
  *
- * 어드민 판정은 입력 어댑터가 경로(`/v1/admin/**`)로 막는다. 여기까지 들어온 호출은
+ * 어드민 판정은 입력 어댑터가 `/v1/admin` 아래 경로 전체를 막는 것으로 한다. 여기까지 들어온 호출은
  * 이미 어드민이다 — 사용자별 소유권 검증이 없는 이유다.
  */
 interface ListCurationTagsForAdminUseCase {
