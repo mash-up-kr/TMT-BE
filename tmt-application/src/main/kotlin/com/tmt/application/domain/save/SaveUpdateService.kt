@@ -74,7 +74,7 @@ class SaveUpdateService(
                 rating = command.rating,
                 content = command.content,
             )
-        if (missing.isNotEmpty()) {
+        if (!SaveRules.shouldPromote(command.draft, missing)) {
             return SaveResult(
                 saveId = command.saveId,
                 reviewId = null,

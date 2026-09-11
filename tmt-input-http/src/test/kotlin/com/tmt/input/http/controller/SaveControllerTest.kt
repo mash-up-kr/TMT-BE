@@ -32,6 +32,7 @@ import com.tmt.input.http.exception.ExceptionAdvice
 import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -134,6 +135,24 @@ class SaveControllerTest {
     }
 
     @Test
+    fun `draft는 유스케이스로 그대로 넘어가고 생략하면 작성 완료다 (TMT-426)`() {
+        postSave("""{ "placeId": "place_1", "draft": true }""").andExpect(status().isCreated)
+        postSave("""{ "placeId": "place_1" }""", idempotencyKey = "key-2").andExpect(status().isCreated)
+
+        assertEquals(listOf(true, false), createSaveUseCase.commands.map { it.draft })
+    }
+
+    @Test
+    fun `draft만 다른 요청은 같은 키를 쓸 수 없다 (TMT-426)`() {
+        // 지문이 바디 기준이라 플래그가 쿼리로 새면 중간 저장 응답이 작성 완료로 리플레이된다
+        postSave("""{ "placeId": "place_1", "draft": true }""").andExpect(status().isCreated)
+
+        postSave("""{ "placeId": "place_1" }""")
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"))
+    }
+
+    @Test
     fun `groupId를 실어 보내면 커맨드로 넘어가고 공유된 그룹이 응답에 나온다 (TMT-423)`() {
         createSaveUseCase.reviewed = true
 
@@ -166,6 +185,18 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.sharedGroupId").doesNotExist())
 
         assertNull(createSaveUseCase.commands.single().groupId)
+    }
+
+    @Test
+    fun `중간 저장은 groupId를 실어도 공유 결과가 없다 (TMT-423·TMT-426)`() {
+        postSave("""{ "placeId": "place_1", "rating": 5, "content": "맛있어요", "groupId": "group_11", "draft": true }""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.reviewId").doesNotExist())
+            .andExpect(jsonPath("$.sharedGroupId").doesNotExist())
+
+        val command = createSaveUseCase.commands.single()
+        assertTrue(command.draft)
+        assertEquals(11L, command.groupId)
     }
 
     @Test
@@ -324,6 +355,15 @@ class SaveControllerTest {
         assertEquals(9L, command.saveId)
         assertEquals(1L, command.placeId)
         assertEquals(listOf(7L), command.photoAssetIds)
+    }
+
+    @Test
+    fun `이어쓰기도 draft를 그대로 넘긴다 (TMT-426)`() {
+        putSave("save_9", """{ "placeId": "place_1", "rating": 5, "draft": true }""")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").doesNotExist())
+
+        assertEquals(true, updateSaveUseCase.commands.single().draft)
     }
 
     @Test

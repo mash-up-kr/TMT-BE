@@ -34,4 +34,14 @@ object SaveRules {
             if (rating == null) add(ReviewCriterion.RATING)
             if (content.isNullOrBlank()) add(ReviewCriterion.CONTENT)
         }
+
+    /**
+     * 리뷰·티켓·집계를 내보낼지의 판정이다 — 최초 저장과 이어쓰기가 같은 기준을 쓴다 (C6).
+     *
+     * 중간 저장은 [missing]이 비어 있어도 승격하지 않는다 — 사용자가 `작성 완료`를 누른 적이 없다 (TMT-426).
+     */
+    fun shouldPromote(
+        draft: Boolean,
+        missing: List<ReviewCriterion>,
+    ): Boolean = !draft && missing.isEmpty()
 }

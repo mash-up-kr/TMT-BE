@@ -4,6 +4,10 @@ import java.time.Instant
 
 /**
  * 작성 완료 (F §4-1). 저장/리뷰 구분은 서버의 완성도 판정(C4)이 하고 클라이언트는 보내지 않는다 (C7).
+ *
+ * 예외가 하나 있다 — [CreateSaveCommand.draft]. 판정은 "무엇이 채워졌나"만 보므로 서버는
+ * 사용자가 `작성 완료`를 눌렀는지 알 수 없고, 화면이 단계 사이에서 중간 저장을 하면 값이 다 찬
+ * 순간 의도와 무관하게 리뷰로 확정돼 버린다. 그 의도만 클라이언트가 실어 보낸다 (TMT-426).
  */
 interface CreateSaveUseCase {
     fun create(command: CreateSaveCommand): SaveResult
@@ -32,8 +36,11 @@ sealed interface PlaceSelection {
 }
 
 /**
+ * @param draft 중간 저장이다 — 판정(C4)을 충족해도 리뷰로 확정하지 않는다. 저장 자체는 똑같이
+ *   이뤄지고 이어쓰기 목록에 남는다. 기본값은 지금까지의 동작(작성 완료)이다 (TMT-426).
  * @param groupId 이 리뷰를 시작한 그룹 (TMT-423). 리뷰가 성립하면 같은 트랜잭션에서 그 그룹에
- *   공유한다. null이면 공유하지 않는다 — 그룹 맥락 없이 들어온 작성이다.
+ *   공유한다. null이면 공유하지 않는다 — 그룹 맥락 없이 들어온 작성이다. 중간 저장이라 리뷰가
+ *   성립하지 않으면 groupId가 있어도 공유하지 않는다.
  */
 data class CreateSaveCommand(
     val userId: Long,
@@ -43,16 +50,20 @@ data class CreateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    val draft: Boolean = false,
     val groupId: Long? = null,
 )
 
 /**
- * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). 화면 분기의 유일한 기준.
+ * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). **화면 분기의 유일한 기준이다.**
  * @param placeId newPlace로 만들어진 매장의 ID. 기존 매장이면 요청값과 같다.
  * @param grantedCount 이번 요청으로 발급된 티켓 수 (0 또는 1). 상한 999장이면 리뷰여도 0이다 (T6).
- * @param missing 리뷰 성립(C4)에 아직 모자란 항목. 리뷰가 됐으면 빈 목록이다 (TMT-395).
+ * @param missing 리뷰 성립(C4)에 아직 모자란 항목 — 안내 문구 전용이고 분기에 쓰지 않는다 (TMT-395).
+ *   중간 저장(`draft`)은 판정을 충족해도 승격하지 않으므로 `missing`이 비었는데 `reviewId`가 null일 수
+ *   있다 — 정상이며, 이 조합도 저장으로 읽는다.
  * @param sharedGroupId 이번 요청으로 리뷰가 올라간 그룹 (TMT-423). 요청에 groupId가 없었거나
- *   그 그룹의 멤버가 아니면 null이다 — 화면이 "그룹에 공유됐어요" 안내를 고르는 기준.
+ *   그 그룹의 멤버가 아니거나 리뷰가 성립하지 않았으면 null이다 — 화면이 "그룹에 공유됐어요"
+ *   안내를 고르는 기준.
  */
 data class SaveResult(
     val saveId: Long,
@@ -87,6 +98,8 @@ interface UpdateSaveUseCase {
 /**
  * @param placeId 저장의 매장과 같아야 한다. 다르거나 읽을 수 없으면 SAVE_PLACE_IMMUTABLE (S6).
  * @param newPlaceRequested 매장 직접 등록 요청이 실려 오면 그것도 매장 변경이다 (S6).
+ * @param draft 중간 저장이다 — [CreateSaveCommand.draft]와 같은 뜻이고, 단계 사이의 자동 저장이
+ *   실제로 반복해서 도는 자리는 이쪽이다 (TMT-426).
  */
 data class UpdateSaveCommand(
     val userId: Long,
@@ -98,6 +111,7 @@ data class UpdateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    val draft: Boolean = false,
     /** 이 리뷰를 시작한 그룹 (TMT-423). 이어쓰기로 판정이 충족되는 시점에 공유한다. */
     val groupId: Long? = null,
 )

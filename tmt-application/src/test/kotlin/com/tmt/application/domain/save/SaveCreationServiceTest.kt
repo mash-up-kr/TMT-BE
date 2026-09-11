@@ -60,6 +60,7 @@ class SaveCreationServiceTest {
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
+        draft: Boolean = false,
         groupId: Long? = null,
     ) = CreateSaveCommand(
         userId,
@@ -69,6 +70,7 @@ class SaveCreationServiceTest {
         positivePointTagIds,
         rating,
         content,
+        draft,
         groupId,
     )
 
@@ -196,6 +198,42 @@ class SaveCreationServiceTest {
         assertEquals(1, result.grantedCount)
         assertEquals(1, result.availableCount)
         assertEquals(listOf(1L to 5), placeStatsPort.added)
+    }
+
+    @Test
+    fun `중간 저장은 판정을 충족해도 리뷰·티켓·집계가 나가지 않는다 (TMT-426)`() {
+        val result = service.create(completeCommand().copy(draft = true))
+
+        assertNull(result.reviewId)
+        assertEquals(0, result.grantedCount)
+        assertTrue(result.missing.isEmpty())
+        assertTrue(saveCommandPort.reviews.isEmpty())
+        assertTrue(placeStatsPort.added.isEmpty())
+        assertTrue(published.isEmpty())
+    }
+
+    @Test
+    fun `중간 저장은 그룹 맥락이 있어도 공유하지 않는다 (TMT-423·TMT-426)`() {
+        sharePorts.addMembership(groupId = 7, userId = 1)
+
+        val result = service.create(completeCommand().copy(draft = true, groupId = 7))
+
+        assertNull(result.reviewId, "중간 저장은 리뷰로 확정하지 않는다")
+        assertNull(result.sharedGroupId, "리뷰가 없으니 공유할 것도 없다")
+        assertTrue(sharePorts.shared.isEmpty())
+        assertTrue(sharePorts.refreshedGroupIds.isEmpty())
+    }
+
+    @Test
+    fun `중간 저장이어도 저장·사진·태그는 그대로 남는다 (TMT-426)`() {
+        val result = service.create(completeCommand().copy(draft = true))
+
+        assertEquals(1, saveCommandPort.saves.size)
+        assertEquals(1, saveCommandPort.photos.getValue(result.saveId).size)
+        assertEquals(
+            listOf("tag_couple", "tag_kind"),
+            saveCommandPort.tags.getValue(result.saveId),
+        )
     }
 
     @Test
