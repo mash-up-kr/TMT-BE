@@ -138,6 +138,30 @@ class PersistenceFixtures(
             createdAt?.let { java.sql.Timestamp.from(it) },
         )
 
+    /**
+     * 업로드한 프로필 사진을 붙인다 — [legacyUrl]을 같이 넣어 정본(`profile_image_asset_id`)이
+     * 카카오 URL 폴백보다 앞서는지 가른다 (V7).
+     *
+     * @return 붙인 자산의 `s3_key`
+     */
+    fun attachProfileImage(
+        userId: Long,
+        legacyUrl: String? = null,
+    ): String {
+        val assetId = newMediaAsset(ownerId = userId, status = "ATTACHED")
+        jdbcTemplate.update(
+            "UPDATE users SET profile_image_asset_id = ?, profile_image_url = ? WHERE id = ?",
+            assetId,
+            legacyUrl,
+            userId,
+        )
+        return jdbcTemplate.queryForObject(
+            "SELECT s3_key FROM media_asset WHERE id = ?",
+            String::class.java,
+            assetId,
+        )!!
+    }
+
     /** save_photo는 `(save_id, photo_order)`가 UNIQUE라 같은 save 안에서 order가 겹치면 안 된다. */
     fun attachPhoto(
         saveId: Long,
@@ -191,6 +215,40 @@ class PersistenceFixtures(
         placeId: Long,
     ) {
         jdbcTemplate.update("DELETE FROM place_favorite WHERE user_id = ? AND place_id = ?", userId, placeId)
+    }
+
+    /**
+     * 큐레이션 칩과 그 매장 목록 (E12, V9).
+     *
+     * 검색·핀 테스트가 **후보를 자기 매장으로 좁히는 손잡이**다. `searchByRelevance`에는
+     * 공간 술어가 없어 검색어를 비우면 DB의 모든 매장이 후보가 되는데, 칩을 걸면
+     * [placeIds]로 준 매장만 남는다 — 같은 컨테이너를 쓰는 다른 테스트의 매장이 안 섞인다.
+     *
+     * `pin_order`는 넘긴 순서대로 1부터 붙는다 — V10 시드의 `row_number()`와 같은 기준이다.
+     * 읽는 쿼리가 아직 없어 단언 대상은 아니다.
+     */
+    fun newCurationTag(
+        placeIds: List<Long> = emptyList(),
+        label: String = "테스트칩",
+        active: Boolean = true,
+    ): String {
+        val id = "curation_t${nextSequence()}"
+        jdbcTemplate.update(
+            "INSERT INTO curation_tag (id, label, display_order, active) VALUES (?, ?, ?, ?)",
+            id,
+            label,
+            1,
+            active,
+        )
+        placeIds.forEachIndexed { index, placeId ->
+            jdbcTemplate.update(
+                "INSERT INTO curation_tag_place (curation_tag_id, place_id, pin_order) VALUES (?, ?, ?)",
+                id,
+                placeId,
+                index + 1,
+            )
+        }
+        return id
     }
 
     /** 그룹. `name`이 UNIQUE(G6)라 유일값을 넣는다. `member_count`는 생성자 포함 1에서 시작한다 */

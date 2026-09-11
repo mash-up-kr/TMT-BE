@@ -138,6 +138,18 @@ class GroupReviewQueryAdapterTest : PersistenceTest() {
         assertTrue(seen.favorite)
     }
 
+    @Test
+    fun `작성자의 업로드한 사진을 내린다 (V7)`() {
+        val owner = fixtures.newUser()
+        val group = fixtures.newGroup(owner)
+        val author = fixtures.newUser()
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
+        val review = fixtures.newPublishedReview(fixtures.newPlace(), userId = author, createdAt = t(1))
+        fixtures.shareReview(group, review.reviewId, review.userId)
+
+        assertEquals(s3Key, rows(group).single().authorProfileImageS3Key)
+    }
+
     private fun rows(groupId: Long) = adapter.findSharedReviewRows(groupId, null, null, null, null, null, 20).rows
 
     private fun t(seconds: Long): Instant = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(seconds)

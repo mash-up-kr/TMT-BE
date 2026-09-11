@@ -18,6 +18,8 @@ fun reviewDetailRow(
     reviewId: Long = 1,
     saveId: Long = 10,
     authorId: Long = 7,
+    authorProfileImageUrl: String? = null,
+    authorProfileImageS3Key: String? = null,
 ) = ReviewDetailRow(
     reviewId = reviewId,
     saveId = saveId,
@@ -26,7 +28,8 @@ fun reviewDetailRow(
     content = "맛도 있고 분위기도 좋아요.",
     authorId = authorId,
     authorNickname = "하아얀",
-    authorProfileImageUrl = null,
+    authorProfileImageUrl = authorProfileImageUrl,
+    authorProfileImageS3Key = authorProfileImageS3Key,
     placeId = 9,
     placeName = "델리스피자",
     placeRoadAddress = "서울 마포구 도화동 200-14",

@@ -3,6 +3,7 @@ package com.tmt.application.domain.group
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.AttachMediaUseCase
 import com.tmt.application.port.input.GroupCommand
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.output.persistence.GroupCommandPort
 import com.tmt.application.port.output.persistence.GroupCoverImageRow
 import com.tmt.application.port.output.persistence.GroupDetailPort
@@ -101,7 +102,7 @@ class GroupCommandServiceTest {
 
     @Test
     fun `생성하면 요청자가 소유자이고 이미지는 ATTACHED로 전이된다 (G13·M7)`() {
-        val view = service.create(command(imageAssetId = 42L))
+        val view = service.create(command(imageAsset = ImageAssetSelection.Set(42L)))
 
         assertEquals(listOf<Any?>(1L, "새 그룹", listOf("region_guro"), 42L), created)
         assertEquals(listOf(42L), attachedIds)
@@ -140,7 +141,7 @@ class GroupCommandServiceTest {
     fun `이미지를 교체하면 이전 asset은 STAGED로 돌아간다 (M4)`() {
         editTarget = GroupEditTarget(ownerId = 1L, imageAssetId = 41L)
 
-        service.update(10L, command(imageAssetId = 42L))
+        service.update(10L, command(imageAsset = ImageAssetSelection.Set(42L)))
 
         assertEquals(listOf(41L), detachedIds)
         assertEquals(listOf(42L), attachedIds)
@@ -150,7 +151,7 @@ class GroupCommandServiceTest {
     fun `이미지를 그대로 둔 편집은 재부착으로 막히지 않는다`() {
         editTarget = GroupEditTarget(ownerId = 1L, imageAssetId = 42L)
 
-        service.update(10L, command(imageAssetId = 42L))
+        service.update(10L, command(imageAsset = ImageAssetSelection.Set(42L)))
 
         // 검증에는 재부착 허용 집합으로 전달되고, 전이는 일어나지 않는다
         assertEquals(setOf(42L), verifyCalls.single().third)
@@ -162,16 +163,27 @@ class GroupCommandServiceTest {
     fun `이미지를 지우면 이전 asset이 STAGED로 돌아간다 (M4)`() {
         editTarget = GroupEditTarget(ownerId = 1L, imageAssetId = 41L)
 
-        service.update(10L, command(imageAssetId = null))
+        service.update(10L, command(imageAsset = ImageAssetSelection.None))
 
         assertEquals(listOf(41L), detachedIds)
         assertTrue(attachedIds.isEmpty())
     }
 
+    @Test
+    fun `imageAssetId를 생략한 편집은 기존 대표 이미지를 유지한다 (TMT-415)`() {
+        editTarget = GroupEditTarget(ownerId = 1L, imageAssetId = 41L)
+
+        service.update(10L, command(imageAsset = ImageAssetSelection.Keep))
+
+        assertEquals(listOf<Any?>(10L, "새 그룹", listOf("region_guro"), 41L), updated)
+        assertTrue(attachedIds.isEmpty())
+        assertTrue(detachedIds.isEmpty())
+    }
+
     private fun command(
         foodCategoryId: String = "cat_korean",
         regionTagIds: List<String> = listOf("region_guro"),
-        imageAssetId: Long? = null,
+        imageAsset: ImageAssetSelection = ImageAssetSelection.None,
     ) = GroupCommand(
         requesterId = 1L,
         name = "새 그룹",
@@ -179,7 +191,7 @@ class GroupCommandServiceTest {
         description = null,
         foodCategoryId = foodCategoryId,
         regionTagIds = regionTagIds,
-        imageAssetId = imageAssetId,
+        imageAsset = imageAsset,
     )
 
     private fun row() =

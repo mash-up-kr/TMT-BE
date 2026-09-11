@@ -38,6 +38,9 @@ sealed interface PlaceSelection {
 /**
  * @param draft 중간 저장이다 — 판정(C4)을 충족해도 리뷰로 확정하지 않는다. 저장 자체는 똑같이
  *   이뤄지고 이어쓰기 목록에 남는다. 기본값은 지금까지의 동작(작성 완료)이다 (TMT-426).
+ * @param groupId 이 리뷰를 시작한 그룹 (TMT-423). 리뷰가 성립하면 같은 트랜잭션에서 그 그룹에
+ *   공유한다. null이면 공유하지 않는다 — 그룹 맥락 없이 들어온 작성이다. 중간 저장이라 리뷰가
+ *   성립하지 않으면 groupId가 있어도 공유하지 않는다.
  */
 data class CreateSaveCommand(
     val userId: Long,
@@ -48,6 +51,7 @@ data class CreateSaveCommand(
     val rating: Int?,
     val content: String?,
     val draft: Boolean = false,
+    val groupId: Long? = null,
 )
 
 /**
@@ -57,6 +61,9 @@ data class CreateSaveCommand(
  * @param missing 리뷰 성립(C4)에 아직 모자란 항목 — 안내 문구 전용이고 분기에 쓰지 않는다 (TMT-395).
  *   중간 저장(`draft`)은 판정을 충족해도 승격하지 않으므로 `missing`이 비었는데 `reviewId`가 null일 수
  *   있다 — 정상이며, 이 조합도 저장으로 읽는다.
+ * @param sharedGroupId 이번 요청으로 리뷰가 올라간 그룹 (TMT-423). 요청에 groupId가 없었거나
+ *   그 그룹의 멤버가 아니거나 리뷰가 성립하지 않았으면 null이다 — 화면이 "그룹에 공유됐어요"
+ *   안내를 고르는 기준.
  */
 data class SaveResult(
     val saveId: Long,
@@ -65,6 +72,7 @@ data class SaveResult(
     val grantedCount: Int,
     val availableCount: Int,
     val missing: List<ReviewCriterion>,
+    val sharedGroupId: Long? = null,
 )
 
 /**
@@ -104,6 +112,8 @@ data class UpdateSaveCommand(
     val rating: Int?,
     val content: String?,
     val draft: Boolean = false,
+    /** 이 리뷰를 시작한 그룹 (TMT-423). 이어쓰기로 판정이 충족되는 시점에 공유한다. */
+    val groupId: Long? = null,
 )
 
 /** 임시저장 버리기 (F·G·I §5-2). 리뷰가 된 저장은 리뷰 삭제 소관이다. */

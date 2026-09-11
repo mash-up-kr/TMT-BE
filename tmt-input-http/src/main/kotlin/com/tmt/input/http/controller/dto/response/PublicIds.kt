@@ -34,6 +34,9 @@ object PublicIds {
         publicId.removePrefix("group_").toLongOrNull()
             ?: throw TmtException(ErrorCode.GROUP_NOT_FOUND)
 
+    /** 접두가 어긋나도 던지지 않는다 — 호출부가 없는 그룹으로 처리한다. */
+    fun parseGroupIdOrNull(publicId: String?): Long? = publicId?.removePrefix("group_")?.toLongOrNull()
+
     /** 표기(`user_7`)와 숫자(`7`) 둘 다 받는다 — FE가 카드의 `author.userId`를 그대로 경로에 넣는다. */
     fun parseUserId(publicId: String): Long =
         publicId.removePrefix("user_").toLongOrNull()

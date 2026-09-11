@@ -91,6 +91,8 @@ class SaveCreationService(
 
         val reviewId = saveCommandPort.insertReview(saveId, command.userId, placeId)
         val granted = saveWriteSupport.tryGrantTicket(command.userId, reviewId)
+        // 그룹에서 시작한 작성이면 그 그룹에 올린다 — 리뷰·티켓과 같은 트랜잭션이다 (TMT-423)
+        val sharedGroupId = saveWriteSupport.shareToGroupIfMember(command.groupId, command.userId, reviewId)
         placeStatsPort.addReview(placeId, requireNotNull(command.rating))
         // 커밋 후 비동기로 요약을 당겨 채운다 (TMT-232). 유실분은 주기 배치가 줍는다
         eventPublisher.publishEvent(ReviewCommittedEvent(reviewId = reviewId, placeId = placeId))
@@ -102,6 +104,7 @@ class SaveCreationService(
             grantedCount = granted,
             availableCount = saveWriteSupport.availableTicketCount(command.userId),
             missing = emptyList(),
+            sharedGroupId = sharedGroupId,
         )
     }
 

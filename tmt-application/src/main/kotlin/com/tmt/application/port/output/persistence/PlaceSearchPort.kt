@@ -17,8 +17,11 @@ data class PlaceSearchCriteria(
     val query: String?,
     /** 검색어가 카테고리 라벨에 걸린 경우의 id들 — 라벨은 서버 상수라 SQL이 모른다 (E9) */
     val queryCategoryIds: List<String>,
-    val categoryId: String?,
-    val regionPrefix: String?,
+    /**
+     * 큐레이션 칩 (E12). 칩에 속한 매장 집합으로 후보를 좁히는 술어이고,
+     * 정렬에는 관여하지 않는다 — 칩이 걸려도 거리순·유사도순 그대로다.
+     */
+    val curationTagId: String?,
     val latitude: Double?,
     val longitude: Double?,
     /** null이면 반경 제한 없음 (nearbyOnly=false) */

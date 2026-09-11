@@ -25,8 +25,8 @@ data class UpdateUserProfileCommand(
     val userId: Long,
     /** 2~20자 (U3) */
     val nickname: String,
-    /** null이면 사진 없는 상태가 된다 */
-    val profileImageAssetId: Long?,
+    /** 생략(Keep)이면 현재 사진을 유지하고, None이면 사진 없는 상태가 된다 */
+    val profileImage: ImageAssetSelection,
 )
 
 /**

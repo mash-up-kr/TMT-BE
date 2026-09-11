@@ -24,4 +24,30 @@ object LikePatterns {
 
     /** 앞 일치 패턴. 술어가 아니라 정렬 가산점에 쓴다 (TMT-300). */
     fun startsWith(raw: String?): String? = raw?.takeIf { it.isNotEmpty() }?.let { "${escape(it)}%" }
+
+    /**
+     * 공백을 지운 부분 일치 패턴 (TMT-413). 쿼리 쪽도 `replace(name, ' ', '')`로 비교한다.
+     *
+     * `ILIKE '%검색어%'`는 글자가 그대로 이어져야 걸려서 **띄어쓰기 하나로 0건이 된다** —
+     * 운영 데이터에서 `위드유 용산`이 `위드유용산카페`를, `오한수 우육면`이 `오한수우육면가`를
+     * 못 찾았다. 공백을 양쪽에서 지우면 사용자가 어떻게 띄어 쓰든 걸린다.
+     *
+     * 공백을 먼저 지우고 이스케이프한다 — 순서가 뒤바뀌면 이스케이프 문자가 잘린다.
+     */
+    fun containsIgnoringSpaces(raw: String?): String? =
+        raw
+            ?.filterNot { it == ' ' }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { "%${escape(it)}%" }
+
+    /**
+     * 공백을 지운 앞 일치 패턴 (TMT-413). 술어가 아니라 정렬 가산점에 쓴다.
+     *
+     * 공백은 SQL의 `replace(name, ' ', '')`와 같은 정의여야 한다 — ASCII 스페이스만 지운다.
+     */
+    fun startsWithIgnoringSpaces(raw: String?): String? =
+        raw
+            ?.filterNot { it == ' ' }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { "${escape(it)}%" }
 }

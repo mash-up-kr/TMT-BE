@@ -38,6 +38,25 @@ class ReviewQueryAdapterTest : PersistenceTest() {
     }
 
     @Test
+    fun `작성자 사진은 업로드한 자산을 우선하고 없으면 카카오 URL이다 (V7)`() {
+        val author = fixtures.newUser()
+        val s3Key = fixtures.attachProfileImage(author, legacyUrl = "https://kakao.example/legacy.jpg")
+        val review = fixtures.newPublishedReview(fixtures.newPlace(), author)
+
+        val row = assertNotNull(adapter.findReviewDetail(review.reviewId))
+
+        assertEquals(s3Key, row.authorProfileImageS3Key)
+        assertEquals("https://kakao.example/legacy.jpg", row.authorProfileImageUrl)
+    }
+
+    @Test
+    fun `업로드한 사진이 없으면 s3 key는 null이다`() {
+        val review = fixtures.newPublishedReview(fixtures.newPlace(), fixtures.newUser())
+
+        assertNull(assertNotNull(adapter.findReviewDetail(review.reviewId)).authorProfileImageS3Key)
+    }
+
+    @Test
     fun `삭제된 리뷰의 상세는 null이다`() {
         val review = fixtures.newPublishedReview(fixtures.newPlace(), deletedAt = Instant.now())
 

@@ -45,6 +45,7 @@ class NearbyQueryAdapter(
                         authorId = it.getAuthorId(),
                         authorNickname = it.getAuthorNickname(),
                         authorProfileImageUrl = it.getAuthorProfileImageUrl(),
+                        authorProfileImageS3Key = it.getAuthorProfileImageS3Key(),
                         placeId = it.getPlaceId(),
                         placeName = it.getPlaceName(),
                         placeRegionName = it.getPlaceRegionName(),
@@ -66,8 +67,7 @@ class NearbyQueryAdapter(
         centerLongitude: Double?,
         query: String?,
         queryCategoryIds: List<String>,
-        categoryId: String?,
-        regionPrefix: String?,
+        curationTagId: String?,
         limit: Int,
     ): List<PinRow> =
         nearbyQueryRepository
@@ -81,8 +81,7 @@ class NearbyQueryAdapter(
                 queryPattern = LikePatterns.contains(query),
                 // 빈 목록이면 어떤 category_id와도 일치하지 않는 CSV가 된다 ('' 단일 원소)
                 queryCategoryCsv = queryCategoryIds.joinToString(","),
-                categoryId = categoryId,
-                regionPrefix = regionPrefix,
+                curationTagId = curationTagId,
                 limitPlusOne = limit + 1,
             ).map {
                 PinRow(

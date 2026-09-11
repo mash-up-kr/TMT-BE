@@ -125,6 +125,6 @@ class PlaceSearchController(
          * 에러 없이 잘못된 페이지를 준다. 올리면 `INVALID_CURSOR` 400이라 클라이언트가
          * 첫 페이지부터 다시 연다 (F §2-1).
          */
-        private const val RELEVANCE_RANKING_VERSION = "PLACE_SEARCH_V2"
+        private const val RELEVANCE_RANKING_VERSION = "PLACE_SEARCH_V3"
     }
 }

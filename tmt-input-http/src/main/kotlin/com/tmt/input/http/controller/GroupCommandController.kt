@@ -4,9 +4,10 @@ import com.tmt.application.port.input.CreateGroupUseCase
 import com.tmt.application.port.input.GroupCommand
 import com.tmt.application.port.input.UpdateGroupUseCase
 import com.tmt.common.exception.ErrorCode
-import com.tmt.common.exception.TmtException
 import com.tmt.input.http.auth.UserId
 import com.tmt.input.http.config.ApiErrorCodes
+import com.tmt.input.http.controller.dto.request.ImageAssetField
+import com.tmt.input.http.controller.dto.request.toSelection
 import com.tmt.input.http.controller.dto.response.GroupDetailResponse
 import com.tmt.input.http.controller.dto.response.PublicIds
 import com.tmt.input.http.controller.dto.response.toResponse
@@ -52,7 +53,12 @@ class GroupCommandController(
             .body(detail.toResponse())
     }
 
-    @Operation(summary = "그룹 편집", description = "생성자만 호출할 수 있다 (G13). 전체 교체라 바꾸지 않는 필드도 현재 값을 실어 보내야 한다.")
+    @Operation(
+        summary = "그룹 편집",
+        description =
+            "생성자만 호출할 수 있다 (G13). 전체 교체라 바꾸지 않는 필드도 현재 값을 실어 보내야 한다. " +
+                "다만 `imageAssetId`는 생략하면 기존 대표 이미지를 유지하고, `null`을 실으면 지운다 (TMT-415).",
+    )
     @ApiErrorCodes(
         ErrorCode.GROUP_TAG_NOT_FOUND,
         ErrorCode.MEDIA_NOT_OWNED,
@@ -77,19 +83,15 @@ class GroupCommandController(
             description = description,
             foodCategoryId = foodCategoryId,
             regionTagIds = regionTagIds,
-            imageAssetId = imageAssetId?.let(::parseAssetId),
+            imageAsset = imageAssetId.toSelection(),
         )
-
-    /** 실구현 발급 assetId는 접두 없는 숫자 문자열이다 (TMT-202). 형식이 다르면 없는 사진과 같게 취급한다 (M2). */
-    private fun parseAssetId(assetId: String): Long =
-        assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
 
     data class GroupRequest(
         val name: String,
         val oneLineDescription: String,
         val foodCategoryId: String,
         val regionTagIds: List<String>,
-        val imageAssetId: String? = null,
+        val imageAssetId: ImageAssetField = ImageAssetField.Omitted,
         val description: String? = null,
     )
 }

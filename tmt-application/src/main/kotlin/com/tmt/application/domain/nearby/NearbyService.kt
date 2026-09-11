@@ -1,6 +1,5 @@
 package com.tmt.application.domain.nearby
 
-import com.tmt.application.domain.place.CurationPresets
 import com.tmt.application.domain.place.FoodCategories
 import com.tmt.application.domain.review.ReviewCardComposer
 import com.tmt.application.port.input.GetNearbyPlacesUseCase
@@ -9,6 +8,7 @@ import com.tmt.application.port.input.NearbyPlacesRequest
 import com.tmt.application.port.input.NearbyPlacesResult
 import com.tmt.application.port.input.NearbyReviewsRequest
 import com.tmt.application.port.input.NearbyReviewsResult
+import com.tmt.application.port.output.persistence.CurationTagPort
 import com.tmt.application.port.output.persistence.NearbyQueryPort
 import com.tmt.common.exception.ErrorCode
 import com.tmt.common.exception.TmtException
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service
 @Service
 class NearbyService(
     private val nearbyQueryPort: NearbyQueryPort,
+    private val curationTagPort: CurationTagPort,
     private val reviewCardComposer: ReviewCardComposer,
 ) : GetNearbyReviewsUseCase,
     GetNearbyPlacesUseCase {
@@ -40,9 +41,10 @@ class NearbyService(
         if (request.south >= request.north || request.west >= request.east) {
             throw TmtException(ErrorCode.VALIDATION_FAILED, "viewport 경계가 뒤집혀 있습니다.")
         }
-        val preset = request.curationTagId?.let { CurationPresets.BY_ID[it] }
-        // 알 수 없는 칩은 mock과 같게 빈 결과다 — 쿼리를 낼 이유가 없다
-        if (request.curationTagId != null && preset == null) return NearbyPlacesResult(emptyList(), truncated = false)
+        // 없는·비활성 칩은 mock과 같게 빈 결과다 — 쿼리를 낼 이유가 없다
+        if (request.curationTagId != null && !curationTagPort.existsActiveTag(request.curationTagId)) {
+            return NearbyPlacesResult(emptyList(), truncated = false)
+        }
 
         val rows =
             nearbyQueryPort.findPins(
@@ -62,8 +64,7 @@ class NearbyService(
                                 .keys
                                 .toList()
                         }.orEmpty(),
-                categoryId = preset?.categoryId,
-                regionPrefix = preset?.regionPrefix,
+                curationTagId = request.curationTagId,
                 limit = MAX_PINS,
             )
 

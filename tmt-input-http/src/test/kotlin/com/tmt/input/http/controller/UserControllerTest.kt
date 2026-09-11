@@ -10,6 +10,7 @@ import com.tmt.application.port.input.GetUserProfileUseCase
 import com.tmt.application.port.input.GetUserReviewGridUseCase
 import com.tmt.application.port.input.GroupCardSlice
 import com.tmt.application.port.input.GroupCardView
+import com.tmt.application.port.input.ImageAssetSelection
 import com.tmt.application.port.input.JoinedGroupKey
 import com.tmt.application.port.input.JoinedGroupView
 import com.tmt.application.port.input.ReviewGridItemView
@@ -61,13 +62,13 @@ class UserControllerTest {
             .andExpect(jsonPath("$.profileCompleted").value(true))
 
         assertEquals(
-            UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImageAssetId = 12L),
+            UpdateUserProfileCommand(userId = 7L, nickname = "준형이", profileImage = ImageAssetSelection.Set(12L)),
             stub.profileUpdates.single(),
         )
     }
 
     @Test
-    fun `가입 완결에 사진을 안 보내면 assetId가 null이다`() {
+    fun `사진 필드를 생략하면 Keep, null을 실으면 None이다 (TMT-415)`() {
         mockMvc
             .perform(
                 put("/v1/users/me/profile")
@@ -76,7 +77,17 @@ class UserControllerTest {
                     .content("""{"nickname":"준형이"}"""),
             ).andExpect(status().isOk)
 
-        assertNull(stub.profileUpdates.single().profileImageAssetId)
+        assertEquals(ImageAssetSelection.Keep, stub.profileUpdates.single().profileImage)
+
+        mockMvc
+            .perform(
+                put("/v1/users/me/profile")
+                    .requestAttr(UserIdArgumentResolver.USER_ID_ATTRIBUTE, 7L)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"nickname":"준형이","profileImageAssetId":null}"""),
+            ).andExpect(status().isOk)
+
+        assertEquals(ImageAssetSelection.None, stub.profileUpdates.last().profileImage)
     }
 
     @Test

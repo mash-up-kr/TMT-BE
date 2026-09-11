@@ -27,7 +27,9 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
                        s.content     AS content,
                        u.id          AS authorId,
                        u.nickname    AS authorNickname,
+                       -- 프로필 사진 정본은 profile_image_asset_id다 — u.profile_image_url은 카카오 값 폴백 (V7)
                        u.profile_image_url AS authorProfileImageUrl,
+                       au_ma.s3_key AS authorProfileImageS3Key,
                        p.id          AS placeId,
                        p.name        AS placeName,
                        p.region_name AS placeRegionName,
@@ -41,6 +43,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
                 JOIN save s  ON s.id = r.save_id
                 JOIN place p ON p.id = r.place_id
                 JOIN users u ON u.id = r.user_id
+                LEFT JOIN media_asset au_ma ON au_ma.id = u.profile_image_asset_id
                 CROSS JOIN pt
                 WHERE r.deleted_at IS NULL
                   AND ST_DWithin(p.location, pt.g, :radius)
@@ -79,6 +82,8 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         fun getAuthorNickname(): String
 
         fun getAuthorProfileImageUrl(): String?
+
+        fun getAuthorProfileImageS3Key(): String?
 
         fun getPlaceId(): Long
 
@@ -179,8 +184,16 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
                     OR p.road_address ILIKE :queryPattern ESCAPE '\'
                     OR p.category_id = ANY(string_to_array(:queryCategoryCsv, ','))
                   )
-              AND (CAST(:categoryId AS varchar) IS NULL OR p.category_id = :categoryId)
-              AND (CAST(:regionPrefix AS text) IS NULL OR p.region_name LIKE :regionPrefix || '%')
+              AND (
+                    -- 칩은 조건이 아니라 운영이 고른 매장 목록이다 (E12, V9). 목록을
+                    -- 애플리케이션으로 끌어올려 IN으로 넘기면 파라미터가 목록 크기만큼
+                    -- 늘고 상한이 없어, 술어를 SQL에 둔다
+                    CAST(:curationTagId AS varchar) IS NULL
+                    OR EXISTS(
+                           SELECT 1 FROM curation_tag_place ctp
+                           WHERE ctp.curation_tag_id = :curationTagId AND ctp.place_id = p.id
+                       )
+                  )
             ORDER BY
                 CASE WHEN CAST(:centerLat AS float8) IS NULL THEN 0.0
                      ELSE ST_Distance(p.location, ST_SetSRID(ST_MakePoint(:centerLng, :centerLat), 4326)::geography)
@@ -199,8 +212,7 @@ interface NearbyQueryRepository : JpaRepository<ReviewEntity, Long> {
         @Param("centerLng") centerLng: Double?,
         @Param("queryPattern") queryPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
-        @Param("categoryId") categoryId: String?,
-        @Param("regionPrefix") regionPrefix: String?,
+        @Param("curationTagId") curationTagId: String?,
         @Param("limitPlusOne") limitPlusOne: Int,
     ): List<PinRowView>
 

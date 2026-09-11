@@ -86,7 +86,9 @@ interface PlaceQueryRepository : JpaRepository<PlaceEntity, Long> {
                    s.content     AS content,
                    u.id          AS authorId,
                    u.nickname    AS authorNickname,
+                   -- 프로필 사진 정본은 profile_image_asset_id다 — u.profile_image_url은 카카오 값 폴백 (V7)
                    u.profile_image_url AS authorProfileImageUrl,
+                   au_ma.s3_key AS authorProfileImageS3Key,
                    p.id          AS placeId,
                    p.name        AS placeName,
                    p.region_name AS placeRegionName,
@@ -105,6 +107,7 @@ interface PlaceQueryRepository : JpaRepository<PlaceEntity, Long> {
             JOIN save s  ON s.id = r.save_id
             JOIN place p ON p.id = r.place_id
             JOIN users u ON u.id = r.user_id
+            LEFT JOIN media_asset au_ma ON au_ma.id = u.profile_image_asset_id
             WHERE r.place_id = :placeId
               AND r.deleted_at IS NULL
               AND (
