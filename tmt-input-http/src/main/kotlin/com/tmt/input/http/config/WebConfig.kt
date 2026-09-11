@@ -1,5 +1,6 @@
 package com.tmt.input.http.config
 
+import com.tmt.input.http.auth.AdminOnlyInterceptor
 import com.tmt.input.http.auth.SignupCompletionInterceptor
 import com.tmt.input.http.auth.UserIdArgumentResolver
 import com.tmt.input.http.filter.RequestIdFilter
@@ -13,6 +14,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebConfig(
     private val signupCompletionInterceptor: SignupCompletionInterceptor,
+    private val adminOnlyInterceptor: AdminOnlyInterceptor,
 ) : WebMvcConfigurer {
     override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
         resolvers.add(UserIdArgumentResolver())
@@ -29,6 +31,11 @@ class WebConfig(
             .addInterceptor(signupCompletionInterceptor)
             .addPathPatterns("/**")
             .excludePathPatterns(*SIGNUP_EXEMPT_PATHS)
+        // 어드민 경로 전체 (TMT-421). 접두 하나로 묶어 두면 /v1/admin 아래에 새로 만든
+        // 엔드포인트가 자동으로 막힌다 — 가드 호출을 잊어서 열리는 것을 막는 쪽이다
+        registry
+            .addInterceptor(adminOnlyInterceptor)
+            .addPathPatterns(ADMIN_PATH_PATTERN)
     }
 
     /**
@@ -69,6 +76,9 @@ class WebConfig(
                 "/api-docs/**",
                 "/v3/api-docs/**",
             )
+
+        /** 어드민 전용 경로. 새 어드민 API는 반드시 이 접두 아래에 만든다 */
+        internal const val ADMIN_PATH_PATTERN = "/v1/admin/**"
 
         private const val PREFLIGHT_CACHE_SECONDS = 600L
     }
