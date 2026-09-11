@@ -89,12 +89,14 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
      * 두 축이라 `ORDER BY`에 컬럼을 늘리면 페이징 경계가 어긋나기 때문이다.
      *
      * ```
-     * 등급(이름 8000 · 주소 4000 · 카테고리 0) + 이름 앞매칭 2000 + 유사도 0~1000
+     * 등급(이름 8000 · 주소 4000 · 이름 유사도 2000 · 카테고리 0) + 이름 앞매칭 2000 + 유사도 0~1000
      * ```
      *
-     * **자릿수를 바꿀 때 지켜야 하는 것** — 아랫자리 합이 윗자리 간격을 넘으면 안 된다.
-     * 앞매칭(2000)이 유사도 만점(1000)보다 커야 앞매칭이 이기고, 등급 간격(4000)이
-     * 등급 안 최대치(2000+1000)보다 커야 주소 1등이 이름 꼴찌를 못 넘는다.
+     * **자릿수를 바꿀 때 지켜야 하는 것** — 등급 안에서 더해지는 최대치가 그 등급과 바로 아래
+     * 등급의 간격을 넘으면 안 된다. 앞매칭(2000)이 유사도 만점(1000)보다 커야 앞매칭이 이기고,
+     * 이름 등급의 최대 가산(2000+1000=3000)이 8000과 4000의 간격(4000)보다 작아야 하며,
+     * 주소 등급의 최대 가산(1000)이 4000과 2000의 간격(2000)보다, 유사도 등급의 최대 가산(1000)이
+     * 2000과 0의 간격(2000)보다 작아야 한다.
      */
     @Query(
         value = """
@@ -113,10 +115,18 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
                                WHEN p.name ILIKE :queryPattern ESCAPE '\'
                                     OR replace(p.name, ' ', '') ILIKE :queryNoSpacePattern ESCAPE '\' THEN
                                    8000
-                                   + CASE WHEN p.name ILIKE :queryPrefixPattern ESCAPE '\' THEN 2000 ELSE 0 END
+                                   + CASE
+                                         WHEN p.name ILIKE :queryPrefixPattern ESCAPE '\'
+                                              OR replace(p.name, ' ', '') ILIKE :queryNoSpacePrefixPattern ESCAPE '\'
+                                             THEN 2000
+                                         ELSE 0
+                                     END
                                    + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
                                WHEN p.road_address ILIKE :queryPattern ESCAPE '\' THEN
                                    4000 + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
+                               -- 유사도(%)로만 걸린 이름 매칭 (TMT-413). 주소 등급 아래·나머지 위다
+                               WHEN p.name % CAST(:query AS text) THEN
+                                   2000 + round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
                                ELSE
                                    round(COALESCE(similarity(p.name, CAST(:query AS text)), 0) * 1000)
                            END AS int
@@ -156,6 +166,7 @@ interface PlaceSearchRepository : JpaRepository<PlaceEntity, Long> {
         @Param("queryPattern") queryPattern: String?,
         @Param("queryNoSpacePattern") queryNoSpacePattern: String?,
         @Param("queryPrefixPattern") queryPrefixPattern: String?,
+        @Param("queryNoSpacePrefixPattern") queryNoSpacePrefixPattern: String?,
         @Param("queryCategoryCsv") queryCategoryCsv: String,
         @Param("categoryId") categoryId: String?,
         @Param("regionPrefix") regionPrefix: String?,

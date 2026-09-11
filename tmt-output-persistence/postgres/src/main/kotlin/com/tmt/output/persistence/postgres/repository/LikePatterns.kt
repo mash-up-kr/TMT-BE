@@ -36,7 +36,18 @@ object LikePatterns {
      */
     fun containsIgnoringSpaces(raw: String?): String? =
         raw
-            ?.filterNot { it.isWhitespace() }
+            ?.filterNot { it == ' ' }
             ?.takeIf { it.isNotEmpty() }
             ?.let { "%${escape(it)}%" }
+
+    /**
+     * 공백을 지운 앞 일치 패턴 (TMT-413). 술어가 아니라 정렬 가산점에 쓴다.
+     *
+     * 공백은 SQL의 `replace(name, ' ', '')`와 같은 정의여야 한다 — ASCII 스페이스만 지운다.
+     */
+    fun startsWithIgnoringSpaces(raw: String?): String? =
+        raw
+            ?.filterNot { it == ' ' }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { "${escape(it)}%" }
 }

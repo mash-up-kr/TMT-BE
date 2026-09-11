@@ -35,6 +35,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
         queryPattern = LikePatterns.contains(query),
         queryNoSpacePattern = LikePatterns.containsIgnoringSpaces(query),
         queryPrefixPattern = LikePatterns.startsWith(query),
+        queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces(query),
         queryCategoryCsv = "",
         categoryId = null,
         regionPrefix = region,
@@ -153,6 +154,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("김밥천국"),
                 queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("김밥천국"),
                 queryPrefixPattern = LikePatterns.startsWith("김밥천국"),
+                queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("김밥천국"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -216,6 +218,57 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
     }
 
     @Test
+    fun `유사도로만 걸린 이름은 자기 등급을 받아 카테고리보다 앞이고 주소보다 뒤다 (TMT-413)`() {
+        val region = isolatedRegion()
+        val bySimilarity = fixtures.newPlace(name = "스타벅스 홍대역", regionName = region, categoryId = null)
+        val byAddress =
+            fixtures.newPlace(
+                name = "이름에 없는 가게",
+                roadAddress = "서울특별시 마포구 홍대 스타벅스로 7",
+                regionName = region,
+                categoryId = null,
+            )
+        val byCategory = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "cat_fastfood")
+
+        val rows =
+            repository.searchByRelevance(
+                query = "홍대 스타벅스",
+                queryPattern = LikePatterns.contains("홍대 스타벅스"),
+                queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("홍대 스타벅스"),
+                queryPrefixPattern = LikePatterns.startsWith("홍대 스타벅스"),
+                queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("홍대 스타벅스"),
+                queryCategoryCsv = "cat_fastfood",
+                categoryId = null,
+                regionPrefix = region,
+                afterSortValue = null,
+                afterPlaceId = null,
+                viewerId = null,
+                limitPlusOne = 50,
+            )
+
+        assertEquals(listOf(byAddress, bySimilarity, byCategory), rows.map { it.getPlaceId() })
+        val byId = rows.associate { it.getPlaceId() to it.getSortValue() }
+        assertTrue(byId.getValue(byAddress) in 4000..4999, "주소 등급")
+        assertTrue(byId.getValue(bySimilarity) in 2000..2999, "유사도 등급 — ELSE로 떨어지지 않는다")
+        assertTrue(byId.getValue(byCategory) < 2000, "카테고리 등급")
+    }
+
+    @Test
+    fun `앞매칭 가산점도 띄어쓰기를 관용한다 (TMT-413)`() {
+        val region = isolatedRegion()
+        // 원문 앞매칭만 보면 `위드유 용산`은 어느 쪽에도 안 붙어 짧은 이름이 유사도로 이긴다
+        val noSpacePrefix = fixtures.newPlace(name = "위드유용산카페", regionName = region)
+        val suffixShortName = fixtures.newPlace(name = "카페위드유용산", regionName = region)
+
+        val rows = searchRelevance("위드유 용산", region)
+
+        assertEquals(noSpacePrefix, rows.first().getPlaceId(), "공백을 지운 앞매칭이 상위로 온다")
+        val byId = rows.associate { it.getPlaceId() to it.getSortValue() }
+        assertTrue(byId.getValue(noSpacePrefix) >= 10000, "앞매칭 가산점 2000이 붙는다")
+        assertTrue(byId.getValue(suffixShortName) < 10000, "앞매칭이 아니면 가산점이 없다")
+    }
+
+    @Test
     fun `관용 술어로 걸린 결과도 커서로 중복·누락 없이 순회한다 (TMT-413)`() {
         val region = isolatedRegion()
         // 이름이 같은 매장 셋 — 점수가 같아 (sortValue, placeId) tie-breaker만 남는다
@@ -256,6 +309,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("피자"),
                 queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("피자"),
                 queryPrefixPattern = LikePatterns.startsWith("피자"),
+                queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("피자"),
                 queryCategoryCsv = "cat_fastfood",
                 categoryId = null,
                 regionPrefix = region,
@@ -286,6 +340,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("본죽"),
                 queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("본죽"),
                 queryPrefixPattern = LikePatterns.startsWith("본죽"),
+                queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("본죽"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,
@@ -317,6 +372,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             queryPattern = null,
             queryNoSpacePattern = null,
             queryPrefixPattern = null,
+            queryNoSpacePrefixPattern = null,
             queryCategoryCsv = "",
             categoryId = null,
             regionPrefix = region,
@@ -348,6 +404,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = LikePatterns.contains(token),
                     queryNoSpacePattern = LikePatterns.containsIgnoringSpaces(token),
                     queryPrefixPattern = LikePatterns.startsWith(token),
+                    queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces(token),
                     queryCategoryCsv = "",
                     categoryId = "cat_korean",
                     regionPrefix = region,
@@ -375,6 +432,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = LikePatterns.contains("한식"),
                     queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("한식"),
                     queryPrefixPattern = LikePatterns.startsWith("한식"),
+                    queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("한식"),
                     queryCategoryCsv = "cat_korean",
                     categoryId = null,
                     regionPrefix = region,
@@ -404,6 +462,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = null,
                     queryNoSpacePattern = null,
                     queryPrefixPattern = null,
+                    queryNoSpacePrefixPattern = null,
                     queryCategoryCsv = "",
                     categoryId = null,
                     regionPrefix = region,
@@ -466,6 +525,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = null,
                 queryNoSpacePattern = null,
                 queryPrefixPattern = null,
+                queryNoSpacePrefixPattern = null,
                 queryCategoryCsv = "cat_korean",
                 categoryId = null,
                 regionPrefix = region,
@@ -523,6 +583,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("100%"),
                 queryNoSpacePattern = LikePatterns.containsIgnoringSpaces("100%"),
                 queryPrefixPattern = LikePatterns.startsWith("100%"),
+                queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces("100%"),
                 queryCategoryCsv = "",
                 categoryId = null,
                 regionPrefix = region,

@@ -23,6 +23,7 @@ class PlaceSearchAdapter(
         val queryNoSpacePattern = LikePatterns.containsIgnoringSpaces(criteria.query)
         // 앞매칭은 술어가 아니라 유사도 정렬의 가산점이다 (TMT-300)
         val queryPrefixPattern = LikePatterns.startsWith(criteria.query)
+        val queryNoSpacePrefixPattern = LikePatterns.startsWithIgnoringSpaces(criteria.query)
         val rows =
             if (criteria.sortByDistance) {
                 placeSearchRepository.searchByDistance(
@@ -46,6 +47,7 @@ class PlaceSearchAdapter(
                     queryPattern = queryPattern,
                     queryNoSpacePattern = queryNoSpacePattern,
                     queryPrefixPattern = queryPrefixPattern,
+                    queryNoSpacePrefixPattern = queryNoSpacePrefixPattern,
                     queryCategoryCsv = queryCategoryCsv,
                     categoryId = criteria.categoryId,
                     regionPrefix = criteria.regionPrefix,
