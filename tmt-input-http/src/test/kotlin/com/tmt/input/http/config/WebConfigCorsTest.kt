@@ -1,6 +1,8 @@
 package com.tmt.input.http.config
 
 import com.tmt.application.port.input.CheckSignupCompletedUseCase
+import com.tmt.input.http.auth.AdminAllowlist
+import com.tmt.input.http.auth.AdminOnlyInterceptor
 import com.tmt.input.http.auth.SignupCompletionInterceptor
 import com.tmt.input.http.filter.RequestIdFilter
 import org.assertj.core.api.Assertions.assertThat
@@ -21,7 +23,12 @@ class WebConfigCorsTest {
 
     private val config: CorsConfiguration =
         ProbeRegistry()
-            .also { WebConfig(SignupCompletionInterceptor(AlwaysCompleted)).addCorsMappings(it) }
+            .also {
+                WebConfig(
+                    SignupCompletionInterceptor(AlwaysCompleted),
+                    AdminOnlyInterceptor(AdminAllowlist("")),
+                ).addCorsMappings(it)
+            }
             .configurations()
             .getValue("/**")
 
