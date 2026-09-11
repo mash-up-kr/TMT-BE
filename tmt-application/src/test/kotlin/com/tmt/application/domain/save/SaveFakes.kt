@@ -1,6 +1,9 @@
 package com.tmt.application.domain.save
 
 import com.tmt.application.port.output.persistence.GroupJoinTicketPort
+import com.tmt.application.port.output.persistence.GroupReviewQueryPort
+import com.tmt.application.port.output.persistence.GroupReviewSharePort
+import com.tmt.application.port.output.persistence.GroupStatsPort
 import com.tmt.application.port.output.persistence.MySaveRow
 import com.tmt.application.port.output.persistence.MySaveRows
 import com.tmt.application.port.output.persistence.NewPlaceRow
@@ -317,4 +320,84 @@ class FakePlaceStatsPort : PlaceStatsPort {
     ) {
         removed += placeId to rating
     }
+}
+
+/**
+ * 그룹 공유 3종 페이크 (TMT-423). 저장 흐름은 멤버 여부만 묻고 공유·집계를 시킨다 —
+ * 조회 쪽 나머지 메서드는 이 경로에서 쓰이지 않아 호출되면 실패시킨다.
+ */
+class FakeGroupSharePorts(
+    private val memberships: MutableSet<Pair<Long, Long>> = mutableSetOf(),
+) : GroupReviewSharePort,
+    GroupStatsPort {
+    val shared = mutableListOf<Triple<Long, Long, Long>>()
+    val refreshedGroupIds = mutableListOf<Long>()
+
+    fun addMembership(
+        groupId: Long,
+        userId: Long,
+    ) {
+        memberships += groupId to userId
+    }
+
+    fun isMemberOf(
+        groupId: Long,
+        userId: Long,
+    ) = (groupId to userId) in memberships
+
+    override fun share(
+        groupId: Long,
+        userId: Long,
+        reviewId: Long,
+    ) {
+        // 실제 포트는 (groupId, reviewId) UNIQUE라 재호출이 무해하다 — 그 성질을 그대로 흉내낸다
+        if (shared.none { it.first == groupId && it.third == reviewId }) {
+            shared += Triple(groupId, userId, reviewId)
+        }
+    }
+
+    override fun unshareAllByUser(
+        groupId: Long,
+        userId: Long,
+    ): Int = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun findSharedGroupIds(reviewId: Long): List<Long> = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun unshareByReview(reviewId: Long): Int = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun replaceUserShares(
+        groupId: Long,
+        userId: Long,
+        reviewIds: List<Long>,
+    ) = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun addMember(groupId: Long) = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun removeMember(groupId: Long) = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun refreshShareStats(groupId: Long) {
+        refreshedGroupIds += groupId
+    }
+}
+
+/** 멤버 판정만 쓰는 조회 페이크 — 나머지는 저장 흐름 밖이다. */
+class FakeGroupMembershipQueryPort(
+    private val shares: FakeGroupSharePorts,
+) : GroupReviewQueryPort {
+    override fun existsGroup(groupId: Long): Boolean = error("저장 흐름에서 쓰이지 않는다")
+
+    override fun isMember(
+        groupId: Long,
+        userId: Long,
+    ): Boolean = shares.isMemberOf(groupId, userId)
+
+    override fun findSharedReviewRows(
+        groupId: Long,
+        afterCreatedAt: Instant?,
+        afterReviewId: Long?,
+        viewerId: Long?,
+        viewerLatitude: Double?,
+        viewerLongitude: Double?,
+        limit: Int,
+    ): PlaceReviewRows = error("저장 흐름에서 쓰이지 않는다")
 }

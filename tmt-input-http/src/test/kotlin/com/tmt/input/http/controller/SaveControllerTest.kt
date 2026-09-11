@@ -31,6 +31,7 @@ import com.tmt.input.http.controller.address.AddressIdTokenCodec
 import com.tmt.input.http.exception.ExceptionAdvice
 import com.tmt.input.http.idempotency.IdempotencyKeyArgumentResolver
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -130,6 +131,41 @@ class SaveControllerTest {
             .andExpect(jsonPath("$.missing").isEmpty)
 
         assertEquals(listOf(7L), createSaveUseCase.commands.single().photoAssetIds)
+    }
+
+    @Test
+    fun `groupId를 실어 보내면 커맨드로 넘어가고 공유된 그룹이 응답에 나온다 (TMT-423)`() {
+        createSaveUseCase.reviewed = true
+
+        postSave("""{ "placeId": "place_1", "rating": 5, "content": "맛있어요", "groupId": "group_11" }""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.reviewId").value("rv_100"))
+            .andExpect(jsonPath("$.sharedGroupId").value("group_11"))
+
+        assertEquals(11L, createSaveUseCase.commands.single().groupId)
+    }
+
+    @Test
+    fun `접두가 어긋난 groupId는 없는 그룹과 같고 리뷰는 그대로 만든다 (TMT-423)`() {
+        createSaveUseCase.reviewed = true
+
+        postSave("""{ "placeId": "place_1", "rating": 5, "content": "맛있어요", "groupId": "11" }""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.reviewId").value("rv_100"))
+
+        // `group_` 없이 온 값도 숫자면 그대로 읽는다 — 접두만 다른 표기를 거부할 이유가 없다
+        assertEquals(11L, createSaveUseCase.commands.single().groupId)
+    }
+
+    @Test
+    fun `groupId가 없으면 공유 결과도 없다 (TMT-423)`() {
+        createSaveUseCase.reviewed = true
+
+        postSave("""{ "placeId": "place_1", "rating": 5, "content": "맛있어요" }""")
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.sharedGroupId").doesNotExist())
+
+        assertNull(createSaveUseCase.commands.single().groupId)
     }
 
     @Test
@@ -521,6 +557,8 @@ class SaveControllerTest {
                 grantedCount = if (reviewed) 1 else 0,
                 availableCount = if (reviewed) 2 else 1,
                 missing = if (reviewed) emptyList() else listOf(ReviewCriterion.CONTENT),
+                // 리뷰가 됐을 때만 공유된다 — 서비스의 판정을 그대로 흉내낸다 (TMT-423)
+                sharedGroupId = command.groupId.takeIf { reviewed },
             )
         }
     }

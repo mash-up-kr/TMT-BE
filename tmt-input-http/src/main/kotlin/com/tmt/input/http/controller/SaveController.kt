@@ -113,6 +113,8 @@ class SaveController(
                             positivePointTagIds = request.positivePointTagIds,
                             rating = request.rating,
                             content = request.content,
+                            // 접두가 어긋난 groupId는 없는 그룹과 같게 본다 — 리뷰는 그대로 만든다
+                            groupId = PublicIds.parseGroupIdOrNull(request.groupId),
                         ),
                     )
                 SaveResultResponse(
@@ -121,6 +123,7 @@ class SaveController(
                     placeId = PublicIds.place(created.placeId),
                     ticket = SaveResultResponse.TicketGrantSummary(created.grantedCount, created.availableCount),
                     missing = created.missing,
+                    sharedGroupId = created.sharedGroupId?.let(PublicIds::group),
                 )
             }
         return ResponseEntity
@@ -176,6 +179,7 @@ class SaveController(
                             positivePointTagIds = request.positivePointTagIds,
                             rating = request.rating,
                             content = request.content,
+                            groupId = PublicIds.parseGroupIdOrNull(request.groupId),
                         ),
                     )
                 SaveResultResponse(
@@ -184,6 +188,7 @@ class SaveController(
                     placeId = PublicIds.place(updated.placeId),
                     ticket = SaveResultResponse.TicketGrantSummary(updated.grantedCount, updated.availableCount),
                     missing = updated.missing,
+                    sharedGroupId = updated.sharedGroupId?.let(PublicIds::group),
                 )
             }.response
     }
@@ -326,6 +331,13 @@ class SaveController(
         val positivePointTagIds: List<String> = emptyList(),
         val rating: Int? = null,
         val content: String? = null,
+        @field:Schema(
+            description =
+                "이 리뷰를 시작한 그룹. 리뷰가 성립하면 같은 트랜잭션에서 그 그룹에 공유한다 (TMT-423). " +
+                    "멤버가 아니거나 없는 그룹이면 리뷰만 만들고 공유는 건너뛴다",
+            example = "group_11",
+        )
+        val groupId: String? = null,
     ) {
         data class NewPlaceRequest(
             val name: String,
@@ -348,6 +360,14 @@ class SaveController(
         val ticket: TicketGrantSummary,
         @field:Schema(description = "리뷰 성립(C4)에 모자란 항목. 리뷰가 됐으면 빈 배열. 사진은 항목이 아니다 (C4-1)")
         val missing: List<ReviewCriterion> = emptyList(),
+        @field:Schema(
+            description =
+                "이번 요청으로 리뷰가 올라간 그룹 (TMT-423). 요청에 groupId가 없었거나 그 그룹의 멤버가 " +
+                    "아니면 null이다 — 화면이 \"그룹에 공유됐어요\" 안내를 고르는 기준",
+            example = "group_11",
+            nullable = true,
+        )
+        val sharedGroupId: String? = null,
     ) {
         data class TicketGrantSummary(
             val grantedCount: Int,

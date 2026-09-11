@@ -88,6 +88,8 @@ class SaveUpdateService(
         // 판정이 이번에 충족됐다 — 리뷰·티켓·집계가 이 시점에 생긴다 (C6)
         val reviewId = saveCommandPort.insertReview(command.saveId, command.userId, save.placeId)
         val granted = saveWriteSupport.tryGrantTicket(command.userId, reviewId)
+        // 이어쓰기로 판정이 충족된 이 시점이 공유 시점이다 (TMT-423)
+        val sharedGroupId = saveWriteSupport.shareToGroupIfMember(command.groupId, command.userId, reviewId)
         placeStatsPort.addReview(save.placeId, requireNotNull(command.rating))
         eventPublisher.publishEvent(ReviewCommittedEvent(reviewId = reviewId, placeId = save.placeId))
 
@@ -98,6 +100,7 @@ class SaveUpdateService(
             grantedCount = granted,
             availableCount = saveWriteSupport.availableTicketCount(command.userId),
             missing = emptyList(),
+            sharedGroupId = sharedGroupId,
         )
     }
 

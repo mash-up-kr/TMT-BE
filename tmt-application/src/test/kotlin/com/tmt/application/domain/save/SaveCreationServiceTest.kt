@@ -30,6 +30,8 @@ class SaveCreationServiceTest {
     private val attachMediaUseCase =
         MediaAttachmentService(mediaAssetPort, MediaUrlResolver("https://media.tmt.example"))
 
+    private val sharePorts = FakeGroupSharePorts()
+
     private val service =
         SaveCreationService(
             saveCommandPort = saveCommandPort,
@@ -40,6 +42,9 @@ class SaveCreationServiceTest {
                     reviewTagPort = reviewTagPort,
                     attachMediaUseCase = attachMediaUseCase,
                     groupJoinTicketPort = ticketPort,
+                    groupReviewQueryPort = FakeGroupMembershipQueryPort(sharePorts),
+                    groupReviewSharePort = sharePorts,
+                    groupStatsPort = sharePorts,
                 ),
             attachMediaUseCase = attachMediaUseCase,
             placeStatsPort = placeStatsPort,
@@ -55,7 +60,17 @@ class SaveCreationServiceTest {
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
-    ) = CreateSaveCommand(userId, place, photoAssetIds, companionTagIds, positivePointTagIds, rating, content)
+        groupId: Long? = null,
+    ) = CreateSaveCommand(
+        userId,
+        place,
+        photoAssetIds,
+        companionTagIds,
+        positivePointTagIds,
+        rating,
+        content,
+        groupId,
+    )
 
     private fun completeCommand(userId: Long = 1): CreateSaveCommand {
         val assetId = mediaAssetPort.seed(ownerId = userId)
@@ -103,6 +118,53 @@ class SaveCreationServiceTest {
         assertEquals(1, result.grantedCount)
         assertTrue(result.missing.isEmpty())
         assertEquals(1, placeStatsPort.added.size)
+    }
+
+    @Test
+    fun `그룹에서 시작한 리뷰는 그 그룹에 올라간다 (TMT-423)`() {
+        sharePorts.addMembership(groupId = 7, userId = 1)
+
+        val result = service.create(completeCommand().copy(groupId = 7))
+
+        val reviewId = requireNotNull(result.reviewId)
+        assertEquals(7L, result.sharedGroupId)
+        assertEquals(listOf(Triple(7L, 1L, reviewId)), sharePorts.shared)
+        // 집계는 증감이 아니라 공유 집합에서 다시 센다 (D3)
+        assertEquals(listOf(7L), sharePorts.refreshedGroupIds)
+    }
+
+    @Test
+    fun `멤버가 아닌 그룹이면 리뷰는 만들고 공유만 건너뛴다 (TMT-423)`() {
+        // 예외로 막으면 리뷰까지 롤백돼 사용자가 쓴 글을 잃는다 — 잘못된 것은 그룹 맥락뿐이다
+        val result = service.create(completeCommand().copy(groupId = 7))
+
+        assertNotNull(result.reviewId, "리뷰는 그대로 생긴다")
+        assertEquals(1, result.grantedCount, "티켓도 그대로 나간다")
+        assertNull(result.sharedGroupId, "공유하지 않았음을 응답이 알린다")
+        assertTrue(sharePorts.shared.isEmpty())
+        assertTrue(sharePorts.refreshedGroupIds.isEmpty())
+    }
+
+    @Test
+    fun `그룹 맥락이 없으면 공유하지 않는다 (TMT-423)`() {
+        sharePorts.addMembership(groupId = 7, userId = 1)
+
+        val result = service.create(completeCommand())
+
+        assertNotNull(result.reviewId)
+        assertNull(result.sharedGroupId)
+        assertTrue(sharePorts.shared.isEmpty())
+    }
+
+    @Test
+    fun `판정을 못 채우면 그룹 맥락이 있어도 공유하지 않는다 (C4·TMT-423)`() {
+        sharePorts.addMembership(groupId = 7, userId = 1)
+
+        val result = service.create(command(rating = 4, content = "태그를 안 골라 미충족이다", groupId = 7))
+
+        assertNull(result.reviewId, "리뷰가 없으니 공유할 것도 없다")
+        assertNull(result.sharedGroupId)
+        assertTrue(sharePorts.shared.isEmpty())
     }
 
     @Test
