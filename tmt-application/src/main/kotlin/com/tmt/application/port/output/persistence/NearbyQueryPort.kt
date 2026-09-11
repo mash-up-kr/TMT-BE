@@ -33,8 +33,8 @@ interface NearbyQueryPort {
         query: String?,
         /** 검색어가 카테고리 라벨에 걸린 경우의 id들 — 라벨은 서버 상수라 SQL이 모른다 (E9) */
         queryCategoryIds: List<String>,
-        categoryId: String?,
-        regionPrefix: String?,
+        /** 큐레이션 칩 (E12) — 칩에 속한 매장으로 후보를 좁힌다. 정렬은 그대로다 */
+        curationTagId: String?,
         limit: Int,
     ): List<PinRow>
 }

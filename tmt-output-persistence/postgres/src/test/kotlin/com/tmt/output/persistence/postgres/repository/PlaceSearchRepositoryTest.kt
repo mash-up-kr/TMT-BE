@@ -2,6 +2,7 @@ package com.tmt.output.persistence.postgres.repository
 
 import com.tmt.output.persistence.postgres.support.PersistenceFixtures
 import com.tmt.output.persistence.postgres.support.PersistenceTest
+import com.tmt.output.persistence.postgres.support.assertKeysetWalk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -14,23 +15,23 @@ import java.time.Instant
  * 매장 검색 네이티브 쿼리 (TMT-195).
  *
  * `searchByRelevance`에는 공간 술어가 없어 검색어를 비우면 DB의 모든 매장이 후보가 된다.
- * 테스트마다 유일한 `region_name`을 주고 `regionPrefix`로 후보를 자기 매장으로 좁힌다 —
- * 이 좁히기 없이는 다른 테스트가 만든 매장이 결과에 섞인다.
+ * 테스트마다 **자기 매장만 담은 큐레이션 칩**을 만들고 `curationTagId`로 후보를 좁힌다 —
+ * 이 좁히기 없이는 다른 테스트가 만든 매장이 결과에 섞인다. 종전에는 유일한 `region_name` +
+ * `regionPrefix`가 그 역할이었는데, 칩이 조건에서 매장 목록으로 바뀌면서(V9) 지역 술어가
+ * 사라져 손잡이도 칩으로 옮겼다.
  */
 class PlaceSearchRepositoryTest : PersistenceTest() {
     @Autowired
     private lateinit var repository: PlaceSearchRepository
 
-    private fun isolatedRegion() = "테스트권역${PersistenceFixtures.nextSequence()}"
-
     @Test
     fun `거리순은 반올림 미터가 앞자리고 반경 밖은 빠진다`() {
-        val region = isolatedRegion()
         val lat = BASE_LAT
         val lng = BASE_LNG
-        val near = fixtures.newPlace(regionName = region, latitude = lat + 0.001, longitude = lng)
-        val mid = fixtures.newPlace(regionName = region, latitude = lat + 0.002, longitude = lng)
-        val outOfRadius = fixtures.newPlace(regionName = region, latitude = lat + 0.05, longitude = lng)
+        val near = fixtures.newPlace(latitude = lat + 0.001, longitude = lng)
+        val mid = fixtures.newPlace(latitude = lat + 0.002, longitude = lng)
+        val outOfRadius = fixtures.newPlace(latitude = lat + 0.05, longitude = lng)
+        val chip = fixtures.newCurationTag(listOf(near, mid, outOfRadius))
 
         val rows =
             repository.searchByDistance(
@@ -40,8 +41,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 query = null,
                 queryPattern = null,
                 queryCategoryCsv = "",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -57,15 +57,16 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `거리순 커서는 오름차순 경계에서 겹치지도 빠뜨리지도 않는다`() {
-        val region = isolatedRegion()
         val lat = BASE_LAT
         val lng = BASE_LNG
         // 같은 좌표 셋 — 거리가 같아 (distance, id) 행 비교의 tie-breaker만 남는다
-        val ids = (1..3).map { fixtures.newPlace(regionName = region, latitude = lat, longitude = lng) }.sorted()
+        val ids = (1..3).map { fixtures.newPlace(latitude = lat, longitude = lng) }.sorted()
+        val chip = fixtures.newCurationTag(ids)
 
         fun page(
             afterSortValue: Int?,
             afterPlaceId: Long?,
+            limitPlusOne: Int,
         ) = repository.searchByDistance(
             lat = lat,
             lng = lng,
@@ -73,29 +74,34 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
             query = null,
             queryPattern = null,
             queryCategoryCsv = "",
-            categoryId = null,
-            regionPrefix = region,
+            curationTagId = chip,
             afterSortValue = afterSortValue,
             afterPlaceId = afterPlaceId,
             viewerId = null,
-            limitPlusOne = 2,
+            limitPlusOne = limitPlusOne,
         )
 
-        val first = page(null, null)
+        val first = page(null, null, 2)
         assertEquals(ids.take(2), first.map { it.getPlaceId() })
 
-        val second = page(first.last().getSortValue(), first.last().getPlaceId())
+        val second = page(first.last().getSortValue(), first.last().getPlaceId(), 2)
         assertEquals(ids.drop(2), second.map { it.getPlaceId() })
+
+        // limit = 1 순회 — 거리가 전부 같아 모든 행이 한 번씩 경계에 선다 (TMT-348)
+        assertKeysetWalk<PlaceSearchRepository.PlaceSearchRowView>(
+            expected = ids,
+            idOf = { it.getPlaceId() },
+        ) { after -> page(after?.getSortValue(), after?.getPlaceId(), 1) }
     }
 
     @Test
     fun `반경이 없으면 거리 제한 없이 거리순으로만 정렬한다`() {
-        val region = isolatedRegion()
         val lat = BASE_LAT
         val lng = BASE_LNG
-        val near = fixtures.newPlace(regionName = region, latitude = lat + 0.001, longitude = lng)
+        val near = fixtures.newPlace(latitude = lat + 0.001, longitude = lng)
         // 반경을 줬다면 잘렸을 거리 — radius가 null이면 후보에 남는다
-        val far = fixtures.newPlace(regionName = region, latitude = lat + 0.5, longitude = lng)
+        val far = fixtures.newPlace(latitude = lat + 0.5, longitude = lng)
+        val chip = fixtures.newCurationTag(listOf(near, far))
 
         val rows =
             repository.searchByDistance(
@@ -105,8 +111,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 query = null,
                 queryPattern = null,
                 queryCategoryCsv = "",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -119,9 +124,9 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `유사도순은 이름이 가까운 순이고 점수는 정수다`() {
-        val region = isolatedRegion()
-        val exact = fixtures.newPlace(name = "김밥천국", regionName = region)
-        val partial = fixtures.newPlace(name = "김밥천국 2호점 분식", regionName = region)
+        val exact = fixtures.newPlace(name = "김밥천국")
+        val partial = fixtures.newPlace(name = "김밥천국 2호점 분식")
+        val chip = fixtures.newCurationTag(listOf(exact, partial))
 
         val rows =
             repository.searchByRelevance(
@@ -129,8 +134,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("김밥천국"),
                 queryPrefixPattern = LikePatterns.startsWith("김밥천국"),
                 queryCategoryCsv = "",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -148,17 +152,16 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `이름에 걸린 매장은 유사도가 낮아도 주소·카테고리보다 앞이다 (TMT-300)`() {
-        val region = isolatedRegion()
         // `피자`는 이름 뒤에 붙어 유사도가 0.125 수준이다 — 등급이 없으면 주소 매칭에 밀린다
-        val nameSuffix = fixtures.newPlace(name = "델리스피자", regionName = region, categoryId = null)
+        val nameSuffix = fixtures.newPlace(name = "델리스피자", categoryId = null)
         val addressHit =
             fixtures.newPlace(
                 name = "무관한가게",
                 roadAddress = "서울특별시 중구 피자거리 3",
-                regionName = region,
                 categoryId = null,
             )
-        val categoryHit = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "cat_fastfood")
+        val categoryHit = fixtures.newPlace(name = "이름무관", categoryId = "cat_fastfood")
+        val chip = fixtures.newCurationTag(listOf(nameSuffix, addressHit, categoryHit))
 
         val rows =
             repository.searchByRelevance(
@@ -166,8 +169,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("피자"),
                 queryPrefixPattern = LikePatterns.startsWith("피자"),
                 queryCategoryCsv = "cat_fastfood",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -184,10 +186,10 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `같은 이름 등급 안에서는 앞매칭이 유사도를 이긴다 (TMT-300)`() {
-        val region = isolatedRegion()
         // 유사도만 보면 짧은 `원조본죽`이 이긴다 — 앞매칭 가산점이 그것을 뒤집는다
-        val prefixLongName = fixtures.newPlace(name = "본죽비빔밥카페", regionName = region)
-        val suffixShortName = fixtures.newPlace(name = "원조본죽", regionName = region)
+        val prefixLongName = fixtures.newPlace(name = "본죽비빔밥카페")
+        val suffixShortName = fixtures.newPlace(name = "원조본죽")
+        val chip = fixtures.newCurationTag(listOf(prefixLongName, suffixShortName))
 
         val rows =
             repository.searchByRelevance(
@@ -195,8 +197,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("본죽"),
                 queryPrefixPattern = LikePatterns.startsWith("본죽"),
                 queryCategoryCsv = "",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -213,40 +214,47 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `유사도순 커서는 내림차순 경계에서 겹치지 않는다`() {
-        val region = isolatedRegion()
         // 검색어가 없으면 점수가 전부 0이라 사실상 id DESC 한 축이 된다
-        val ids = (1..3).map { fixtures.newPlace(regionName = region) }.sortedDescending()
+        val ids = (1..3).map { fixtures.newPlace() }.sortedDescending()
+        val chip = fixtures.newCurationTag(ids)
 
         fun page(
             afterSortValue: Int?,
             afterPlaceId: Long?,
+            limitPlusOne: Int,
         ) = repository.searchByRelevance(
             query = null,
             queryPattern = null,
             queryPrefixPattern = null,
             queryCategoryCsv = "",
-            categoryId = null,
-            regionPrefix = region,
+            curationTagId = chip,
             afterSortValue = afterSortValue,
             afterPlaceId = afterPlaceId,
             viewerId = null,
-            limitPlusOne = 2,
+            limitPlusOne = limitPlusOne,
         )
 
-        val first = page(null, null)
+        val first = page(null, null, 2)
         assertEquals(ids.take(2), first.map { it.getPlaceId() })
         assertEquals(0, first.first().getSortValue())
 
-        val second = page(first.last().getSortValue(), first.last().getPlaceId())
+        val second = page(first.last().getSortValue(), first.last().getPlaceId(), 2)
         assertEquals(ids.drop(2), second.map { it.getPlaceId() })
+
+        // 점수가 전부 0이라 tie-breaker만 남는다 — limit = 1이면 모든 행이 경계에 선다 (TMT-348)
+        assertKeysetWalk<PlaceSearchRepository.PlaceSearchRowView>(
+            expected = ids,
+            idOf = { it.getPlaceId() },
+        ) { after -> page(after?.getSortValue(), after?.getPlaceId(), 1) }
     }
 
     @Test
-    fun `카테고리 칩은 검색어와 AND로 걸린다`() {
-        val region = isolatedRegion()
+    fun `큐레이션 칩은 검색어와 AND로 걸린다`() {
         val token = "칩${PersistenceFixtures.nextSequence()}"
-        val match = fixtures.newPlace(name = "$token 한식", regionName = region, categoryId = "cat_korean")
-        val otherCategory = fixtures.newPlace(name = "$token 일식", regionName = region, categoryId = "japanese")
+        val inChip = fixtures.newPlace(name = "$token 한식")
+        // 검색어에는 걸리지만 칩 목록에 없다 — 칩이 조건이 아니라 목록이라(V9) id로 갈린다
+        val outOfChip = fixtures.newPlace(name = "$token 일식")
+        val chip = fixtures.newCurationTag(listOf(inChip))
 
         val rows =
             repository
@@ -255,24 +263,49 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = LikePatterns.contains(token),
                     queryPrefixPattern = LikePatterns.startsWith(token),
                     queryCategoryCsv = "",
-                    categoryId = "cat_korean",
-                    regionPrefix = region,
+                    curationTagId = chip,
                     afterSortValue = null,
                     afterPlaceId = null,
                     viewerId = null,
                     limitPlusOne = 50,
                 ).map { it.getPlaceId() }
 
-        assertEquals(listOf(match), rows)
-        assertFalse(otherCategory in rows)
+        assertEquals(listOf(inChip), rows)
+        assertFalse(outOfChip in rows)
+    }
+
+    @Test
+    fun `다른 칩의 매장은 섞이지 않는다`() {
+        val mine = fixtures.newPlace(latitude = BASE_LAT, longitude = BASE_LNG)
+        val theirs = fixtures.newPlace(latitude = BASE_LAT, longitude = BASE_LNG)
+        val chip = fixtures.newCurationTag(listOf(mine))
+        fixtures.newCurationTag(listOf(theirs))
+
+        val rows =
+            repository
+                .searchByDistance(
+                    lat = BASE_LAT,
+                    lng = BASE_LNG,
+                    radius = 1000,
+                    query = null,
+                    queryPattern = null,
+                    queryCategoryCsv = "",
+                    curationTagId = chip,
+                    afterSortValue = null,
+                    afterPlaceId = null,
+                    viewerId = null,
+                    limitPlusOne = 50,
+                ).map { it.getPlaceId() }
+
+        assertEquals(listOf(mine), rows)
     }
 
     @Test
     fun `검색어가 카테고리 라벨이면 CSV로 넘어온 코드로도 잡힌다`() {
-        val region = isolatedRegion()
         // 이름·주소에는 없고 카테고리만 맞는 매장 — 서비스가 라벨을 id로 바꿔 CSV로 넘긴 경우다
-        val byCategory = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "cat_korean")
-        val other = fixtures.newPlace(name = "이름무관", regionName = region, categoryId = "japanese")
+        val byCategory = fixtures.newPlace(name = "이름무관", categoryId = "cat_korean")
+        val other = fixtures.newPlace(name = "이름무관", categoryId = "japanese")
+        val chip = fixtures.newCurationTag(listOf(byCategory, other))
 
         val rows =
             repository
@@ -281,8 +314,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = LikePatterns.contains("한식"),
                     queryPrefixPattern = LikePatterns.startsWith("한식"),
                     queryCategoryCsv = "cat_korean",
-                    categoryId = null,
-                    regionPrefix = region,
+                    curationTagId = chip,
                     afterSortValue = null,
                     afterPlaceId = null,
                     viewerId = null,
@@ -295,8 +327,8 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `찜은 보는 사람 기준이다`() {
-        val region = isolatedRegion()
-        val place = fixtures.newPlace(regionName = region)
+        val place = fixtures.newPlace()
+        val chip = fixtures.newCurationTag(listOf(place))
         val viewer = fixtures.newUser()
         val stranger = fixtures.newUser()
         fixtures.deleteFavorite(viewer, place)
@@ -309,8 +341,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                     queryPattern = null,
                     queryPrefixPattern = null,
                     queryCategoryCsv = "",
-                    categoryId = null,
-                    regionPrefix = region,
+                    curationTagId = chip,
                     afterSortValue = null,
                     afterPlaceId = null,
                     viewerId = userId,
@@ -358,9 +389,9 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `패턴이 없으면 검색어 조건이 아예 걸리지 않는다 — 널 가드의 정본은 패턴이다`() {
-        val region = isolatedRegion()
-        val korean = fixtures.newPlace(regionName = region, categoryId = "cat_korean")
-        val japanese = fixtures.newPlace(regionName = region, categoryId = "cat_japanese")
+        val korean = fixtures.newPlace(categoryId = "cat_korean")
+        val japanese = fixtures.newPlace(categoryId = "cat_japanese")
+        val chip = fixtures.newCurationTag(listOf(korean, japanese))
 
         // 빈 검색어가 흘러들어온 상황 — query는 비어 있지만 LikePatterns.contains는 null을 준다.
         // :query로 가르면 "검색어 있음"이 되고 ILIKE NULL은 NULL이라 카테고리 갈래만 남는다 (TMT-335)
@@ -370,8 +401,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = null,
                 queryPrefixPattern = null,
                 queryCategoryCsv = "cat_korean",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -383,16 +413,15 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `거리순도 같은 규칙이다`() {
-        val region = isolatedRegion()
         val korean =
-            fixtures.newPlace(regionName = region, categoryId = "cat_korean", latitude = BASE_LAT, longitude = BASE_LNG)
+            fixtures.newPlace(categoryId = "cat_korean", latitude = BASE_LAT, longitude = BASE_LNG)
         val japanese =
             fixtures.newPlace(
-                regionName = region,
                 categoryId = "cat_japanese",
                 latitude = BASE_LAT + 0.001,
                 longitude = BASE_LNG,
             )
+        val chip = fixtures.newCurationTag(listOf(korean, japanese))
 
         val rows =
             repository.searchByDistance(
@@ -402,8 +431,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 query = "",
                 queryPattern = null,
                 queryCategoryCsv = "cat_korean",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
@@ -415,9 +443,9 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
 
     @Test
     fun `검색어의 퍼센트는 와일드카드가 아니라 글자다 (TMT-296)`() {
-        val region = isolatedRegion()
-        val literal = fixtures.newPlace(name = "100% 수제버거", regionName = region)
-        fixtures.newPlace(name = "김밥천국", regionName = region)
+        val literal = fixtures.newPlace(name = "100% 수제버거")
+        val other = fixtures.newPlace(name = "김밥천국")
+        val chip = fixtures.newCurationTag(listOf(literal, other))
 
         val rows =
             repository.searchByRelevance(
@@ -425,8 +453,7 @@ class PlaceSearchRepositoryTest : PersistenceTest() {
                 queryPattern = LikePatterns.contains("100%"),
                 queryPrefixPattern = LikePatterns.startsWith("100%"),
                 queryCategoryCsv = "",
-                categoryId = null,
-                regionPrefix = region,
+                curationTagId = chip,
                 afterSortValue = null,
                 afterPlaceId = null,
                 viewerId = null,
