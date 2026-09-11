@@ -21,16 +21,17 @@ class WebConfigCorsTest {
         fun configurations(): Map<String, CorsConfiguration> = getCorsConfigurations()
     }
 
-    private val config: CorsConfiguration =
-        ProbeRegistry()
-            .also {
-                WebConfig(
-                    SignupCompletionInterceptor(AlwaysCompleted),
-                    AdminOnlyInterceptor(AdminAllowlist("")),
-                ).addCorsMappings(it)
-            }
-            .configurations()
-            .getValue("/**")
+    private val config: CorsConfiguration = corsConfiguration()
+
+    private fun corsConfiguration(): CorsConfiguration {
+        val registry = ProbeRegistry()
+        WebConfig(
+            SignupCompletionInterceptor(AlwaysCompleted),
+            // 허용 목록은 비워 둔다 — CORS 검증과 무관하다
+            AdminOnlyInterceptor(AdminAllowlist("")),
+        ).addCorsMappings(registry)
+        return registry.configurations().getValue("/**")
+    }
 
     @Test
     fun `로컬 개발 오리진을 허용한다`() {
