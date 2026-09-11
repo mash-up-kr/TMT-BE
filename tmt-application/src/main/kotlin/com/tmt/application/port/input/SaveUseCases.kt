@@ -4,6 +4,10 @@ import java.time.Instant
 
 /**
  * 작성 완료 (F §4-1). 저장/리뷰 구분은 서버의 완성도 판정(C4)이 하고 클라이언트는 보내지 않는다 (C7).
+ *
+ * 예외가 하나 있다 — [CreateSaveCommand.draft]. 판정은 "무엇이 채워졌나"만 보므로 서버는
+ * 사용자가 `작성 완료`를 눌렀는지 알 수 없고, 화면이 단계 사이에서 중간 저장을 하면 값이 다 찬
+ * 순간 의도와 무관하게 리뷰로 확정돼 버린다. 그 의도만 클라이언트가 실어 보낸다 (TMT-426).
  */
 interface CreateSaveUseCase {
     fun create(command: CreateSaveCommand): SaveResult
@@ -31,6 +35,10 @@ sealed interface PlaceSelection {
     ) : PlaceSelection
 }
 
+/**
+ * @param draft 중간 저장이다 — 판정(C4)을 충족해도 리뷰로 확정하지 않는다. 저장 자체는 똑같이
+ *   이뤄지고 이어쓰기 목록에 남는다. 기본값은 지금까지의 동작(작성 완료)이다 (TMT-426).
+ */
 data class CreateSaveCommand(
     val userId: Long,
     val place: PlaceSelection,
@@ -39,10 +47,12 @@ data class CreateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    val draft: Boolean = false,
 )
 
 /**
  * @param reviewId null이면 저장, 값이 있으면 리뷰다 (S3). 화면 분기의 유일한 기준.
+ *   중간 저장(`draft`)은 판정을 충족해도 항상 null이다 — 이때만 `missing`이 비어 있으면서 null이다.
  * @param placeId newPlace로 만들어진 매장의 ID. 기존 매장이면 요청값과 같다.
  * @param grantedCount 이번 요청으로 발급된 티켓 수 (0 또는 1). 상한 999장이면 리뷰여도 0이다 (T6).
  * @param missing 리뷰 성립(C4)에 아직 모자란 항목. 리뷰가 됐으면 빈 목록이다 (TMT-395).
@@ -79,6 +89,8 @@ interface UpdateSaveUseCase {
 /**
  * @param placeId 저장의 매장과 같아야 한다. 다르거나 읽을 수 없으면 SAVE_PLACE_IMMUTABLE (S6).
  * @param newPlaceRequested 매장 직접 등록 요청이 실려 오면 그것도 매장 변경이다 (S6).
+ * @param draft 중간 저장이다 — [CreateSaveCommand.draft]와 같은 뜻이고, 단계 사이의 자동 저장이
+ *   실제로 반복해서 도는 자리는 이쪽이다 (TMT-426).
  */
 data class UpdateSaveCommand(
     val userId: Long,
@@ -90,6 +102,7 @@ data class UpdateSaveCommand(
     val positivePointTagIds: List<String>,
     val rating: Int?,
     val content: String?,
+    val draft: Boolean = false,
 )
 
 /** 임시저장 버리기 (F·G·I §5-2). 리뷰가 된 저장은 리뷰 삭제 소관이다. */

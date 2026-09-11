@@ -55,7 +55,17 @@ class SaveCreationServiceTest {
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
-    ) = CreateSaveCommand(userId, place, photoAssetIds, companionTagIds, positivePointTagIds, rating, content)
+        draft: Boolean = false,
+    ) = CreateSaveCommand(
+        userId,
+        place,
+        photoAssetIds,
+        companionTagIds,
+        positivePointTagIds,
+        rating,
+        content,
+        draft,
+    )
 
     private fun completeCommand(userId: Long = 1): CreateSaveCommand {
         val assetId = mediaAssetPort.seed(ownerId = userId)
@@ -134,6 +144,30 @@ class SaveCreationServiceTest {
         assertEquals(1, result.grantedCount)
         assertEquals(1, result.availableCount)
         assertEquals(listOf(1L to 5), placeStatsPort.added)
+    }
+
+    @Test
+    fun `중간 저장은 판정을 충족해도 리뷰·티켓·집계가 나가지 않는다 (TMT-426)`() {
+        val result = service.create(completeCommand().copy(draft = true))
+
+        assertNull(result.reviewId)
+        assertEquals(0, result.grantedCount)
+        assertTrue(result.missing.isEmpty())
+        assertTrue(saveCommandPort.reviews.isEmpty())
+        assertTrue(placeStatsPort.added.isEmpty())
+        assertTrue(published.isEmpty())
+    }
+
+    @Test
+    fun `중간 저장이어도 저장·사진·태그는 그대로 남는다 (TMT-426)`() {
+        val result = service.create(completeCommand().copy(draft = true))
+
+        assertEquals(1, saveCommandPort.saves.size)
+        assertEquals(1, saveCommandPort.photos.getValue(result.saveId).size)
+        assertEquals(
+            listOf("tag_couple", "tag_kind"),
+            saveCommandPort.tags.getValue(result.saveId),
+        )
     }
 
     @Test

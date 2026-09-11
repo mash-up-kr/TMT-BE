@@ -74,7 +74,8 @@ class SaveUpdateService(
                 rating = command.rating,
                 content = command.content,
             )
-        if (missing.isNotEmpty()) {
+        // 중간 저장이면 판정이 충족돼도 여기서 멈춘다 (TMT-426)
+        if (command.draft || missing.isNotEmpty()) {
             return SaveResult(
                 saveId = command.saveId,
                 reviewId = null,

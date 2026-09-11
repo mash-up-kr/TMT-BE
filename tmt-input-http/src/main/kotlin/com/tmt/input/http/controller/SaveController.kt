@@ -64,7 +64,9 @@ class SaveController(
 ) {
     @Operation(
         summary = "작성 완료 (신규)",
-        description = "완성도 판정(C4)을 충족하면 리뷰·티켓·매장 집계까지 같은 트랜잭션에서 나간다 (TX-1).",
+        description =
+            "완성도 판정(C4)을 충족하면 리뷰·티켓·매장 집계까지 같은 트랜잭션에서 나간다 (TX-1). " +
+                "`draft: true`면 판정을 충족해도 확정하지 않는다 — 단계 사이의 중간 저장용이다.",
     )
     @ApiErrorCodes(
         ErrorCode.PLACE_NOT_FOUND,
@@ -113,6 +115,7 @@ class SaveController(
                             positivePointTagIds = request.positivePointTagIds,
                             rating = request.rating,
                             content = request.content,
+                            draft = request.draft,
                         ),
                     )
                 SaveResultResponse(
@@ -131,7 +134,9 @@ class SaveController(
 
     @Operation(
         summary = "작성 완료 (이어쓰기)",
-        description = "전체 교체다. 매장은 바꿀 수 없다 (S6). 서버는 같은 완성도 판정을 다시 돌린다 (C6).",
+        description =
+            "전체 교체다. 매장은 바꿀 수 없다 (S6). 서버는 같은 완성도 판정을 다시 돌린다 (C6). " +
+                "`draft: true`면 확정하지 않는다 — 자동 저장은 매 호출 새 Idempotency-Key를 쓴다.",
     )
     @ApiErrorCodes(
         ErrorCode.SAVE_NOT_FOUND,
@@ -176,6 +181,7 @@ class SaveController(
                             positivePointTagIds = request.positivePointTagIds,
                             rating = request.rating,
                             content = request.content,
+                            draft = request.draft,
                         ),
                     )
                 SaveResultResponse(
@@ -318,6 +324,10 @@ class SaveController(
     private fun parseAssetId(assetId: String): Long =
         assetId.toLongOrNull() ?: throw TmtException(ErrorCode.MEDIA_NOT_OWNED)
 
+    /**
+     * @param draft 중간 저장 — 판정(C4)을 충족해도 리뷰로 확정하지 않는다 (TMT-426). 생략하면 `작성 완료`다.
+     *   `newPlace`는 중간 저장에서도 매장을 만든다 — 이어쓰기가 매장을 못 바꾸기 때문이다 (S6).
+     */
     data class SaveCreateRequest(
         val placeId: String? = null,
         val newPlace: NewPlaceRequest? = null,
@@ -326,6 +336,11 @@ class SaveController(
         val positivePointTagIds: List<String> = emptyList(),
         val rating: Int? = null,
         val content: String? = null,
+        @field:Schema(
+            description = "중간 저장이면 true — 값이 다 차도 리뷰·티켓이 나가지 않는다. 생략하면 작성 완료(false)",
+            defaultValue = "false",
+        )
+        val draft: Boolean = false,
     ) {
         data class NewPlaceRequest(
             val name: String,
@@ -337,6 +352,7 @@ class SaveController(
     /**
      * @param missing 리뷰 성립(C4)에 모자란 항목 — 리뷰가 됐으면 빈 배열 (TMT-395). 사진은 항목이 아니다 (C4-1).
      *   FE는 이걸로 "별점만 매기면 리뷰가 돼요" 같은 안내 문구를 고른다. 화면 분기 자체는 여전히 reviewId다 (S3).
+     *   중간 저장(`draft`) 응답은 판정을 충족해도 reviewId가 null이고 missing이 비어 있다 — 오류가 아니다.
      *
      *   **기본값은 멱등 리플레이 때문이다** — 이 필드가 없던 때 기록된 응답 JSON을 되돌려줄 때
      *   non-null 파라미터가 비면 역직렬화가 깨진다. 보관이 P1D라 배포 후 하루가 그 창이다 (PR #118 리뷰).

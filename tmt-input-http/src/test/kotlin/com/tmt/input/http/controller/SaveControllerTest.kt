@@ -133,6 +133,24 @@ class SaveControllerTest {
     }
 
     @Test
+    fun `draft는 유스케이스로 그대로 넘어가고 생략하면 작성 완료다 (TMT-426)`() {
+        postSave("""{ "placeId": "place_1", "draft": true }""").andExpect(status().isCreated)
+        postSave("""{ "placeId": "place_1" }""", idempotencyKey = "key-2").andExpect(status().isCreated)
+
+        assertEquals(listOf(true, false), createSaveUseCase.commands.map { it.draft })
+    }
+
+    @Test
+    fun `draft만 다른 요청은 같은 키를 쓸 수 없다 (TMT-426)`() {
+        // 지문이 바디 기준이라 플래그가 쿼리로 새면 중간 저장 응답이 작성 완료로 리플레이된다
+        postSave("""{ "placeId": "place_1", "draft": true }""").andExpect(status().isCreated)
+
+        postSave("""{ "placeId": "place_1" }""")
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"))
+    }
+
+    @Test
     fun `같은 키 재요청에 Save가 두 번 생기지 않는다 (규약 §9)`() {
         val body = """{ "placeId": "place_1" }"""
         postSave(body).andExpect(status().isCreated).andExpect(jsonPath("$.saveId").value("save_1"))
@@ -288,6 +306,15 @@ class SaveControllerTest {
         assertEquals(9L, command.saveId)
         assertEquals(1L, command.placeId)
         assertEquals(listOf(7L), command.photoAssetIds)
+    }
+
+    @Test
+    fun `이어쓰기도 draft를 그대로 넘긴다 (TMT-426)`() {
+        putSave("save_9", """{ "placeId": "place_1", "rating": 5, "draft": true }""")
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewId").doesNotExist())
+
+        assertEquals(true, updateSaveUseCase.commands.single().draft)
     }
 
     @Test

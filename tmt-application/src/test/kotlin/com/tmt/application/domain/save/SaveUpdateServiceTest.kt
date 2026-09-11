@@ -88,6 +88,7 @@ class SaveUpdateServiceTest {
         positivePointTagIds: List<String> = emptyList(),
         rating: Int? = null,
         content: String? = null,
+        draft: Boolean = false,
     ) = UpdateSaveCommand(
         userId = userId,
         saveId = saveId,
@@ -98,6 +99,7 @@ class SaveUpdateServiceTest {
         positivePointTagIds = positivePointTagIds,
         rating = rating,
         content = content,
+        draft = draft,
     )
 
     @Test
@@ -142,6 +144,59 @@ class SaveUpdateServiceTest {
         assertEquals(1, result.grantedCount)
         assertEquals(listOf(1L to 5), placeStatsPort.added)
         assertTrue(published.any { it is ReviewCommittedEvent })
+    }
+
+    @Test
+    fun `중간 저장으로 이어쓰면 판정을 충족해도 확정하지 않는다 (TMT-426)`() {
+        val saveId = seedDraft()
+
+        val result =
+            service.update(
+                updateCommand(
+                    saveId = saveId,
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "3단계에서 다음을 눌러 중간 저장한 상태다",
+                    draft = true,
+                ),
+            )
+
+        assertNull(result.reviewId)
+        assertEquals(0, result.grantedCount)
+        assertTrue(result.missing.isEmpty())
+        assertTrue(placeStatsPort.added.isEmpty())
+        assertTrue(published.none { it is ReviewCommittedEvent })
+    }
+
+    @Test
+    fun `중간 저장으로 쌓아 둔 값은 마지막 작성 완료에서 리뷰가 된다 (TMT-426)`() {
+        val saveId = seedDraft()
+        service.update(
+            updateCommand(
+                saveId = saveId,
+                companionTagIds = listOf("tag_couple"),
+                positivePointTagIds = listOf("tag_kind"),
+                rating = 5,
+                content = "중간 저장",
+                draft = true,
+            ),
+        )
+
+        val result =
+            service.update(
+                updateCommand(
+                    saveId = saveId,
+                    companionTagIds = listOf("tag_couple"),
+                    positivePointTagIds = listOf("tag_kind"),
+                    rating = 5,
+                    content = "중간 저장",
+                ),
+            )
+
+        assertNotNull(result.reviewId)
+        assertEquals(1, result.grantedCount)
+        assertEquals(listOf(1L to 5), placeStatsPort.added)
     }
 
     @Test
