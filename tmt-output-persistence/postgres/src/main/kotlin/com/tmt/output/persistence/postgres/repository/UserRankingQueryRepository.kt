@@ -34,6 +34,8 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
                                   WHERE g.owner_id = u.id), 0)              AS mc
                 FROM users u
                 LEFT JOIN media_asset ma ON ma.id = u.profile_image_asset_id
+                -- 가입 미완료 계정은 랭킹에 싣지 않는다 (TMT-370)
+                WHERE u.profile_completed_at IS NOT NULL
             ) t
             WHERE (CAST(:afterReviewCount AS bigint) IS NULL
                    OR (t.rc, t.uid) < (CAST(:afterReviewCount AS bigint), CAST(:afterUserId AS bigint)))

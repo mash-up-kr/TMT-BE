@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Import
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.fail
 
@@ -55,6 +56,15 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
         val user = fixtures.newUser("리뷰0")
 
         assertEquals(0, rowOf(user).reviewCount)
+    }
+
+    @Test
+    fun `가입을 끝내지 않은 사용자는 목록에서 빠진다`() {
+        val place = fixtures.newPlace()
+        val pending = fixtures.newUser("미완료", profileCompletedAt = null)
+        fixtures.newPublishedReview(place, userId = pending)
+
+        assertFalse(allUserIds().contains(pending))
     }
 
     @Test
@@ -105,6 +115,18 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
             if (row.userId in mine) return listOf(row)
             cursor = UserRankingKey(row.reviewCount, row.userId)
         }
+    }
+
+    private fun allUserIds(): Set<Long> {
+        val ids = mutableSetOf<Long>()
+        var cursor: UserRankingKey? = null
+        repeat(MAX_SCAN_PAGES) {
+            val slice = adapter.findUserRankings(UserRankingsQuery(after = cursor, limit = SCAN_PAGE_SIZE))
+            slice.rows.forEach { ids += it.userId }
+            if (!slice.hasNext) return ids
+            cursor = assertNotNull(slice.lastKey, "다음 페이지가 있는데 정렬 키가 없다")
+        }
+        fail("$MAX_SCAN_PAGES 페이지를 넘겨도 목록 끝에 닿지 못했다")
     }
 
     private fun rowOf(userId: Long): UserRankingRow {
