@@ -24,6 +24,12 @@ spring:
         order_updates: true
 
 tmt:
+  admin:
+    # 큐레이션 칩 운영 API의 허용 목록 (TMT-421). 쉼표로 구분한 userId다.
+    # 역할 컬럼이 아니라 설정인 이유는 이 레포에 역할 개념이 없고, 칩 편집 하나를 위해
+    # 역할 체계를 세우지 않기로 했기 때문이다 — 어드민이 늘면 users.role로 옮긴다.
+    # **비어 있으면 아무도 어드민이 아니다** (/v1/admin/** 전부 403). 기본값이 열리면 안 된다
+    user-ids: ${ADMIN_USER_IDS:}
   auth:
     kakao:
       # 카카오 로그인 (TMT-271). 정본은 SSM /tmt-prod/auth/* -> 배포 .env.
