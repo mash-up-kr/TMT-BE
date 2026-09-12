@@ -2,6 +2,7 @@ package com.tmt.input.http.controller
 
 import com.tmt.application.port.input.GetUserRankingsUseCase
 import com.tmt.application.port.input.UserRankingKey
+import com.tmt.application.port.input.UserRankingSort
 import com.tmt.application.port.input.UserRankingView
 import com.tmt.application.port.input.UserRankingsRequest
 import com.tmt.application.port.input.UserRankingsResult
@@ -43,7 +44,7 @@ class RankingControllerTest {
             .andExpect(jsonPath("$.items[0].userId").value("user_7"))
             .andExpect(jsonPath("$.items[0].nickname").value("유저7"))
             .andExpect(jsonPath("$.items[0].reviewCount").value(3))
-            .andExpect(jsonPath("$.items[0].memberCount").value(12))
+            .andExpect(jsonPath("$.items[0].sharedReviewCount").value(12))
             .andExpect(jsonPath("$.items[0].profileImageUrl").doesNotExist())
             .andExpect(jsonPath("$.nextCursor").doesNotExist())
             .andExpect(jsonPath("$.hasNext").value(false))
@@ -62,7 +63,7 @@ class RankingControllerTest {
             UserRankingsResult(
                 items = listOf(view(userId = 7)),
                 hasNext = true,
-                lastKey = UserRankingKey(reviewCount = 3, userId = 7),
+                lastKey = UserRankingKey(sortValue = 3, userId = 7),
             )
 
         val body =
@@ -79,8 +80,53 @@ class RankingControllerTest {
             .andExpect(status().isOk)
 
         val after = requireNotNull(requireNotNull(lastRequest).after)
-        assertEquals(3, after.reviewCount)
+        assertEquals(3, after.sortValue)
         assertEquals(7L, after.userId)
+    }
+
+    @Test
+    fun `sort를 생략하면 리뷰 수 정렬이다`() {
+        mockMvc.perform(get("/v1/rankings/users")).andExpect(status().isOk)
+
+        assertEquals(UserRankingSort.REVIEW_COUNT, requireNotNull(lastRequest).sort)
+    }
+
+    @Test
+    fun `sort는 공유 리뷰 수로 바꿀 수 있다`() {
+        mockMvc
+            .perform(get("/v1/rankings/users").param("sort", "sharedReviewCount"))
+            .andExpect(status().isOk)
+
+        assertEquals(UserRankingSort.SHARED_REVIEW_COUNT, requireNotNull(lastRequest).sort)
+    }
+
+    @Test
+    fun `지원하지 않는 sort 값은 VALIDATION_FAILED다`() {
+        mockMvc
+            .perform(get("/v1/rankings/users").param("sort", "REVIEW_COUNT"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `sort가 바뀌면 이전 커서는 INVALID_CURSOR다`() {
+        result =
+            UserRankingsResult(
+                items = listOf(view(userId = 7)),
+                hasNext = true,
+                lastKey = UserRankingKey(sortValue = 3, userId = 7),
+            )
+        val body =
+            mockMvc
+                .perform(get("/v1/rankings/users"))
+                .andReturn()
+                .response.contentAsString
+        val cursor = Regex("\"nextCursor\":\"([^\"]+)\"").find(body)!!.groupValues[1]
+
+        mockMvc
+            .perform(get("/v1/rankings/users").param("sort", "sharedReviewCount").param("cursor", cursor))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
     }
 
     @Test
@@ -97,6 +143,6 @@ class RankingControllerTest {
             nickname = "유저$userId",
             profileImageUrl = null,
             reviewCount = 3,
-            memberCount = 12,
+            sharedReviewCount = 12,
         )
 }

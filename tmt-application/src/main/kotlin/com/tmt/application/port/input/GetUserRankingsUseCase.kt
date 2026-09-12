@@ -5,14 +5,35 @@ fun interface GetUserRankingsUseCase {
     fun get(request: UserRankingsRequest): UserRankingsResult
 }
 
+/** 랭킹 정렬 축 (TMT-438). 화면의 탭 둘이 이 값만 바꿔 부른다. */
+enum class UserRankingSort(
+    val apiValue: String,
+) {
+    REVIEW_COUNT("reviewCount"),
+    SHARED_REVIEW_COUNT("sharedReviewCount"),
+    ;
+
+    companion object {
+        val DEFAULT = REVIEW_COUNT
+
+        /** 목록 밖이면 null — 호출자가 VALIDATION_FAILED로 바꾼다. */
+        fun fromApiValue(value: String?): UserRankingSort? =
+            if (value == null) DEFAULT else entries.firstOrNull { it.apiValue == value }
+    }
+}
+
 data class UserRankingsRequest(
+    val sort: UserRankingSort,
     val after: UserRankingKey?,
     val limit: Int,
 )
 
-/** (reviewCount, userId) 내림차순. 마지막 키는 유일해야 한다 — userId가 tie-breaker다. */
+/**
+ * (정렬값, userId) 내림차순. 정렬값의 의미는 요청의 sort가 정한다.
+ * 마지막 키는 유일해야 한다 — userId가 tie-breaker다.
+ */
 data class UserRankingKey(
-    val reviewCount: Int,
+    val sortValue: Int,
     val userId: Long,
 )
 
@@ -28,6 +49,6 @@ data class UserRankingView(
     val nickname: String,
     val profileImageUrl: String?,
     val reviewCount: Int,
-    /** 소유한 그룹의 멤버 수 합 (생성자 포함). 소유 그룹이 없으면 0. */
-    val memberCount: Int,
+    /** 그룹에 공유한 리뷰 수. 한 리뷰를 여러 그룹에 공유해도 1이다. */
+    val sharedReviewCount: Int,
 )

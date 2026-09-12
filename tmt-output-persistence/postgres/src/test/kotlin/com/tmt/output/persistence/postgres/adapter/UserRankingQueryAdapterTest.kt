@@ -1,6 +1,7 @@
 package com.tmt.output.persistence.postgres.adapter
 
 import com.tmt.application.port.input.UserRankingKey
+import com.tmt.application.port.input.UserRankingSort
 import com.tmt.application.port.output.persistence.UserRankingRow
 import com.tmt.application.port.output.persistence.UserRankingsQuery
 import com.tmt.output.persistence.postgres.support.PersistenceTest
@@ -25,7 +26,7 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
     private lateinit var adapter: UserRankingQueryAdapter
 
     @Test
-    fun `리뷰 수는 살아있는 리뷰만 세고 소유 그룹이 없으면 멤버 수는 0이다`() {
+    fun `리뷰 수는 살아있는 리뷰만 세고 공유가 없으면 0이다`() {
         val user = fixtures.newUser("랭킹없음")
         val place = fixtures.newPlace()
         fixtures.newPublishedReview(place, userId = user)
@@ -36,19 +37,45 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
 
         assertEquals("랭킹없음", row.nickname)
         assertEquals(2, row.reviewCount)
-        assertEquals(0, row.memberCount)
+        assertEquals(0, row.sharedReviewCount)
     }
 
     @Test
-    fun `멤버 수는 소유한 그룹의 멤버 수 합이다`() {
-        val owner = fixtures.newUser("랭킹주인")
-        val other = fixtures.newUser("남의주인")
-        setMemberCount(fixtures.newGroup(owner), 3)
-        setMemberCount(fixtures.newGroup(owner), 5)
-        setMemberCount(fixtures.newGroup(other), 9)
+    fun `한 리뷰를 여러 그룹에 공유해도 공유 리뷰 수는 1이다`() {
+        val user = fixtures.newUser("여러그룹공유")
+        val place = fixtures.newPlace()
+        val review = fixtures.newPublishedReview(place, userId = user).reviewId
+        val another = fixtures.newPublishedReview(place, userId = user).reviewId
+        repeat(3) { fixtures.shareReview(fixtures.newGroup(user), review, user) }
+        fixtures.shareReview(fixtures.newGroup(user), another, user)
 
-        assertEquals(8, rowOf(owner).memberCount)
-        assertEquals(9, rowOf(other).memberCount)
+        assertEquals(2, rowOf(user).sharedReviewCount)
+    }
+
+    @Test
+    fun `삭제된 리뷰의 공유는 세지 않는다`() {
+        val user = fixtures.newUser("공유후삭제")
+        val place = fixtures.newPlace()
+        val alive = fixtures.newPublishedReview(place, userId = user).reviewId
+        val deleted = fixtures.newPublishedReview(place, userId = user, deletedAt = java.time.Instant.now()).reviewId
+        val group = fixtures.newGroup(user)
+        fixtures.shareReview(group, alive, user)
+        fixtures.shareReview(group, deleted, user)
+
+        assertEquals(1, rowOf(user).sharedReviewCount)
+    }
+
+    @Test
+    fun `남이 공유한 리뷰는 내 공유 수에 들어가지 않는다`() {
+        val mine = fixtures.newUser("내공유")
+        val other = fixtures.newUser("남공유")
+        val place = fixtures.newPlace()
+        val group = fixtures.newGroup(mine)
+        fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = mine).reviewId, mine)
+        fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = other).reviewId, other)
+
+        assertEquals(1, rowOf(mine).sharedReviewCount)
+        assertEquals(1, rowOf(other).sharedReviewCount)
     }
 
     @Test
@@ -93,8 +120,69 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
             expected = mine.sortedDescending(),
             idOf = { it.userId },
         ) { after ->
-            nextRowOfMine(after, mine.toSet())
+            nextRowOfMine(UserRankingSort.REVIEW_COUNT, after, mine.toSet())
         }
+    }
+
+    @Test
+    fun `커서가 공유 리뷰 수 동률 경계에서 중복도 누락도 없다`() {
+        // 공유 수가 전부 같은 넷. 리뷰 수는 일부러 제각각이라 축이 섞이면 순서가 깨진다
+        val place = fixtures.newPlace()
+        val mine =
+            (1..4).map { n ->
+                val user = fixtures.newUser("공유동률$n")
+                val group = fixtures.newGroup(user)
+                repeat(
+                    2,
+                ) { fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = user).reviewId, user) }
+                repeat(n) { fixtures.newPublishedReview(place, userId = user) }
+                user
+            }
+
+        assertKeysetWalk<UserRankingRow>(
+            expected = mine.sortedDescending(),
+            idOf = { it.userId },
+        ) { after ->
+            nextRowOfMine(UserRankingSort.SHARED_REVIEW_COUNT, after, mine.toSet())
+        }
+    }
+
+    @Test
+    fun `공유 리뷰 수 정렬은 공유 수 내림차순이다`() {
+        val place = fixtures.newPlace()
+        // 리뷰 수와 공유 수의 순서를 일부러 반대로 둔다 — 축을 잘못 잡으면 순서가 뒤집힌다
+        val users =
+            listOf(3, 2, 1).map { shares ->
+                val user = fixtures.newUser("공유정렬$shares")
+                val group = fixtures.newGroup(user)
+                repeat(
+                    shares,
+                ) { fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = user).reviewId, user) }
+                repeat(4 - shares) { fixtures.newPublishedReview(place, userId = user) }
+                user
+            }
+        val mine = users.toSet()
+
+        val bySharedCount = scanMine(UserRankingSort.SHARED_REVIEW_COUNT, mine)
+
+        assertEquals(users, bySharedCount.map { it.userId })
+        assertEquals(listOf(3, 2, 1), bySharedCount.map { it.sharedReviewCount })
+    }
+
+    /** 내 fixture만 골라 정렬 순서대로 모은다. */
+    private fun scanMine(
+        sort: UserRankingSort,
+        mine: Set<Long>,
+    ): List<UserRankingRow> {
+        val rows = mutableListOf<UserRankingRow>()
+        var cursor: UserRankingKey? = null
+        repeat(MAX_SCAN_PAGES) {
+            val slice = adapter.findUserRankings(UserRankingsQuery(sort = sort, after = cursor, limit = SCAN_PAGE_SIZE))
+            slice.rows.filterTo(rows) { it.userId in mine }
+            if (!slice.hasNext) return rows
+            cursor = assertNotNull(slice.lastKey, "다음 페이지가 있는데 정렬 키가 없다")
+        }
+        fail("$MAX_SCAN_PAGES 페이지를 넘겨도 목록 끝에 닿지 못했다")
     }
 
     /**
@@ -102,26 +190,39 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
      * 유지하면서 내 fixture만 순회한다.
      */
     private fun nextRowOfMine(
+        sort: UserRankingSort,
         after: UserRankingRow?,
         mine: Set<Long>,
     ): List<UserRankingRow> {
-        var cursor = after?.let { UserRankingKey(it.reviewCount, it.userId) }
+        var cursor = after?.let { UserRankingKey(sortValueOf(sort, it), it.userId) }
         while (true) {
             val row =
                 adapter
-                    .findUserRankings(UserRankingsQuery(after = cursor, limit = 1))
+                    .findUserRankings(UserRankingsQuery(sort = sort, after = cursor, limit = 1))
                     .rows
                     .firstOrNull() ?: return emptyList()
             if (row.userId in mine) return listOf(row)
-            cursor = UserRankingKey(row.reviewCount, row.userId)
+            cursor = UserRankingKey(sortValueOf(sort, row), row.userId)
         }
     }
+
+    private fun sortValueOf(
+        sort: UserRankingSort,
+        row: UserRankingRow,
+    ): Int =
+        when (sort) {
+            UserRankingSort.REVIEW_COUNT -> row.reviewCount
+            UserRankingSort.SHARED_REVIEW_COUNT -> row.sharedReviewCount
+        }
 
     private fun allUserIds(): Set<Long> {
         val ids = mutableSetOf<Long>()
         var cursor: UserRankingKey? = null
         repeat(MAX_SCAN_PAGES) {
-            val slice = adapter.findUserRankings(UserRankingsQuery(after = cursor, limit = SCAN_PAGE_SIZE))
+            val slice =
+                adapter.findUserRankings(
+                    UserRankingsQuery(sort = UserRankingSort.REVIEW_COUNT, after = cursor, limit = SCAN_PAGE_SIZE),
+                )
             slice.rows.forEach { ids += it.userId }
             if (!slice.hasNext) return ids
             cursor = assertNotNull(slice.lastKey, "다음 페이지가 있는데 정렬 키가 없다")
@@ -132,19 +233,15 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
     private fun rowOf(userId: Long): UserRankingRow {
         var cursor: UserRankingKey? = null
         repeat(MAX_SCAN_PAGES) {
-            val slice = adapter.findUserRankings(UserRankingsQuery(after = cursor, limit = SCAN_PAGE_SIZE))
+            val slice =
+                adapter.findUserRankings(
+                    UserRankingsQuery(sort = UserRankingSort.REVIEW_COUNT, after = cursor, limit = SCAN_PAGE_SIZE),
+                )
             slice.rows.firstOrNull { row -> row.userId == userId }?.let { return it }
             if (!slice.hasNext) fail("userId=$userId 행을 찾지 못했다")
             cursor = assertNotNull(slice.lastKey, "다음 페이지가 있는데 정렬 키가 없다")
         }
         fail("$MAX_SCAN_PAGES 페이지를 넘겨도 userId=$userId 행이 없다")
-    }
-
-    private fun setMemberCount(
-        groupId: Long,
-        memberCount: Int,
-    ) {
-        jdbcTemplate.update("UPDATE groups SET member_count = ? WHERE id = ?", memberCount, groupId)
     }
 
     private companion object {
