@@ -20,7 +20,7 @@ class UserRankingService(
     override fun get(request: UserRankingsRequest): UserRankingsResult {
         val slice =
             userRankingQueryPort.findUserRankings(
-                UserRankingsQuery(after = request.after, limit = request.limit),
+                UserRankingsQuery(sort = request.sort, after = request.after, limit = request.limit),
             )
 
         return UserRankingsResult(

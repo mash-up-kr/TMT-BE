@@ -17,7 +17,8 @@ class UserRankingQueryAdapter(
     override fun findUserRankings(query: UserRankingsQuery): UserRankingsSlice {
         val rows =
             userRankingQueryRepository.findUserRankingRows(
-                afterReviewCount = query.after?.reviewCount,
+                sort = query.sort.name,
+                afterSortValue = query.after?.sortValue,
                 afterUserId = query.after?.userId,
                 limitPlusOne = query.limit + 1,
             )
@@ -35,7 +36,7 @@ class UserRankingQueryAdapter(
                     )
                 },
             hasNext = rows.size > query.limit,
-            lastKey = page.lastOrNull()?.let { UserRankingKey(it.getReviewCount(), it.getUserId()) },
+            lastKey = page.lastOrNull()?.let { UserRankingKey(it.getSortValue(), it.getUserId()) },
         )
     }
 }

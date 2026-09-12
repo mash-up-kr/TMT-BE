@@ -2,6 +2,7 @@ package com.tmt.application.domain.user
 
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.UserRankingKey
+import com.tmt.application.port.input.UserRankingSort
 import com.tmt.application.port.input.UserRankingsRequest
 import com.tmt.application.port.output.persistence.UserRankingQueryPort
 import com.tmt.application.port.output.persistence.UserRankingRow
@@ -37,18 +38,29 @@ class UserRankingServiceTest {
                 hasNext = false,
             )
 
-        val urls = service.get(UserRankingsRequest(after = null, limit = 20)).items.map { it.profileImageUrl }
+        val urls =
+            service
+                .get(
+                    UserRankingsRequest(sort = UserRankingSort.REVIEW_COUNT, after = null, limit = 20),
+                ).items
+                .map {
+                    it.profileImageUrl
+                }
 
         assertEquals(listOf("https://cdn.example.com/profile/1.jpg", "https://kakao.example/2.png", null), urls)
     }
 
     @Test
-    fun `커서와 limit을 조회 포트에 그대로 넘기고 정렬 키를 돌려준다`() {
-        val key = UserRankingKey(reviewCount = 4, userId = 9)
+    fun `sort와 커서와 limit을 조회 포트에 그대로 넘기고 정렬 키를 돌려준다`() {
+        val key = UserRankingKey(sortValue = 4, userId = 9)
         slice = UserRankingsSlice(rows = listOf(row(userId = 9)), hasNext = true, lastKey = key)
 
-        val result = service.get(UserRankingsRequest(after = key, limit = 5))
+        val result =
+            service.get(
+                UserRankingsRequest(sort = UserRankingSort.SHARED_REVIEW_COUNT, after = key, limit = 5),
+            )
 
+        assertEquals(UserRankingSort.SHARED_REVIEW_COUNT, requireNotNull(lastQuery).sort)
         assertEquals(key, requireNotNull(lastQuery).after)
         assertEquals(5, requireNotNull(lastQuery).limit)
         assertEquals(key, result.lastKey)

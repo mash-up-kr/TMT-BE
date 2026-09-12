@@ -1,14 +1,16 @@
 package com.tmt.application.port.output.persistence
 
 import com.tmt.application.port.input.UserRankingKey
+import com.tmt.application.port.input.UserRankingSort
 
 /** 유저 활동량 랭킹 읽기 (TMT-436). 키셋 페이징은 SQL이 하고, 카드 조립은 서비스가 한다. */
 interface UserRankingQueryPort {
-    /** (reviewCount, userId) DESC 키셋. 리뷰 0건 사용자도 포함한다. */
+    /** (정렬값, userId) DESC 키셋. 정렬 축은 query.sort가 정한다. 리뷰 0건 사용자도 포함한다. */
     fun findUserRankings(query: UserRankingsQuery): UserRankingsSlice
 }
 
 data class UserRankingsQuery(
+    val sort: UserRankingSort,
     val after: UserRankingKey?,
     val limit: Int,
 )
