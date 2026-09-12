@@ -26,5 +26,5 @@ data class UserRankingRow(
     val profileImageUrl: String?,
     val profileImageS3Key: String?,
     val reviewCount: Int,
-    val memberCount: Int,
+    val sharedReviewCount: Int,
 )

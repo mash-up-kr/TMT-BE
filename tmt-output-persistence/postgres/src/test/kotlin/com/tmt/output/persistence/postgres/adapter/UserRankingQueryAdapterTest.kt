@@ -25,7 +25,7 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
     private lateinit var adapter: UserRankingQueryAdapter
 
     @Test
-    fun `리뷰 수는 살아있는 리뷰만 세고 소유 그룹이 없으면 멤버 수는 0이다`() {
+    fun `리뷰 수는 살아있는 리뷰만 세고 공유가 없으면 0이다`() {
         val user = fixtures.newUser("랭킹없음")
         val place = fixtures.newPlace()
         fixtures.newPublishedReview(place, userId = user)
@@ -36,19 +36,45 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
 
         assertEquals("랭킹없음", row.nickname)
         assertEquals(2, row.reviewCount)
-        assertEquals(0, row.memberCount)
+        assertEquals(0, row.sharedReviewCount)
     }
 
     @Test
-    fun `멤버 수는 소유한 그룹의 멤버 수 합이다`() {
-        val owner = fixtures.newUser("랭킹주인")
-        val other = fixtures.newUser("남의주인")
-        setMemberCount(fixtures.newGroup(owner), 3)
-        setMemberCount(fixtures.newGroup(owner), 5)
-        setMemberCount(fixtures.newGroup(other), 9)
+    fun `한 리뷰를 여러 그룹에 공유해도 공유 리뷰 수는 1이다`() {
+        val user = fixtures.newUser("여러그룹공유")
+        val place = fixtures.newPlace()
+        val review = fixtures.newPublishedReview(place, userId = user).reviewId
+        val another = fixtures.newPublishedReview(place, userId = user).reviewId
+        repeat(3) { fixtures.shareReview(fixtures.newGroup(user), review, user) }
+        fixtures.shareReview(fixtures.newGroup(user), another, user)
 
-        assertEquals(8, rowOf(owner).memberCount)
-        assertEquals(9, rowOf(other).memberCount)
+        assertEquals(2, rowOf(user).sharedReviewCount)
+    }
+
+    @Test
+    fun `삭제된 리뷰의 공유는 세지 않는다`() {
+        val user = fixtures.newUser("공유후삭제")
+        val place = fixtures.newPlace()
+        val alive = fixtures.newPublishedReview(place, userId = user).reviewId
+        val deleted = fixtures.newPublishedReview(place, userId = user, deletedAt = java.time.Instant.now()).reviewId
+        val group = fixtures.newGroup(user)
+        fixtures.shareReview(group, alive, user)
+        fixtures.shareReview(group, deleted, user)
+
+        assertEquals(1, rowOf(user).sharedReviewCount)
+    }
+
+    @Test
+    fun `남이 공유한 리뷰는 내 공유 수에 들어가지 않는다`() {
+        val mine = fixtures.newUser("내공유")
+        val other = fixtures.newUser("남공유")
+        val place = fixtures.newPlace()
+        val group = fixtures.newGroup(mine)
+        fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = mine).reviewId, mine)
+        fixtures.shareReview(group, fixtures.newPublishedReview(place, userId = other).reviewId, other)
+
+        assertEquals(1, rowOf(mine).sharedReviewCount)
+        assertEquals(1, rowOf(other).sharedReviewCount)
     }
 
     @Test
@@ -138,13 +164,6 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
             cursor = assertNotNull(slice.lastKey, "다음 페이지가 있는데 정렬 키가 없다")
         }
         fail("$MAX_SCAN_PAGES 페이지를 넘겨도 userId=$userId 행이 없다")
-    }
-
-    private fun setMemberCount(
-        groupId: Long,
-        memberCount: Int,
-    ) {
-        jdbcTemplate.update("UPDATE groups SET member_count = ? WHERE id = ?", memberCount, groupId)
     }
 
     private companion object {

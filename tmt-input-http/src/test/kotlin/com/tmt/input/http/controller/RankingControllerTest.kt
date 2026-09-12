@@ -43,7 +43,7 @@ class RankingControllerTest {
             .andExpect(jsonPath("$.items[0].userId").value("user_7"))
             .andExpect(jsonPath("$.items[0].nickname").value("유저7"))
             .andExpect(jsonPath("$.items[0].reviewCount").value(3))
-            .andExpect(jsonPath("$.items[0].memberCount").value(12))
+            .andExpect(jsonPath("$.items[0].sharedReviewCount").value(12))
             .andExpect(jsonPath("$.items[0].profileImageUrl").doesNotExist())
             .andExpect(jsonPath("$.nextCursor").doesNotExist())
             .andExpect(jsonPath("$.hasNext").value(false))
@@ -97,6 +97,6 @@ class RankingControllerTest {
             nickname = "유저$userId",
             profileImageUrl = null,
             reviewCount = 3,
-            memberCount = 12,
+            sharedReviewCount = 12,
         )
 }

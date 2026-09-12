@@ -65,6 +65,6 @@ class UserRankingServiceTest {
         profileImageUrl = legacyUrl,
         profileImageS3Key = s3Key,
         reviewCount = 4,
-        memberCount = 0,
+        sharedReviewCount = 0,
     )
 }

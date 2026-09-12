@@ -31,7 +31,7 @@ class UserRankingQueryAdapter(
                         profileImageUrl = it.getProfileImageUrl(),
                         profileImageS3Key = it.getProfileImageS3Key(),
                         reviewCount = it.getReviewCount(),
-                        memberCount = it.getMemberCount(),
+                        sharedReviewCount = it.getSharedReviewCount(),
                     )
                 },
             hasNext = rows.size > query.limit,

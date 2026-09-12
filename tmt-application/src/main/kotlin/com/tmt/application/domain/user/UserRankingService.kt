@@ -31,7 +31,7 @@ class UserRankingService(
                         nickname = row.nickname,
                         profileImageUrl = row.profileImageS3Key?.let(mediaUrlResolver::urlOf) ?: row.profileImageUrl,
                         reviewCount = row.reviewCount,
-                        memberCount = row.memberCount,
+                        sharedReviewCount = row.sharedReviewCount,
                     )
                 },
             hasNext = slice.hasNext,

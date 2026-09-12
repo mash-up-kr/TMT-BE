@@ -28,6 +28,6 @@ data class UserRankingView(
     val nickname: String,
     val profileImageUrl: String?,
     val reviewCount: Int,
-    /** 소유한 그룹의 멤버 수 합 (생성자 포함). 소유 그룹이 없으면 0. */
-    val memberCount: Int,
+    /** 그룹에 공유한 리뷰 수. 한 리뷰를 여러 그룹에 공유해도 1이다. */
+    val sharedReviewCount: Int,
 )

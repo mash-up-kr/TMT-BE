@@ -21,7 +21,7 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
                    t.image_url AS profileImageUrl,
                    t.s3_key    AS profileImageS3Key,
                    CAST(t.rc AS int) AS reviewCount,
-                   CAST(t.mc AS int) AS memberCount
+                   CAST(t.sc AS int) AS sharedReviewCount
             FROM (
                 SELECT u.id                AS uid,
                        u.nickname          AS nickname,
@@ -29,9 +29,11 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
                        ma.s3_key           AS s3_key,
                        (SELECT COUNT(*) FROM review r
                          WHERE r.user_id = u.id AND r.deleted_at IS NULL)   AS rc,
-                       -- 소유 그룹이 없으면 SUM은 NULL이다 (D3: member_count는 생성자 포함)
-                       COALESCE((SELECT SUM(g.member_count) FROM groups g
-                                  WHERE g.owner_id = u.id), 0)              AS mc
+                       -- 한 리뷰를 여러 그룹에 공유해도 1이다 (share_uq는 그룹당 1행)
+                       (SELECT COUNT(DISTINCT s.review_id)
+                          FROM group_review_share s
+                          JOIN review sr ON sr.id = s.review_id AND sr.deleted_at IS NULL
+                         WHERE s.user_id = u.id)                            AS sc
                 FROM users u
                 LEFT JOIN media_asset ma ON ma.id = u.profile_image_asset_id
                 -- 가입 미완료 계정은 랭킹에 싣지 않는다 (TMT-370)
@@ -61,6 +63,6 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
 
         fun getReviewCount(): Int
 
-        fun getMemberCount(): Int
+        fun getSharedReviewCount(): Int
     }
 }

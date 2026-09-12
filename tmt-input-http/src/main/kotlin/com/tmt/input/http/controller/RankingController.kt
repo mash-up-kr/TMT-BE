@@ -55,7 +55,7 @@ class RankingController(
             nickname = nickname,
             profileImageUrl = profileImageUrl,
             reviewCount = reviewCount,
-            memberCount = memberCount,
+            sharedReviewCount = sharedReviewCount,
         )
 
     /** (reviewCount, userId) — 마지막 키는 유일해야 한다 */
