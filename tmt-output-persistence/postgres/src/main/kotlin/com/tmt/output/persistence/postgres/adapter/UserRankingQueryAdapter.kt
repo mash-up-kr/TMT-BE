@@ -20,6 +20,8 @@ class UserRankingQueryAdapter(
                 sort = query.sort.name,
                 afterSortValue = query.after?.sortValue,
                 afterUserId = query.after?.userId,
+                // 빈 목록이면 빈 문자열 → string_to_array가 빈 배열을 줘 아무도 빠지지 않는다
+                excludedCsv = query.excludedUserIds.joinToString(","),
                 limitPlusOne = query.limit + 1,
             )
         val page = rows.take(query.limit)

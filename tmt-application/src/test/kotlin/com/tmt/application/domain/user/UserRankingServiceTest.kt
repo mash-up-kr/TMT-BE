@@ -23,7 +23,7 @@ class UserRankingServiceTest {
             }
         }
 
-    private val service = UserRankingService(port, MediaUrlResolver("https://cdn.example.com"))
+    private val service = UserRankingService(port, MediaUrlResolver("https://cdn.example.com"), "1, 1010,x,")
 
     @Test
     fun `업로드한 프로필 사진이 카카오 URL보다 앞선다`() {
@@ -63,6 +63,8 @@ class UserRankingServiceTest {
         assertEquals(UserRankingSort.SHARED_REVIEW_COUNT, requireNotNull(lastQuery).sort)
         assertEquals(key, requireNotNull(lastQuery).after)
         assertEquals(5, requireNotNull(lastQuery).limit)
+        // 설정 "1, 1010,x," → 공백은 다듬고 숫자가 아닌 것과 빈 조각은 버린다
+        assertEquals(listOf(1L, 1010L), requireNotNull(lastQuery).excludedUserIds)
         assertEquals(key, result.lastKey)
         assertEquals(true, result.hasNext)
     }
