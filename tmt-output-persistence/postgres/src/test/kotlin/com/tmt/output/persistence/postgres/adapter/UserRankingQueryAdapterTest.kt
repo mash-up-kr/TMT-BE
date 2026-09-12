@@ -43,7 +43,11 @@ class UserRankingQueryAdapterTest : PersistenceTest() {
             assertTrue(kept in ids, "$sort: 제외 목록에 없는 계정이 빠졌다")
         }
 
-        val all = adapter.findUserRankings(UserRankingsQuery(UserRankingSort.entries.first(), null, 1000)).rows.map { it.userId }
+        val all =
+            adapter
+                .findUserRankings(UserRankingsQuery(UserRankingSort.entries.first(), null, 1000))
+                .rows
+                .map { it.userId }
         assertTrue(excluded in all && kept in all, "빈 목록이면 둘 다 나온다")
     }
 
