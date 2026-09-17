@@ -1,6 +1,7 @@
 # place 적재 파이프라인 (TMT-161)
 
-소상공인 상가(상권)정보 서울분을 `place` 테이블에 적재한다.
+소상공인 상가(상권)정보를 `place` 테이블에 적재한다. 기본 범위는 서울이고, 성남시가
+2026-09-17 추가됐다 (TMT-440, 아래 §지역 확장).
 
 ## 정본 결정 — 왜 상가정보 단독인가
 
@@ -41,7 +42,7 @@ sql/upsert.sql
 # 1. 다운로드 + 압축 해제 (파일명이 CP437이라 -O cp949 필요, 스크립트가 처리)
 ./download.sh /tmp/sangga-work
 
-# 2. 변환 — 통계가 stderr로 나온다. kept가 실측 기준(141,126 ± 분기 변동)과 크게 다르면 멈추고 원인 확인
+# 2. 변환 — 통계가 stderr로 나온다. kept가 실측 기준(서울 141,126 · 성남 12,202, ± 분기 변동)과 크게 다르면 멈추고 원인 확인
 python3 transform.py /tmp/sangga-work/sangga/소상공인시장진흥공단_상가(상권)정보_서울_*.csv > /tmp/sangga-work/clean.tsv
 
 # 3. 적재 — PSQL로 대상 DB를 지정
@@ -49,7 +50,20 @@ PSQL="podman exec -i tmt-postgres psql -U tmt -d tmt" ./load.sh /tmp/sangga-work
 
 # 시험 적재 (마포구만)
 python3 transform.py --sigungu 마포구 ... > mapo.tsv
+
+# 성남시 (TMT-440) — 같은 zip의 경기 CSV. --sigungu는 접두 매칭이라 '성남시 분당구·수정구·중원구'를 다 잡는다
+python3 transform.py --sido 경기도 --sigungu 성남시 /tmp/sangga-work/sangga/소상공인시장진흥공단_상가(상권)정보_경기_*.csv > seongnam.tsv
 ```
+
+### 지역 확장 (TMT-440)
+
+지역은 `transform.py`의 `--sido`(기본 `서울특별시`) · `--sigungu`(접두 매칭) 필터와 `BBOX` 프리셋으로 정한다.
+프리셋에 없는 지역은 **시끄럽게 죽는다** — bbox 없이 넣으면 좌표계 이상을 걸러낼 수단이 없기 때문이다.
+새 지역을 넣을 때는 원본에서 경도·위도 min/max를 먼저 실측해 `BBOX`에 추가한다.
+
+성남시 202606 실측: 음식 12,202건(분당 6,169 · 수정 3,208 · 중원 2,825), 소분류는 서울과 같은 43종, 매핑률 99.2%
+(NULL 95건은 서울과 같은 의도적 미매핑 2종). `region_name`은 `성남시 분당구 정자동` 형식으로 시군구명에 구가 포함된다.
+그룹 지역 태그(D_01 §2-1)·큐레이션 태그 `region_prefix`(V10)는 서울 구 기준이라 성남을 모른다 — 기획 결정 후 별도 티켓.
 
 ### 운영 적재 (TMT-163)
 
@@ -60,7 +74,7 @@ DB 인스턴스 역할에 `s3:GetObject`가 `data/*`에만 열려 있다 (`infra
 ```bash
 # 1) 로컬에서 업로드 (tmt-admin 자격)
 gzip -k clean.tsv
-aws s3 cp clean.tsv.gz s3://ttalkkak-tmt-db-backup/data/place/seoul-<기준분기>.tsv.gz
+aws s3 cp clean.tsv.gz s3://ttalkkak-tmt-db-backup/data/place/<지역>-<기준분기>.tsv.gz   # seoul-202606, seongnam-202606
 
 # 2) DB 인스턴스에서 (SSM Run Command): aws s3 cp → gunzip →
 #    docker exec -i postgres psql ... (load.sh와 같은 staging→COPY→upsert 단계)
