@@ -4,7 +4,9 @@
 정본은 소상공인 상가(상권)정보 단독이다 — 근거는 TMT-160 결정(2026-08-22)과
 [분석] 매장 원본 데이터 실측 문서 §6. 인허가 병합은 UT2 이후로 유예됐다.
 
-입력:  상가정보 서울 CSV (UTF-8, 분기 갱신). 컬럼은 이름으로 찾는다 —
+입력:  상가정보 시도별 CSV (UTF-8, 분기 갱신). 기본은 서울 필터고, --sido·--sigungu로
+       다른 지역을 고른다 — 성남시는 경기 CSV에서 `--sido 경기도 --sigungu 성남시` (TMT-440).
+       컬럼은 이름으로 찾는다 —
        분기 갱신에서 컬럼 순서가 바뀌어도 동작하고, 이름이 바뀌면 시끄럽게 죽는다.
 출력:  탭 구분 TSV (stdout). 컬럼 순서는 load.sh의 staging 테이블과 일치해야 한다.
        NULL은 빈 필드다 — load.sh가 COPY ... NULL '' 로 읽는다. sentinel(\\N)을 쓰면
@@ -29,9 +31,27 @@ REQUIRED_COLUMNS = [
 
 MAX_LEN = {"name": 100, "road_address": 200, "jibun_address": 200, "region_name": 50}
 
-# 서울 bbox — 실측 문서 §2의 함정(엉뚱한 좌표계가 bbox는 통과) 때문에 넉넉하지 않게 잡는다.
-SEOUL_LON = (126.734, 127.270)
-SEOUL_LAT = (37.413, 37.716)
+# 지역별 bbox (lon_min, lon_max, lat_min, lat_max) — 실측 문서 §2의 함정(엉뚱한 좌표계가
+# bbox는 통과) 때문에 넉넉하지 않게 잡는다. 키는 시도명 또는 "시도명/시군구 접두".
+# 실측(202606): 성남 127.045~127.184 · 37.335~37.474 (TMT-440) / 수원 126.933~127.084 · 37.232~37.338 /
+# 제주 126.164~126.970 · 33.114~33.964 / 강원 127.164~129.355 · 37.081~38.587 (TMT-441).
+# 시도명은 원본 표기를 그대로 쓴다 — '강원도'가 아니라 '강원특별자치도', '제주도'가 아니라 '제주특별자치도'.
+BBOX = {
+    "서울특별시": (126.734, 127.270, 37.413, 37.716),
+    "경기도/성남시": (127.000, 127.230, 37.300, 37.510),
+    "경기도/수원시": (126.900, 127.120, 37.200, 37.370),
+    "제주특별자치도": (126.100, 127.000, 33.080, 34.020),
+    "강원특별자치도": (127.050, 129.400, 37.020, 38.650),
+}
+
+
+def pick_bbox(sido, sigungu):
+    """시군구 프리셋이 있으면 그것, 없으면 시도 프리셋. 둘 다 없으면 시끄럽게 죽는다 —
+    bbox 없이 적재하면 좌표계 이상을 걸러낼 방법이 없다."""
+    for key in ([f"{sido}/{sigungu}"] if sigungu else []) + [sido]:
+        if key in BBOX:
+            return BBOX[key]
+    raise SystemExit(f"bbox 프리셋이 없다: sido={sido} sigungu={sigungu} — BBOX에 실측값을 추가할 것")
 
 
 def build_name(sangho: str, jijeom: str) -> str:
@@ -45,11 +65,13 @@ def build_name(sangho: str, jijeom: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("csv_path")
-    ap.add_argument("--sigungu", help="시군구명 필터 (예: 마포구) — 시험 적재용")
+    ap.add_argument("--sido", default="서울특별시", help="시도명 필터 (기본 서울특별시)")
+    ap.add_argument("--sigungu", help="시군구명 접두 필터 (예: 마포구, 성남시 — '성남시 분당구'도 잡는다)")
     args = ap.parse_args()
+    bbox = pick_bbox(args.sido, args.sigungu)
 
     stats = {
-        "read": 0, "kept": 0, "not_food": 0, "not_seoul": 0, "sigungu_filtered": 0,
+        "read": 0, "kept": 0, "not_food": 0, "not_sido": 0, "sigungu_filtered": 0,
         "missing_required": 0, "bad_coord": 0, "coord_out_of_bbox": 0,
         "too_long": 0, "dup_external_id": 0,
     }
@@ -70,10 +92,10 @@ def main() -> int:
             if row["상권업종대분류명"].strip() != "음식":
                 stats["not_food"] += 1
                 continue
-            if row["시도명"].strip() != "서울특별시":
-                stats["not_seoul"] += 1
+            if row["시도명"].strip() != args.sido:
+                stats["not_sido"] += 1
                 continue
-            if args.sigungu and row["시군구명"].strip() != args.sigungu:
+            if args.sigungu and not row["시군구명"].strip().startswith(args.sigungu):
                 stats["sigungu_filtered"] += 1
                 continue
 
@@ -91,7 +113,7 @@ def main() -> int:
             except ValueError:
                 stats["bad_coord"] += 1
                 continue
-            if not (SEOUL_LON[0] <= lon <= SEOUL_LON[1] and SEOUL_LAT[0] <= lat <= SEOUL_LAT[1]):
+            if not (bbox[0] <= lon <= bbox[1] and bbox[2] <= lat <= bbox[3]):
                 stats["coord_out_of_bbox"] += 1
                 continue
             if (len(name) > MAX_LEN["name"] or len(road) > MAX_LEN["road_address"]
@@ -116,7 +138,7 @@ def main() -> int:
     # 값 드리프트 방어 — 컬럼 이름 가드(위)는 값 변경을 못 잡는다. 공단이 대분류명을
     # '음식' → '음식점'처럼 바꾸면 전량이 not_food로 빠지므로, 0건이면 시끄럽게 죽는다.
     if stats["kept"] == 0:
-        print("kept=0 — 필터 값('음식'/'서울특별시')이 데이터와 어긋난 것 같다. "
+        print(f"kept=0 — 필터 값('음식'/'{args.sido}'/{args.sigungu!r})이 데이터와 어긋난 것 같다. "
               "상권업종대분류명·시도명의 실제 값 분포를 확인할 것.", file=sys.stderr)
         return 1
     return 0
