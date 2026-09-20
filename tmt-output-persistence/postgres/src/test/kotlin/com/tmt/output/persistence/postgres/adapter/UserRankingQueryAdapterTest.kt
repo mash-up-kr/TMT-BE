@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -24,6 +25,31 @@ import kotlin.test.fail
 class UserRankingQueryAdapterTest : PersistenceTest() {
     @Autowired
     private lateinit var adapter: UserRankingQueryAdapter
+
+    @Test
+    fun `제외 목록에 든 계정은 랭킹에 나오지 않고 빈 목록이면 아무도 빠지지 않는다`() {
+        // 팀원 테스트·시드 계정이 상위를 차지하면 리더보드가 의미를 잃는다 — 설정 id 목록으로 거른다
+        val excluded = fixtures.newUser("제외대상")
+        val kept = fixtures.newUser("남는사람")
+
+        UserRankingSort.entries.forEach { sort ->
+            val ids =
+                adapter
+                    .findUserRankings(
+                        UserRankingsQuery(sort = sort, after = null, limit = 1000, excludedUserIds = listOf(excluded)),
+                    ).rows
+                    .map { it.userId }
+            assertFalse(excluded in ids, "$sort: 제외 계정이 나왔다")
+            assertTrue(kept in ids, "$sort: 제외 목록에 없는 계정이 빠졌다")
+        }
+
+        val all =
+            adapter
+                .findUserRankings(UserRankingsQuery(UserRankingSort.entries.first(), null, 1000))
+                .rows
+                .map { it.userId }
+        assertTrue(excluded in all && kept in all, "빈 목록이면 둘 다 나온다")
+    }
 
     @Test
     fun `리뷰 수는 살아있는 리뷰만 세고 공유가 없으면 0이다`() {

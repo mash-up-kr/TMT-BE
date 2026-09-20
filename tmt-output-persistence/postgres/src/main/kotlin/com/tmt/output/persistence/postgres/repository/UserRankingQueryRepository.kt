@@ -50,6 +50,8 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
                 ) c
                 -- 가입 미완료 계정은 랭킹에 싣지 않는다 (TMT-370)
                 WHERE u.profile_completed_at IS NOT NULL
+                  -- 팀원 테스트·시드 계정 제외. 빈 문자열이면 빈 배열이라 아무도 빠지지 않는다
+                  AND NOT (u.id = ANY(CAST(string_to_array(:excludedCsv, ',') AS bigint[])))
             ) t
             WHERE (CAST(:afterSortValue AS bigint) IS NULL
                    OR (t.sv, t.uid) < (CAST(:afterSortValue AS bigint), CAST(:afterUserId AS bigint)))
@@ -62,6 +64,7 @@ interface UserRankingQueryRepository : JpaRepository<UserEntity, Long> {
         @Param("sort") sort: String,
         @Param("afterSortValue") afterSortValue: Int?,
         @Param("afterUserId") afterUserId: Long?,
+        @Param("excludedCsv") excludedCsv: String,
         @Param("limitPlusOne") limitPlusOne: Int,
     ): List<UserRankingRowView>
 

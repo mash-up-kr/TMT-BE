@@ -9,10 +9,12 @@ interface UserRankingQueryPort {
     fun findUserRankings(query: UserRankingsQuery): UserRankingsSlice
 }
 
+/** @param excludedUserIds 랭킹에서 빼는 계정 — 팀원 테스트·시드. 설정 `tmt.ranking.excluded-user-ids`가 정본이다 */
 data class UserRankingsQuery(
     val sort: UserRankingSort,
     val after: UserRankingKey?,
     val limit: Int,
+    val excludedUserIds: List<Long> = emptyList(),
 )
 
 data class UserRankingsSlice(
