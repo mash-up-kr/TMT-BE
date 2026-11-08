@@ -40,6 +40,21 @@ class SaveQueryAdapterTest : PersistenceTest() {
     }
 
     @Test
+    fun `저장 상세 사진은 순서대로 나오고 PUT에 되돌려 보낼 mediaAssetId를 싣는다 (M2)`() {
+        val user = fixtures.newUser()
+        val save = fixtures.newSave(user, fixtures.newPlace())
+        val second = fixtures.newMediaAsset(user)
+        val first = fixtures.newMediaAsset(user)
+        fixtures.attachPhoto(save, second, photoOrder = 1)
+        fixtures.attachPhoto(save, first, photoOrder = 0)
+
+        val photos = adapter.findSavePhotos(save)
+
+        assertEquals(listOf(first, second), photos.map { it.mediaAssetId })
+        assertEquals(listOf(0, 1), photos.map { it.photoOrder })
+    }
+
+    @Test
     fun `리뷰가 된 저장은 reviewId가 채워진다`() {
         val published = fixtures.newPublishedReview(fixtures.newPlace())
 

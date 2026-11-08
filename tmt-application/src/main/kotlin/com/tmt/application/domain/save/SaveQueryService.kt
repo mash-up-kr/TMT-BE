@@ -45,6 +45,7 @@ class SaveQueryService(
                 saveQueryPort.findSavePhotos(saveId).map {
                     SaveDetailView.Photo(
                         photoId = it.savePhotoId,
+                        assetId = it.mediaAssetId,
                         url = mediaUrlFactory.of(it.s3Key),
                         order = it.photoOrder,
                     )

@@ -3,6 +3,7 @@ package com.tmt.application.domain.save
 import com.tmt.application.domain.aisummary.ReviewCommittedEvent
 import com.tmt.application.domain.media.FakeMediaAssetPort
 import com.tmt.application.domain.media.MediaAttachmentService
+import com.tmt.application.domain.media.MediaUrlFactory
 import com.tmt.application.domain.media.MediaUrlResolver
 import com.tmt.application.port.input.CreateSaveCommand
 import com.tmt.application.port.input.PlaceSelection
@@ -155,6 +156,19 @@ class SaveUpdateServiceTest {
         assertNotNull(result.reviewId)
         assertNull(result.sharedGroupId)
         assertTrue(sharePorts.shared.isEmpty())
+    }
+
+    @Test
+    fun `상세로 받은 assetId를 그대로 되돌려 보내면 기존 사진이 유지된다 (M2)`() {
+        val assetId = mediaAssetPort.seed(ownerId = 1)
+        val saveId = seedDraft(photoAssetIds = listOf(assetId))
+        val queryService = SaveQueryService(saveQueryPort, MediaUrlFactory("https://media.tmt.example/"))
+
+        val before = queryService.get(userId = 1, saveId = saveId).photos.map { it.assetId }
+
+        service.update(updateCommand(saveId = saveId, photoAssetIds = before, rating = 3))
+
+        assertEquals(before, queryService.get(userId = 1, saveId = saveId).photos.map { it.assetId })
     }
 
     @Test

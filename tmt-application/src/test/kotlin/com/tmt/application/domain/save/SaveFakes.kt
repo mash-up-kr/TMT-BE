@@ -132,7 +132,12 @@ class FakeSaveQueryPort(
 
     override fun findSavePhotos(saveId: Long): List<SavePhotoRow> =
         commandPort.photos[saveId].orEmpty().mapIndexed { index, assetId ->
-            SavePhotoRow(savePhotoId = assetId, s3Key = "photos/$assetId.jpg", photoOrder = index)
+            SavePhotoRow(
+                savePhotoId = assetId,
+                mediaAssetId = assetId,
+                s3Key = "photos/$assetId.jpg",
+                photoOrder = index,
+            )
         }
 
     override fun findSaveTags(saveId: Long): List<SaveTagRow> =

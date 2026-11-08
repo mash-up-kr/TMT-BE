@@ -32,6 +32,8 @@ class SaveQueryServiceTest {
         val detail = service.get(userId = 1, saveId = saveId)
 
         assertEquals("https://media.tmt.example/photos/7.jpg", detail.photos.single().url)
+        // 이어쓰기에서 PUT photoAssetIds로 되돌려 보낼 값이다 (M2)
+        assertEquals(7L, detail.photos.single().assetId)
         assertEquals("한식", detail.place.categoryName)
         assertEquals(4, detail.rating)
     }
