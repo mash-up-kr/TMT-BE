@@ -17,3 +17,7 @@ output "db_private_ip" {
 output "app_image_repository" {
   value = "kix.ocir.io/${data.oci_objectstorage_namespace.this.namespace}/${oci_artifacts_container_repository.app.display_name}"
 }
+
+output "app_env_secret_id" {
+  value = oci_vault_secret.app_env.id
+}
