@@ -9,7 +9,7 @@ variable "tenancy_ocid" {
 }
 
 variable "ssh_allowed_cidr" {
-  description = "SSH(22)를 열어줄 주소. 운영자 공인 IP/32로 좁힌다."
+  description = "SSH(22)를 열어줄 주소. GitHub Actions가 SSH로 배포하므로 0.0.0.0/0이고, 서버는 키 인증만 받는다."
   type        = string
 }
 
