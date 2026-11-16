@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DB 서버 — 매일 pg_dump를 떠서 tmt-db-backup 버킷 pg/YYYY/MM/에 올린다. 보관 30일은 버킷 수명주기가 지운다.
+# DB 서버 — 매주 pg_dump를 떠서 tmt-db-backup 버킷 pg/YYYY/MM/에 올린다. 보관 30일은 버킷 수명주기가 지운다.
 # 선행: /etc/tmt/backup.env(600)에 S3 호환 키를 둔다.
 #   OCI_S3_ACCESS_KEY_ID=… / OCI_S3_SECRET_ACCESS_KEY=…
 # 사용: ssh ubuntu@<db> 'sudo bash -s' < backup.sh
@@ -48,13 +48,13 @@ Type=oneshot
 ExecStart=/usr/local/bin/tmt-pg-backup.sh
 EOS
 
-# 인스턴스 타임존이 UTC다 — 18:00 UTC = 03:00 KST
+# 인스턴스 타임존이 UTC다 — 일요일 18:00 UTC = 월요일 03:00 KST
 cat > /etc/systemd/system/tmt-pg-backup.timer <<'EOS'
 [Unit]
 Description=TMT PostgreSQL backup schedule
 
 [Timer]
-OnCalendar=*-*-* 18:00:00
+OnCalendar=Sun *-*-* 18:00:00
 Persistent=true
 
 [Install]
