@@ -10,8 +10,8 @@
 #   WAS_SSH_KNOWN_HOSTS  : ssh-keyscan으로 받은 WAS 호스트 키 — 중간자 접속을 막는다
 #   DISCORD_WEBHOOK_RELEASE_URL : (선택) 배포 알림 웹훅 — 없으면 알림 스킵
 #
-# 시크릿 정본은 WAS의 /opt/tmt/.env(600)다. CI는 이미지와 릴리즈만 바꾼다 —
-# 시크릿을 바꿀 때는 서버에서 .env를 고치고 컨테이너를 재기동한다.
+# 앱 시크릿 정본은 Vault 시크릿 tmt-prod-env다(infra/oracle/vault.tf). WAS가 배포마다 자기 인스턴스
+# 권한으로 읽어 .env를 새로 쓴다 — 값을 바꾸려면 콘솔·CLI로 새 버전을 만들고 재배포한다.
 # PostgreSQL은 DB 인스턴스 소관이라 여기서 건드리지 않는다.
 name: CI/CD
 
@@ -23,6 +23,8 @@ on:
 env:
   OCIR_REGISTRY: kix.ocir.io
   APP_IMAGE_REPO: kix.ocir.io/axrpyc6zylkj/tmt
+  # terraform output app_env_secret_id — 식별자일 뿐 값이 아니다
+  APP_ENV_SECRET_ID: ocid1.vaultsecret.oc1.ap-osaka-1.amaaaaaaaj6wb6aahoqigq22wvb3yjsrgfsmvifpf53wfll2guxushpao5yq
 
 jobs:
   build-and-deploy:
@@ -98,7 +100,7 @@ jobs:
           $SSH 'sudo tee /opt/tmt/Caddyfile >/dev/null' < docker/Caddyfile
           $SSH 'sudo tee /opt/tmt/remote-deploy.sh >/dev/null' < scripts/deploy/remote-deploy.sh
           echo "$OCIR_AUTH_TOKEN" | $SSH "sudo docker login ${OCIR_REGISTRY} -u '${OCIR_USERNAME}' --password-stdin"
-          $SSH "sudo bash /opt/tmt/remote-deploy.sh '${APP_IMAGE_REPO}:${TAG}' '${SENTRY_RELEASE}'"
+          $SSH "sudo bash /opt/tmt/remote-deploy.sh '${APP_IMAGE_REPO}:${TAG}' '${SENTRY_RELEASE}' '${APP_ENV_SECRET_ID}'"
 
       - name: 헬스체크
         env:
