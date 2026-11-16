@@ -1,51 +1,51 @@
 services:
   app:
-    image: ${ECR_REGISTRY}/${ECR_REPOSITORY:-tmt}:latest
+    # OCIR 이미지 (TMT-445). 배포 스크립트가 릴리즈마다 .env에 적는다
+    image: ${APP_IMAGE:?APP_IMAGE is required}
     container_name: tmt-app
     restart: unless-stopped
-    # 8080 직결은 전환기 동안 유지한다 (TMT-175) — CI 헬스체크와 기존 FE 설정이
-    # 아직 이 경로를 쓴다. HTTPS 경로(caddy)로 완전히 넘어가면 닫는다.
+    # CI 헬스체크가 서버 안에서 8080으로 확인한다. 외부 8080은 보안 규칙이 막는다
     ports:
       - "8080:8080"
     # 물리 메모리 아래여야 한다 — 한도가 물리보다 크면 컨테이너가 한도에 닿기 전에
     # 호스트가 먼저 말라, 도커가 이 컨테이너만 죽여주지 못하고 커널 OOM 킬러가
-    # 임의의 프로세스(Caddy·SSM 에이전트)를 고른다. WAS는 t3.micro(916MiB)이고
+    # 임의의 프로세스(Caddy 등)를 고른다. WAS는 E2.1.Micro(956MiB)이고
     # OS·Caddy가 함께 올라가 앱 몫은 750m 안팎이다. JAVA_OPTS와 같이 움직인다 (TMT-259)
     mem_limit: 750m
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - TZ=Asia/Seoul
-      # DB 접속 정보는 배포 시 SSM 파라미터(/tmt-prod/db/*)에서 .env로 내려온다 (TMT-107).
+      # 시크릿 정본은 서버의 /opt/tmt/.env다 (TMT-445).
       # PostgreSQL은 별도 DB 인스턴스에 있다 — 같은 호스트의 도커 네트워크가 아니다.
       - DB_HOST=${DB_HOST}
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
-      # 미디어 버킷·조회 base URL (TMT-201). 정본은 SSM /tmt-prod/media/* — 배포 시 .env로 내려온다.
+      # 미디어 버킷·조회 base URL (TMT-201). 정본은 서버 .env
       # 앱 소비는 TMT-202(사진 업로드 실구현)에서 붙는다.
       - MEDIA_BUCKET=${MEDIA_BUCKET}
       - MEDIA_BASE_URL=${MEDIA_BASE_URL}
-      # 리뷰 요약 LLM 키 (TMT-232). 정본은 SSM /tmt-prod/ai/* — 빈 값이면 해당 프로바이더 비활성
+      # 리뷰 요약 LLM 키 (TMT-232). 정본은 서버 .env — 빈 값이면 해당 프로바이더 비활성
       - GROQ_API_KEY=${GROQ_API_KEY}
-      # 모델 소멸 시 SSM /tmt-prod/ai/groq-model 값만 바꿔 복구한다 (TMT-297).
+      # 모델 소멸 시 .env의 GROQ_MODEL 값만 바꿔 복구한다 (TMT-297).
       # :- 기본값이 있는 이유: .env에 빈 값이 오면 Spring이 yml 기본값 대신 빈 문자열을 쓰기 때문.
-      # 우선순위: SSM 값 → 이 :- 기본값 → (compose 밖 실행에서만) application.yml 기본값
+      # 우선순위: .env 값 → 이 :- 기본값 → (compose 밖 실행에서만) application.yml 기본값
       - GROQ_MODEL=${GROQ_MODEL:-qwen/qwen3.8-27b}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      # 주소 API 키 (TMT-187)·addressId 서명 키 (TMT-191). 정본은 SSM /tmt-prod/address/*
+      # 주소 API 키 (TMT-187)·addressId 서명 키 (TMT-191). 정본은 서버 .env
       - JUSO_SEARCH_KEY=${JUSO_SEARCH_KEY}
       - JUSO_COORD_KEY=${JUSO_COORD_KEY}
       - ADDRESS_TOKEN_SECRET=${ADDRESS_TOKEN_SECRET}
-      # 카카오 로그인 키 (TMT-271)·JWT 서명 키 (TMT-272). 정본은 SSM /tmt-prod/auth/*.
+      # 카카오 로그인 키 (TMT-271)·JWT 서명 키 (TMT-272). 정본은 서버 .env.
       # JWT_SECRET이 비면 앱이 기동하지 않는다 (application-prod.yml fail-fast)
       - KAKAO_REST_API_KEY=${KAKAO_REST_API_KEY}
       - KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      # 에러 수집 (TMT-325). 정본은 SSM /tmt-prod/sentry/dsn — 빈 값이면 SDK가 no-op이다.
+      # 에러 수집 (TMT-325). 정본은 서버 .env — 빈 값이면 SDK가 no-op이다.
       # release는 CI가 배포 커밋 SHA로 채운다
       - SENTRY_DSN=${SENTRY_DSN}
       - SENTRY_RELEASE=${SENTRY_RELEASE}
-      # 어드민 허용 목록 (TMT-421). 정본은 SSM /tmt-prod/admin/user-ids.
+      # 어드민 허용 목록 (TMT-421). 정본은 서버 .env.
       # 비어 있으면 /v1/admin/** 이 전부 403이다 — 기본값이 열리면 안 된다
       - ADMIN_USER_IDS=${ADMIN_USER_IDS}
     volumes:
