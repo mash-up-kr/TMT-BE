@@ -25,6 +25,11 @@ services:
       # 앱 소비는 TMT-202(사진 업로드 실구현)에서 붙는다.
       - MEDIA_BUCKET=${MEDIA_BUCKET}
       - MEDIA_BASE_URL=${MEDIA_BASE_URL}
+      # S3 호환 엔드포인트·고정 키. 비어 있으면 AWS S3 + 인스턴스 역할이다
+      - MEDIA_REGION=${MEDIA_REGION:-ap-northeast-2}
+      - MEDIA_ENDPOINT=${MEDIA_ENDPOINT:-}
+      - MEDIA_ACCESS_KEY_ID=${MEDIA_ACCESS_KEY_ID:-}
+      - MEDIA_SECRET_ACCESS_KEY=${MEDIA_SECRET_ACCESS_KEY:-}
       # 리뷰 요약 LLM 키 (TMT-232). 정본은 서버 .env — 빈 값이면 해당 프로바이더 비활성
       - GROQ_API_KEY=${GROQ_API_KEY}
       # 모델 소멸 시 .env의 GROQ_MODEL 값만 바꿔 복구한다 (TMT-297).

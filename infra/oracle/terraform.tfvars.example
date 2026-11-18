@@ -1,0 +1,2 @@
+tenancy_ocid     = "ocid1.tenancy.oc1..<딸깍 테넌시>"
+ssh_allowed_cidr = "0.0.0.0/0"
