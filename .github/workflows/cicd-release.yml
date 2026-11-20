@@ -1,17 +1,18 @@
 # 릴리즈 태그(vX.Y.Z) 발행 시 자동 배포 (docs/BRANCHING.md §5)
 #
-# 필요한 Repository secrets:
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY : 배포 IAM 사용자 — infra/terraform/ci.tf의
-#                                               ci_deploy 정책이 부착되어 있어야 한다
-#   DISCORD_WEBHOOK_RELEASE_URL               : (선택) 배포 알림 웹훅 — 없으면 알림 스킵
+# Oracle Cloud 오사카 WAS로 배포한다 (TMT-445, infra/oracle). 이미지는 OCIR, 서버 접속은 SSH다.
 #
-# 2대 구성 대응 (TMT-107):
-#   - WAS에는 앱 컨테이너만 배포한다. PostgreSQL은 DB 인스턴스의 user_data 소관이라
-#     여기서 건드리지 않는다.
-#   - 서버 접속은 SSH가 아니라 SSM Run Command — 보안그룹 22번이 전면 차단이어도
-#     동작하므로 SERVER_HOST/SERVER_KEY 시크릿이 필요 없다. 대상은 Name 태그로 찾는다.
-#   - DB 접속 정보 정본은 SSM 파라미터(/tmt-prod/db/*)다. GitHub Secrets에 두지 않고
-#     WAS 인스턴스가 자기 IAM 역할로 배포 시점에 읽는다.
+# 필요한 Repository secrets:
+#   OCIR_USERNAME        : <namespace>/<콘솔 사용자명>
+#   OCIR_AUTH_TOKEN      : 그 사용자의 인증 토큰
+#   WAS_HOST             : WAS 예약 공인 IP
+#   WAS_SSH_KEY          : 배포 전용 SSH 개인 키 (ubuntu 계정)
+#   WAS_SSH_KNOWN_HOSTS  : ssh-keyscan으로 받은 WAS 호스트 키 — 중간자 접속을 막는다
+#   DISCORD_WEBHOOK_RELEASE_URL : (선택) 배포 알림 웹훅 — 없으면 알림 스킵
+#
+# 앱 시크릿 정본은 Vault 시크릿 tmt-prod-env다(infra/oracle/vault.tf). WAS가 배포마다 자기 인스턴스
+# 권한으로 읽어 .env를 새로 쓴다 — 값을 바꾸려면 콘솔·CLI로 새 버전을 만들고 재배포한다.
+# PostgreSQL은 DB 인스턴스 소관이라 여기서 건드리지 않는다.
 name: CI/CD
 
 on:
@@ -20,16 +21,10 @@ on:
       - published
 
 env:
-  AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: tmt
-  WAS_NAME_TAG: tmt-prod-was
-  SSM_DB_PREFIX: /tmt-prod/db
-  SSM_MEDIA_PREFIX: /tmt-prod/media
-  SSM_AI_PREFIX: /tmt-prod/ai
-  SSM_ADDRESS_PREFIX: /tmt-prod/address
-  SSM_AUTH_PREFIX: /tmt-prod/auth
-  SSM_SENTRY_PREFIX: /tmt-prod/sentry
-  SSM_ADMIN_PREFIX: /tmt-prod/admin
+  OCIR_REGISTRY: kix.ocir.io
+  APP_IMAGE_REPO: kix.ocir.io/axrpyc6zylkj/tmt
+  # terraform output app_env_secret_id — 식별자일 뿐 값이 아니다
+  APP_ENV_SECRET_ID: ocid1.vaultsecret.oc1.ap-osaka-1.amaaaaaaaj6wb6aahoqigq22wvb3yjsrgfsmvifpf53wfll2guxushpao5yq
 
 jobs:
   build-and-deploy:
@@ -66,247 +61,64 @@ jobs:
       - name: JAR 빌드
         run: ./gradlew :tmt-bootstrap:bootJar
 
-      - name: AWS 자격 증명 설정
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: OCIR 로그인
+        env:
+          OCIR_USERNAME: ${{ secrets.OCIR_USERNAME }}
+          OCIR_AUTH_TOKEN: ${{ secrets.OCIR_AUTH_TOKEN }}
+        run: echo "$OCIR_AUTH_TOKEN" | docker login "$OCIR_REGISTRY" -u "$OCIR_USERNAME" --password-stdin
 
-      - name: ECR 로그인
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
+      # WAS가 E2.1.Micro(x86)라 러너(amd64)에서 그대로 빌드한다
       - name: Docker 이미지 빌드 및 푸시
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest .
-          docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+          docker build -t "${APP_IMAGE_REPO}:${TAG}" -t "${APP_IMAGE_REPO}:latest" .
+          docker push "${APP_IMAGE_REPO}:${TAG}"
+          docker push "${APP_IMAGE_REPO}:latest"
 
-      - name: 배포 대상 WAS 조회
-        id: was
-        run: |
-          read -r INSTANCE_ID PUBLIC_IP <<< "$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${WAS_NAME_TAG}" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].[InstanceId,PublicIpAddress]' \
-            --output text)"
-
-          if [ -z "${INSTANCE_ID:-}" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "::error::Name=${WAS_NAME_TAG} 태그의 실행 중 인스턴스를 찾지 못했습니다"
-            exit 1
-          fi
-
-          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
-          echo "public_ip=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
-
-      # 2026-09-01 v0.1.0 배포 장애 (TMT-306): 인스턴스가 메모리 고갈로 얼어 SSM 에이전트가 죽어 있었는데,
-      # send-command는 성공하고 명령만 영원히 InProgress였다. 워크플로는 11분 뒤 "InProgress로 끝났다"고
-      # 실패했고 그 메시지가 진짜 원인(에이전트 사망 → 재부팅 필요)을 가렸다. 보내기 전에 살았는지 본다.
-      - name: SSM 에이전트 생존 확인
+      - name: SSH 준비
         env:
-          INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
+          WAS_SSH_KEY: ${{ secrets.WAS_SSH_KEY }}
+          WAS_SSH_KNOWN_HOSTS: ${{ secrets.WAS_SSH_KNOWN_HOSTS }}
         run: |
-          # 일시적 하트비트 누락·에이전트 재시작으로 잠깐 ConnectionLost일 수 있어 3회(10초 간격) 본다.
-          # aws 호출 자체가 실패(AccessDenied 등)하면 read가 스텝을 조용히 죽이므로 결과를 먼저 변수에 담는다
-          PING=""; LAST_PING=""
-          for attempt in 1 2 3; do
-            INFO=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
-              --query 'InstanceInformationList[0].[PingStatus,LastPingDateTime]' --output text 2>&1) || {
-              echo "::error::describe-instance-information 호출 실패 — CI 사용자 정책(ci.tf)의 ssm:DescribeInstanceInformation을 확인하세요: ${INFO}"
-              exit 1
-            }
-            read -r PING LAST_PING <<< "${INFO}"
-            echo "SSM PingStatus=${PING:-None} LastPing=${LAST_PING:-None} (attempt ${attempt})"
-            [ "${PING:-}" = "Online" ] && break
-            [ "$attempt" -lt 3 ] && sleep 10
-          done
-          if [ "${PING:-}" != "Online" ]; then
-            echo "::error::WAS(${INSTANCE_ID})의 SSM 에이전트가 ${PING:-None} 상태입니다 (마지막 ping ${LAST_PING:-없음}). 인스턴스가 응답 불능일 가능성이 높습니다 — 헬스체크 후 aws ec2 reboot-instances 를 검토하세요. 배포 명령을 보내지 않고 중단합니다"
-            exit 1
-          fi
-          # PingStatus는 누락이 몇 번 쌓여야 바뀌는 지연 지표다. 에이전트는 5분 간격으로 ping하므로
-          # 마지막 ping이 10분 넘게 과거면 "Online이지만 방금 얼었을" 가능성을 경고로 남긴다 (중단은 안 한다)
-          if [ -n "${LAST_PING:-}" ] && [ "${LAST_PING}" != "None" ]; then
-            AGE=$(( $(date -u +%s) - $(date -u -d "${LAST_PING}" +%s 2>/dev/null || date -u +%s) ))
-            if [ "$AGE" -gt 600 ]; then
-              echo "::warning::SSM 마지막 ping이 ${AGE}초 전입니다 — Online으로 표시돼도 인스턴스가 방금 얼었을 수 있습니다. 배포가 InProgress에 머물면 이 값을 먼저 보세요"
-            fi
-          fi
+          install -m 700 -d ~/.ssh
+          echo "$WAS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "$WAS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: 배포 (SSM Run Command)
+      - name: 배포 (SSH)
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          INSTANCE_ID: ${{ steps.was.outputs.instance_id }}
-          PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
+          WAS_HOST: ${{ secrets.WAS_HOST }}
+          OCIR_USERNAME: ${{ secrets.OCIR_USERNAME }}
+          OCIR_AUTH_TOKEN: ${{ secrets.OCIR_AUTH_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
           # Sentry 이벤트의 릴리즈 — 어느 커밋에서 난 에러인지 이 값으로 갈린다 (TMT-325)
           SENTRY_RELEASE: ${{ github.sha }}
         run: |
-          # compose 파일은 scp 대신 명령 페이로드에 실어 보낸다. Run Command 인라인
-          # 파라미터 한도(약 8KB) 안에 넉넉히 들어가는 크기다.
-          COMPOSE_B64=$(base64 < docker/docker-compose.prod.yml | tr -d '\n')
-          CADDYFILE_B64=$(base64 < docker/Caddyfile | tr -d '\n')
-
-          # 원격 스크립트. $VAR는 여기서 치환되어 들어가고, 원격에서 평가될 변수는 \$로 남긴다.
-          cat > /tmp/remote.sh <<EOF
-          set -euo pipefail
-
-          DEPLOY_DIR=/opt/tmt
-          mkdir -p "\$DEPLOY_DIR"
-
-          # Docker Compose 플러그인 설치 (없으면)
-          if ! docker compose version >/dev/null 2>&1; then
-            mkdir -p /usr/local/lib/docker/cli-plugins
-            curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\$(uname -m)" \
-              -o /usr/local/lib/docker/cli-plugins/docker-compose
-            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-          fi
-
-          # DB 접속 정보 — 정본은 SSM 파라미터. 인스턴스 IAM 역할로 읽는다.
-          DB_HOST=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/host --query Parameter.Value --output text)
-          DB_NAME=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/name --query Parameter.Value --output text)
-          DB_USER=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/user --query Parameter.Value --output text)
-          DB_PASSWORD=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_DB_PREFIX}/password --with-decryption --query Parameter.Value --output text)
-          # 미디어 버킷·조회 base URL (TMT-201) — 정본은 SSM 파라미터, DB 접속 정보와 같은 방식
-          MEDIA_BUCKET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_MEDIA_PREFIX}/bucket --query Parameter.Value --output text)
-          MEDIA_BASE_URL=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_MEDIA_PREFIX}/base-url --query Parameter.Value --output text)
-          # LLM 키 (TMT-232) — 아직 등록 전이면 빈 값으로 두고 해당 프로바이더는 앱이 건너뛴다
-          GROQ_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
-          # 모델 id — 파라미터가 없거나 빈 값이면 앱 기본값을 쓴다 (TMT-297)
-          GROQ_MODEL=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/groq-model --query Parameter.Value --output text 2>/dev/null || echo "")
-          GEMINI_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AI_PREFIX}/gemini-api-key --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
-          # 주소 API 키 (TMT-187) — 검색용·좌표용이 서로 다른 키다. 없으면 주소 검색이
-          # ADDRESS_PROVIDER_UNAVAILABLE로 죽으므로 LLM 키와 달리 빈 값 폴백을 두지 않는다
-          JUSO_SEARCH_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-search-key --with-decryption --query Parameter.Value --output text)
-          JUSO_COORD_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/juso-coord-key --with-decryption --query Parameter.Value --output text)
-          # addressId 서명 키 (TMT-191). 외부 발급이 아니라 우리가 만든 HMAC 시크릿이다
-          ADDRESS_TOKEN_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADDRESS_PREFIX}/token-secret --with-decryption --query Parameter.Value --output text)
-          # 카카오 로그인 키 (TMT-271)·JWT 서명 키 (TMT-272). JWT_SECRET은 prod에 기본값이
-          # 없어(application-prod.yml) 비면 앱 기동 자체가 실패한다 — 빈 값 폴백을 두지 않는다
-          KAKAO_REST_API_KEY=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/kakao-rest-api-key --with-decryption --query Parameter.Value --output text)
-          KAKAO_CLIENT_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/kakao-client-secret --with-decryption --query Parameter.Value --output text)
-          JWT_SECRET=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_AUTH_PREFIX}/jwt-secret --with-decryption --query Parameter.Value --output text)
-          # Sentry DSN (TMT-325) — 미등록이면 빈 값으로 두고 SDK가 no-op으로 뜬다.
-          # 수집이 끊기는 편이 기동이 막히는 것보다 낫다
-          SENTRY_DSN=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_SENTRY_PREFIX}/dsn --with-decryption --query Parameter.Value --output text 2>/dev/null || echo "")
-          # 어드민 허용 목록 (TMT-421). 비어 있으면 /v1/admin/** 전부 403이라 기능만 닫히고
-          # 서비스는 정상이므로 필수 검사에는 넣지 않는다
-          ADMIN_USER_IDS=\$(aws ssm get-parameter --region ${AWS_REGION} --name ${SSM_ADMIN_PREFIX}/user-ids --query Parameter.Value --output text 2>/dev/null || echo "")
-
-          # 필수 값이 비면 배포를 멈춘다 — 명령 치환은 실패해도 스크립트를 끝내지 않아,
-          # 그냥 두면 빈 .env로 컨테이너가 떠서 그 기능만 조용히 죽는다 (TMT-252).
-          # 주소 키는 조용히 죽지도 않는다 — 없으면 앱이 기동에 실패하는데, 그때는 이미
-          # 기존 컨테이너를 내린 뒤라 서비스가 함께 내려간다. 여기서 먼저 끊는다 (TMT-191)
-          for v in "\$DB_HOST" "\$DB_NAME" "\$DB_USER" "\$DB_PASSWORD" "\$MEDIA_BUCKET" "\$MEDIA_BASE_URL" \
-                   "\$JUSO_SEARCH_KEY" "\$JUSO_COORD_KEY" "\$ADDRESS_TOKEN_SECRET" \
-                   "\$KAKAO_REST_API_KEY" "\$KAKAO_CLIENT_SECRET" "\$JWT_SECRET"; do
-            [ -n "\$v" ] && continue
-            echo "필수 설정을 SSM에서 읽지 못했다 — 인스턴스 역할의 ssm:GetParameter 범위를 확인하라 (infra/terraform/iam.tf)" >&2
-            exit 1
-          done
-
-          # ECR pull — 인스턴스 역할 권한 (infra/terraform/ecr.tf)
-          aws ecr get-login-password --region ${AWS_REGION} \
-            | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-
-          echo "${COMPOSE_B64}" | base64 -d > "\$DEPLOY_DIR/docker-compose.prod.yml"
-          echo "${CADDYFILE_B64}" | base64 -d > "\$DEPLOY_DIR/Caddyfile"
-
-          umask 077
-          cat > "\$DEPLOY_DIR/.env" <<ENV
-          ECR_REGISTRY=${ECR_REGISTRY}
-          ECR_REPOSITORY=${ECR_REPOSITORY}
-          DB_HOST=\$DB_HOST
-          DB_NAME=\$DB_NAME
-          DB_USER=\$DB_USER
-          DB_PASSWORD=\$DB_PASSWORD
-          MEDIA_BUCKET=\$MEDIA_BUCKET
-          MEDIA_BASE_URL=\$MEDIA_BASE_URL
-          GROQ_API_KEY=\$GROQ_API_KEY
-          GROQ_MODEL=\$GROQ_MODEL
-          GEMINI_API_KEY=\$GEMINI_API_KEY
-          JUSO_SEARCH_KEY=\$JUSO_SEARCH_KEY
-          JUSO_COORD_KEY=\$JUSO_COORD_KEY
-          ADDRESS_TOKEN_SECRET=\$ADDRESS_TOKEN_SECRET
-          KAKAO_REST_API_KEY=\$KAKAO_REST_API_KEY
-          KAKAO_CLIENT_SECRET=\$KAKAO_CLIENT_SECRET
-          JWT_SECRET=\$JWT_SECRET
-          SENTRY_DSN=\$SENTRY_DSN
-          SENTRY_RELEASE=${SENTRY_RELEASE}
-          ADMIN_USER_IDS=\$ADMIN_USER_IDS
-          ENV
-
-          cd "\$DEPLOY_DIR"
-
-          # 단일 인스턴스 시절 잔재 정리 — postgres는 이제 DB 인스턴스 소관이라
-          # WAS에 떠 있으면 안 된다. 볼륨은 지우지 않는다.
-          docker rm -f tmt-postgres 2>/dev/null || true
-          docker rm -f tmt-app 2>/dev/null || true
-
-          docker compose -f docker-compose.prod.yml pull app
-          docker compose -f docker-compose.prod.yml up -d --force-recreate
-          docker image prune -f
-
-          echo ">>> 배포 완료"
-          docker ps
-          EOF
-
-          COMMAND_ID=$(aws ssm send-command \
-            --document-name AWS-RunShellScript \
-            --instance-ids "$INSTANCE_ID" \
-            --comment "release ${{ github.event.release.tag_name }}" \
-            --parameters "$(jq -n --rawfile s /tmp/remote.sh '{commands: [$s], executionTimeout: ["600"]}')" \
-            --query 'Command.CommandId' --output text)
-
-          echo "SSM Command: $COMMAND_ID"
-
-          # aws ssm wait command-executed는 최대 100초라 이미지 pull이 끝나기 전에
-          # 타임아웃될 수 있어 직접 폴링한다. 발급 직후에는 조회가 404일 수 있다.
-          # 원격 executionTimeout(600s)이 먼저 걸리므로 정상이라면 10분 안에 종료 상태가 온다.
-          # 15분까지 기다려도 InProgress면 명령이 오래 걸리는 게 아니라 에이전트가 상태를 못 올리는 것이다
-          STATUS=Pending
-          for _ in $(seq 1 90); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-              --query 'Status' --output text 2>/dev/null || echo Pending)
-            case "$STATUS" in
-              Success|Failed|Cancelled|TimedOut) break ;;
-            esac
-            sleep 10
-          done
-
-          aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
-            --output json | jq -r '"--- status: \(.Status)\n--- stdout\n\(.Stdout)\n--- stderr\n\(.Stderr)"'
-
-          if [ "$STATUS" != "Success" ]; then
-            # 명령이 안 끝난 것(InProgress)과 에이전트가 죽은 것을 갈라서 보여준다. 배포 스크립트는
-            # 구 컨테이너를 내린 뒤 새 컨테이너를 띄우므로, 서비스가 살아 있는지도 같이 남긴다
-            PING=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
-              --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo Unknown)
-            HEALTH=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${PUBLIC_IP}:8080/api/health/db" || true)
-            echo "::error::배포 명령이 ${STATUS} 상태로 끝났습니다 — SSM 에이전트 ${PING}, 서비스 헬스 HTTP ${HEALTH}. InProgress + 에이전트 비정상이면 인스턴스 동결이니 재부팅을, Failed면 위 stderr를 보세요"
-            exit 1
-          fi
+          SSH="ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes ubuntu@${WAS_HOST}"
+          $SSH 'sudo tee /opt/tmt/docker-compose.prod.yml >/dev/null' < docker/docker-compose.prod.yml
+          $SSH 'sudo tee /opt/tmt/Caddyfile >/dev/null' < docker/Caddyfile
+          $SSH 'sudo tee /opt/tmt/remote-deploy.sh >/dev/null' < scripts/deploy/remote-deploy.sh
+          echo "$OCIR_AUTH_TOKEN" | $SSH "sudo docker login ${OCIR_REGISTRY} -u '${OCIR_USERNAME}' --password-stdin"
+          $SSH "sudo bash /opt/tmt/remote-deploy.sh '${APP_IMAGE_REPO}:${TAG}' '${SENTRY_RELEASE}' '${APP_ENV_SECRET_ID}'"
 
       - name: 헬스체크
         env:
-          PUBLIC_IP: ${{ steps.was.outputs.public_ip }}
-          API_HOST: 3-39-38-23.sslip.io # TMT-175. 실도메인 전환 시 Caddyfile과 함께 교체
+          WAS_HOST: ${{ secrets.WAS_HOST }}
+          # 실도메인 전환(TMT-446) 뒤 api.ttomatto.kr로 바꾼다
+          API_HOST: 129-225-153-130.sslip.io
         run: |
-          # 1) 앱 자체 (8080 직결) — 앱이 못 뜨면 여기서 끊는다
-          for _ in $(seq 1 36); do
-            if curl -sf "http://${PUBLIC_IP}:8080/api/health/db" >/dev/null; then
+          # 1) 앱 자체 — 서버 안에서 8080으로 본다. E2.1.Micro는 기동에 90초 안팎이 걸린다
+          SSH="ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes ubuntu@${WAS_HOST}"
+          for _ in $(seq 1 60); do
+            if $SSH 'curl -sf localhost:8080/api/health/db >/dev/null'; then
               echo ">>> 앱 헬스체크 통과"
               break
             fi
             sleep 5
           done
-          curl -sf "http://${PUBLIC_IP}:8080/api/health/db" >/dev/null || {
-            echo "::error::3분 내에 /api/health/db가 응답하지 않았습니다"
+          $SSH 'curl -sf localhost:8080/api/health/db >/dev/null' || {
+            echo "::error::5분 내에 /api/health/db가 응답하지 않았습니다 — docker logs tmt-app을 보세요"
             exit 1
           }
 

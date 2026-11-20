@@ -42,7 +42,7 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 3. Publish 순간 [cicd-release.yml](../.github/workflows/cicd-release.yml)이 실행된다. Actions 탭에서 진행 상황 확인
 4. 완료되면 디스코드 배포 알림(웹훅 설정 시)과 서버 헬스체크로 확인 — 워크플로 자체도 마지막에 같은 헬스체크를 수행한다:
    ```bash
-   curl http://<WAS 공인 IP>:8080/api/health/db   # IP: infra/terraform → terraform output -raw was_public_ip
+   curl https://129-225-153-130.sslip.io/api/health/db   # 실도메인 전환(TMT-446) 뒤에는 api.ttomatto.kr
    ```
 
 > 릴리즈 노트는 자동 생성(Generate release notes)을 쓴다 — squash merge 덕에 PR 단위로 정리된다.
@@ -50,40 +50,36 @@ GitHub Release 발행 (vX.Y.Z) ──→ cicd-release.yml 자동 트리거 ─�
 
 ## 4. 파이프라인이 하는 일
 
-2대 구성(WAS/DB 분리, TMT-107) 기준이다. **배포는 SSH가 아니라 SSM Run Command로 간다** — 보안그룹 22번이 전면 차단이어도 동작하고, 배포 대상은 `Name=tmt-prod-was` 태그로 찾으므로 서버 주소·SSH 키 시크릿이 없다.
+Oracle Cloud 오사카 2대 구성(WAS/DB 분리, `infra/oracle`) 기준이다. 이미지는 OCIR, 서버 접속은 배포 전용 키의 SSH다 (TMT-445).
 
 | 단계 | 내용 |
 |------|------|
 | 빌드 | `./gradlew :tmt-bootstrap:bootJar` |
-| 이미지 | Docker 이미지 빌드 → ECR에 `latest` 태그로 push |
-| 대상 조회 | `Name=tmt-prod-was` 태그로 실행 중인 WAS 인스턴스 ID·공인 IP 조회 |
-| 에이전트 확인 | SSM 에이전트 `PingStatus`가 `Online`이 아니면 명령을 보내지 않고 중단 — 인스턴스가 얼어 있으면 명령이 영원히 `InProgress`로 남아 원인을 가린다 (2026-09-01 장애, TMT-306). 이때는 `aws ec2 reboot-instances` 후 릴리즈를 재실행(`gh run rerun --failed`)한다 |
-| 배포 | SSM Run Command로 WAS에서 실행: compose 파일 갱신(명령 페이로드로 전달) → DB 접속 정보를 SSM 파라미터(`/tmt-prod/db/*`)에서 읽어 `.env` 생성 → ECR pull → `tmt-app` `--force-recreate` 재기동 |
-| DB | **건드리지 않는다** — PostgreSQL은 DB 인스턴스의 user_data 소관 (`infra/terraform`) |
-| 헬스체크 | `http://<WAS_IP>:8080/api/health/db`가 응답할 때까지 최대 3분 대기, 실패 시 워크플로 실패 |
+| 이미지 | Docker 이미지 빌드 → OCIR(`kix.ocir.io/axrpyc6zylkj/tmt`)에 `vX.Y.Z`·`latest` 두 태그로 push |
+| 배포 | SSH로 compose·Caddyfile·`scripts/deploy/remote-deploy.sh`를 `/opt/tmt`에 올린 뒤 실행: Vault 시크릿을 읽어 `.env` 생성 → 필수 값 검사 → `vX.Y.Z` 이미지 pull → `--force-recreate` 재기동 |
+| DB | **건드리지 않는다** — PostgreSQL은 DB 인스턴스 소관 (`infra/oracle/provision`) |
+| 헬스체크 | 서버 안에서 `localhost:8080/api/health/db`를 최대 5분, 이어서 HTTPS 경로를 최대 3분 기다린다. E2.1.Micro는 기동에 90초 안팎이 걸린다 |
 | 알림 | 성공 시 디스코드 웹훅으로 릴리즈 노트 전송 (미설정 시 스킵) |
 
-DB 비밀번호의 **정본은 SSM SecureString**(`/tmt-prod/db/password`) 하나다. GitHub Secrets에는 두지 않는다 — WAS 인스턴스가 자기 IAM 역할로 배포 시점에 읽는다.
+앱 시크릿의 **정본은 Vault 시크릿 `tmt-prod-env`**(`.env` 전체, `infra/oracle/vault.tf`) 하나다. WAS가 자기 인스턴스 권한(동적 그룹 `tmt-was`)으로 배포 시점에 읽는다. 값을 바꾸려면 콘솔이나 CLI로 시크릿의 새 버전을 만들고 재배포한다:
+
+```bash
+oci vault secret update-base64 --secret-id "$(cd infra/oracle && terraform output -raw app_env_secret_id)" \
+  --secret-content-content "$(base64 < new.env)"
+```
 
 ### 필요한 Repository secrets
 
 | Secret | 용도 |
 |--------|------|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | 배포 IAM 사용자 — `infra/terraform/ci.tf`의 `ci_deploy` 정책 부착 필요 |
+| `OCIR_USERNAME` / `OCIR_AUTH_TOKEN` | OCIR 로그인 — `<namespace>/<콘솔 사용자명>`과 그 사용자의 인증 토큰 |
+| `WAS_HOST` | WAS 예약 공인 IP (`terraform output -raw was_public_ip`) |
+| `WAS_SSH_KEY` / `WAS_SSH_KNOWN_HOSTS` | 배포 전용 SSH 개인 키(ubuntu 계정)와 `ssh-keyscan`으로 받은 호스트 키 |
 | `DISCORD_WEBHOOK_RELEASE_URL` | (선택) 배포 알림 웹훅 |
-
-배포 IAM 사용자에 정책 부착 (최초 1회):
-
-```bash
-aws iam attach-user-policy --user-name <ci-user> \
-  --policy-arn "$(cd infra/terraform && terraform output -raw ci_deploy_policy_arn)"
-```
-
-> 종전의 `ECR_REGISTRY`(로그인 액션 출력으로 대체) · `SERVER_HOST` / `SERVER_KEY`(태그 조회 + SSM으로 대체) · `POSTGRES_PASSWORD`(정본이 SSM으로 일원화) 시크릿은 더 이상 쓰지 않으므로 지워도 된다.
 
 ## 5. 롤백
 
-이미지를 `latest` 단일 태그로만 push하므로 **"이전 이미지로 되돌리기"는 불가능하다. 롤백 = 코드를 되돌려 새 패치 릴리즈를 발행(roll-forward)한다.**
+기본은 **코드를 되돌려 새 패치 릴리즈를 발행(roll-forward)**한다. 급할 때는 이전 버전 이미지(`vX.Y.Z` 태그)로 바로 되돌릴 수 있다 — 아래 3번.
 
 1. 문제 PR을 revert (GitHub PR 화면의 *Revert* 버튼 → revert PR 머지)
 2. 새 패치 버전으로 릴리즈 발행 — 예) `v0.3.1` 문제 시 `v0.3.2`
@@ -92,7 +88,11 @@ aws iam attach-user-policy --user-name <ci-user> \
 gh release create v0.3.2 --generate-notes
 ```
 
-> 버전별 이미지 태그(`vX.Y.Z`)를 함께 push하도록 개선하면 이미지 단위 롤백이 가능해진다 — 필요해지면 릴리즈 워크플로에 태그 추가.
+3. 이미지 단위로 즉시 되돌리기 — WAS에서 이전 태그로 배포 스크립트를 다시 돌린다:
+
+```bash
+ssh ubuntu@<WAS> "sudo bash /opt/tmt/remote-deploy.sh kix.ocir.io/axrpyc6zylkj/tmt:v0.3.1 rollback <app_env_secret_id>"
+```
 
 ## 6. 주의사항
 
